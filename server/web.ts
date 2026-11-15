@@ -153,6 +153,8 @@ export const app = Bun.serve<WsData>({
 
     // Client-side routes — serve the SPA shell.
     '/': shell,
+    // Demo serves home at /demo (see homePath in client/api/app-config.ts).
+    ...(getAppConfig().demo ? { '/demo': shell } : {}),
     '/dev': shell,
     '/dev/*': shell,
     // Isolated sandboxes bypass app startup and share the client/dev entry point.

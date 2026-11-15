@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Redirect } from 'wouter'
+import { homePath } from '@/client/api/app-config'
 import { useSaveAppSettings } from '@/client/features/app-settings/api'
 import type { OnboardingHarness } from '@/lib/onboarding'
 import { useOnboardingSettings } from './api'
@@ -10,14 +11,14 @@ import { WorkspaceSetupStep } from './workspace-setup-step'
 export function OnboardingPage() {
   const onboarding = useOnboardingSettings()
   const save = useSaveAppSettings()
-  const [destination, setDestination] = useState('/')
+  const [destination, setDestination] = useState(homePath)
   const [harness, setHarness] = useState<OnboardingHarness>()
   if (onboarding.loading || onboarding.error)
     return <OnboardingStatus error={onboarding.error || undefined} onRetry={onboarding.retry} />
   if (!onboarding.enabled || !onboarding.data?.showOnboarding) return <Redirect to={destination} />
 
   function finish(workspaceId?: string) {
-    setDestination(workspaceId ? `/workspace/${workspaceId}/overview` : '/')
+    setDestination(workspaceId ? `/workspace/${workspaceId}/overview` : homePath())
     save.mutate({ showOnboarding: false })
   }
   if (!harness) return <AgentSetupStep onComplete={setHarness} />

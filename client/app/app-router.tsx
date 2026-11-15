@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect } from 'react'
 
 import { Redirect, Route, Switch, useLocation } from 'wouter'
 
+import { homePath } from '@/client/api/app-config'
 import { setWorkspaceSwitchHandler } from '@/client/features/chat/connection/chat-connection'
 import { useWorkspaceStateSync } from '@/client/features/workspace/workspace-state'
 
@@ -21,7 +22,7 @@ const DevRoutes =
     : null
 
 function DevLazy() {
-  if (!DevRoutes) return <Redirect to="/" />
+  if (!DevRoutes) return <Redirect to={homePath()} />
   return (
     <Suspense fallback={null}>
       <DevRoutes />
@@ -44,7 +45,7 @@ export function AppRouter() {
   return (
     <Switch>
       <Route path="/dev/*?" component={DevLazy} />
-      <Route path="/" component={HomeRoute} />
+      <Route path={homePath()} component={HomeRoute} />
       <Route path="/onboarding" component={OnboardingRoute} />
       <Route path="/settings" component={SettingsRoute} />
       {/* The wildcard is the destination path (`views/orders`, `overview`, …) —

@@ -37,6 +37,25 @@ describe('Workspace', () => {
     await expect(page.getByRole('button', { name: 'Close panel' })).toBeVisible()
   })
 
+  test(
+    'demo home',
+    async page => {
+      // The demo serves home at /demo; a query string must not break the match.
+      await page.goto('/#/demo?ref=launch')
+      await expect(page.getByText('acme-store').first()).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/demo')
+    },
+    {
+      api: {
+        '/api/config': {
+          environment: 'cloud',
+          demo: true,
+          demoInstallUrl: 'https://moi.computer'
+        } satisfies ClientAppConfig
+      }
+    }
+  )
+
   test('new workspace', async page => {
     await page.goto('/#/')
     await page.getByRole('button', { name: 'New', exact: true }).click()

@@ -4,7 +4,7 @@ import { IconPlus, IconSandbox, IconSmartHome } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
-import { useAppConfig } from '@/client/api/app-config'
+import { homePath, useAppConfig } from '@/client/api/app-config'
 import {
   useReorderWorkspaces,
   useWorkspaceMetadata,
@@ -97,7 +97,7 @@ function Sidebar({ workspaces }: SidebarProps) {
         <Tooltip>
           <TooltipTrigger
             render={
-              <Link href="/" aria-label="Home" className={sidebarNavButtonClass}>
+              <Link href={homePath()} aria-label="Home" className={sidebarNavButtonClass}>
                 <IconSmartHome stroke={1.5} />
               </Link>
             }

@@ -1,7 +1,7 @@
 import { IconChevronDown, IconLoader2 } from '@tabler/icons-react'
 import { useLocation } from 'wouter'
 
-import { useAppConfig } from '@/client/api/app-config'
+import { homePath, useAppConfig } from '@/client/api/app-config'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +39,7 @@ export function GeneralSettings() {
   const label = name ?? cwd ?? 'this space'
 
   const remove = () => {
-    removeWorkspace.mutate(workspaceId, { onSuccess: () => navigate('/') })
+    removeWorkspace.mutate(workspaceId, { onSuccess: () => navigate(homePath()) })
   }
 
   return (

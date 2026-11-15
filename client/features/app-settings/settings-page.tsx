@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Redirect } from 'wouter'
+import { homePath } from '@/client/api/app-config'
 import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { useAccount } from '../account/account-provider'
@@ -13,7 +14,7 @@ export function SettingsPage() {
       window.location.replace('/cloud/login')
     }
   }, [account.cloud, account.demo, account.status, account.registered])
-  if (account.demo) return <Redirect to="/" replace />
+  if (account.demo) return <Redirect to={homePath()} replace />
   if (account.status === 'signed-out') return null
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">

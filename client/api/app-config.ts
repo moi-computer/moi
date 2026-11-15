@@ -42,6 +42,13 @@ export async function loadAppConfig(): Promise<ClientAppConfig | undefined> {
   return fetchAppConfig()
 }
 
+// Demo serves home at /demo: '/' belongs to whatever fronts the demo. A bare
+// pathname, used as a route pattern and a navigation target; the config is
+// frozen before mount, so this is safe in callbacks and render alike.
+export function homePath(): string {
+  return current.demo ? '/demo' : '/'
+}
+
 export function useAppConfig(): ClientAppConfig {
   return useSyncExternalStore(
     subscribe,

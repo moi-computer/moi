@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { homePath } from '@/client/api/app-config'
 import { HttpError } from '@/client/api/http'
 import { useLocation } from 'wouter'
 import { IconFolderOff } from '@tabler/icons-react'
@@ -38,7 +39,7 @@ export function WorkspaceMissingState({ workspaceId }: WorkspaceMissingStateProp
       <Button
         variant="secondary"
         disabled={remove.isPending}
-        onClick={() => remove.mutate(workspaceId, { onSuccess: () => navigate('/') })}
+        onClick={() => remove.mutate(workspaceId, { onSuccess: () => navigate(homePath()) })}
       >
         {remove.isPending ? 'Deleting workspace…' : 'Delete workspace'}
       </Button>
@@ -97,7 +98,7 @@ export function WorkspaceOpenError({ error, retrying, onRetry }: WorkspaceOpenEr
     <RecoveryMessage
       title={missing ? 'Workspace not found or you don’t have access' : 'Couldn’t open workspace'}
       retrying={!missing && retrying}
-      onRetry={missing ? () => navigate('/') : onRetry}
+      onRetry={missing ? () => navigate(homePath()) : onRetry}
       actionLabel={missing ? 'Back to home' : 'Try again'}
     >
       {missing ? undefined : error.message}

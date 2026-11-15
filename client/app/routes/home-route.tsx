@@ -5,7 +5,7 @@ import { OnboardingStatus } from '@/client/features/onboarding/onboarding-status
 import { SidebarLayout } from '@/client/app/shell/sidebar-layout'
 import { HomePage } from '@/client/features/home/home-page'
 
-// The `/` route: the app shell wrapping the workspaces view.
+// The home route (`/`, or `/demo` in demo mode): the app shell wrapping the workspaces view.
 export function HomeRoute() {
   const onboarding = useOnboardingSettings()
   if (onboarding.loading || onboarding.error)

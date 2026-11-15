@@ -1,4 +1,4 @@
-import { useAppConfig } from '@/client/api/app-config'
+import { homePath, useAppConfig } from '@/client/api/app-config'
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useSearch } from 'wouter'
@@ -40,7 +40,7 @@ export function WorkspaceRegistration({ userId, workspaceId }: WorkspaceRegistra
   })
   useEffect(() => {
     if (!cloud) {
-      navigate('/', { replace: true })
+      navigate(homePath(), { replace: true })
       return
     }
     if (!query.data) return
