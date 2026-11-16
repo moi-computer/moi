@@ -25,14 +25,9 @@ import { welcomeNewWorkspace } from './workspace-welcome-state'
 type ScreenFixtureProps = {
   workspaceId?: string
   contentPending?: boolean
-  chatAvailable?: boolean
 }
 
-function ScreenFixture({
-  workspaceId = 'test',
-  contentPending = false,
-  chatAvailable = true
-}: ScreenFixtureProps) {
+function ScreenFixture({ workspaceId = 'test', contentPending = false }: ScreenFixtureProps) {
   return (
     <WorkspaceLayoutContext
       value={{
@@ -41,10 +36,9 @@ function ScreenFixture({
         setLayout: () => {},
         name: 'Test workspace',
         cwd: null,
-        provider: 'codex',
+        harness: 'codex',
         apiBase: '/api/workspaces/test',
-        chatAvailable,
-        isRemote: !chatAvailable,
+        isRemote: false,
         isLoading: false
       }}
     >
@@ -62,8 +56,7 @@ async function mount(
   globalConnected = false,
   contentPending = false,
   check?: Promise<HarnessAvailability>,
-  environment: 'local' | 'cloud' = 'cloud',
-  chatAvailable = true
+  environment: 'local' | 'cloud' = 'cloud'
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = {
@@ -95,7 +88,7 @@ async function mount(
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const key = workspaceKeys.harness('test')
   let data: WorkspaceHarness = {
-    provider: 'codex',
+    harness: 'codex',
     availability: status,
     models: [],
     supportsStreaming: true,
@@ -200,7 +193,7 @@ async function mount(
   const render = () => {
     root.render(
       <QueryClientProvider client={client}>
-        <ScreenFixture contentPending={contentPending} chatAvailable={chatAvailable} />
+        <ScreenFixture contentPending={contentPending} />
       </QueryClientProvider>
     )
   }
@@ -331,7 +324,7 @@ test('the app sidebar renders known workspaces while the workspace area waits fo
       id: 'cold',
       name: 'My workspace',
       path: '/tmp/cold',
-      type: 'codex',
+      harness: 'codex',
       addedAt: '2026-01-01T00:00:00Z'
     }
   ])
@@ -640,21 +633,4 @@ test('missing local agents reuse install while cloud keeps manual recovery', asy
   const cloud = await mount(missing)
   expect(cloud.document.body.textContent).toContain('Install instructions')
   expect(cloud.document.body.textContent).not.toContain('Install ChatGPT')
-})
-
-test('chat availability from context skips agent setup while preserving content loading', async () => {
-  const { document, setContentPending } = await mount(
-    { status: 'login-required', reason: 'Sign in' },
-    false,
-    false,
-    true,
-    undefined,
-    'cloud',
-    false
-  )
-  expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
-  expect(document.body.textContent).not.toContain('Set up ChatGPT')
-  await setContentPending(false)
-  expect(document.querySelector('[data-content]')).not.toBeNull()
-  expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
 })

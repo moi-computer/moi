@@ -3,7 +3,7 @@
 // drives both the CLI status and the frontend's automatic update check.
 import { join } from 'node:path'
 
-import type { WorkspaceSkillStatus, WorkspaceType } from '@/lib/types'
+import type { WorkspaceSkillStatus, HarnessType } from '@/lib/types'
 
 import { findWorkspaceForPath, liftToWorkspaceRoot, listWorkspaces } from '../workspaces/registry'
 import { bundledSkillDirectory } from './template'
@@ -74,9 +74,9 @@ export const isBehind = (installed: string | null, bundled: string | null): bool
 // Report every installed copy, plus the required primary harness destination.
 export async function skillStatuses(
   workspaceRoot: string,
-  type?: WorkspaceType
+  harness?: HarnessType
 ): Promise<WorkspaceSkillStatus[]> {
-  return skillStatusesForLocations(await resolveSkillLocations(workspaceRoot, type))
+  return skillStatusesForLocations(await resolveSkillLocations(workspaceRoot, harness))
 }
 
 export async function skillStatusesForLocations(
@@ -92,7 +92,7 @@ export async function skillStatusesForLocations(
   )
 }
 
-export type ResolvedWorkspace = { root: string; type?: WorkspaceType }
+export type ResolvedWorkspace = { root: string; harness?: HarnessType }
 
 // Resolve a path to its workspace root: the registered workspace that owns it
 // (carrying its backend type), else lifted out of any `.moi/`, else the path
@@ -100,7 +100,7 @@ export type ResolvedWorkspace = { root: string; type?: WorkspaceType }
 // the same places.
 export async function resolveWorkspace(cwd: string): Promise<ResolvedWorkspace> {
   const ws = findWorkspaceForPath(await listWorkspaces(), cwd)
-  if (ws) return { root: ws.path, type: ws.type }
+  if (ws) return { root: ws.path, harness: ws.harness }
   return { root: liftToWorkspaceRoot(cwd) }
 }
 
@@ -114,8 +114,8 @@ export async function resolveWorkspaceRoot(cwd: string): Promise<string> {
 // version checks must not break the command they ride on.
 export async function staleSkillNotice(cwd: string): Promise<string | null> {
   try {
-    const { root, type } = await resolveWorkspace(cwd)
-    const stale = (await skillStatuses(root, type)).filter(s =>
+    const { root, harness } = await resolveWorkspace(cwd)
+    const stale = (await skillStatuses(root, harness)).filter(s =>
       isMinorBehind(s.installed, s.bundled)
     )
     if (stale.length === 0) return null

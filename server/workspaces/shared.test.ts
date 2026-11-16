@@ -54,6 +54,14 @@ test('concurrent opens provision once and later opens leave the reference and sk
   expect(other.path).not.toBe(first.path)
   expect(await listWorkspaces()).toHaveLength(2)
 })
+test('a chosen agent is saved in the registry and never in the shared reference', async () => {
+  const entry = await openSharedWorkspace(target, 'codex')
+  expect((await listWorkspaces())[0]?.harness).toBe('codex')
+  expect(await Bun.file(join(entry.path, '.moi/.workspace.json')).json()).toEqual({
+    version: 2,
+    remote: target
+  })
+})
 test('manual references are reused and malformed addresses create nothing', async () => {
   const path = join(root, 'manual')
   await initializeRemoteWorkspaceConfig(path, target)

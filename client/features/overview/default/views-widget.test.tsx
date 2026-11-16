@@ -25,10 +25,9 @@ function render(views: ViewInfo[], showOnboarding = true, canCreate = true): str
             setLayout: noop,
             name: null,
             cwd: null,
-            provider: 'codex',
+            harness: 'codex',
             workspaceId: 'workspace',
             apiBase: '/api/workspaces/test',
-            chatAvailable: true,
             isRemote: false,
             isLoading: false
           }

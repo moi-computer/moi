@@ -312,7 +312,7 @@ describe('sweepAllWorkspaces', () => {
   test('the periodic pass reclaims expired orphans without any further save', async () => {
     const { setRegistryPath, registerWorkspace } = await import('../workspaces/registry')
     setRegistryPath(join(WS, 'workspaces.json'))
-    await registerWorkspace(WS, { type: 'claude-code' })
+    await registerWorkspace(WS, { harness: 'claude-code' })
 
     const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
     const kept = assetSrcFileName(src)!

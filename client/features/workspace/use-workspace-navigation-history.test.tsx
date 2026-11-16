@@ -186,11 +186,10 @@ function mountNavigation(
           setLayout: patch => setLayout(current => ({ ...current, ...patch })),
           name: null,
           cwd: null,
-          provider: null,
+          harness: null,
           workspaceId: 'abc',
           apiBase: remote ? '/api/workspaces/alice:board' : '/api/workspaces/abc',
           isRemote: remote,
-          chatAvailable: true,
           isLoading: false
         }}
       >

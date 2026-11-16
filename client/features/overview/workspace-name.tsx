@@ -7,7 +7,7 @@ import { WorkspaceIconPicker } from '@/client/features/workspace/settings/worksp
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 
 export function WorkspaceName() {
-  const { layout, name, provider, workspaceId } = useWorkspaceLayoutCtx()
+  const { layout, name, harness, workspaceId } = useWorkspaceLayoutCtx()
   const workspaceName = name ?? 'Workspace'
   const saveName = useSaveWorkspaceName(workspaceId)
   const [nameDraft, setNameDraft] = useState(workspaceName)
@@ -24,7 +24,7 @@ export function WorkspaceName() {
     <WorkspaceIdentity
       name={nameDraft}
       icon={layout.icon}
-      workspaceType={provider}
+      harness={harness}
       workspaceTheme={layout.theme}
       onNameChange={setNameDraft}
       onNameCommit={commitName}

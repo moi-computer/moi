@@ -146,7 +146,7 @@ test('duplicate workspace requests create one workspace and submit one brief', a
       registered++
       expect(path).toBe(join(dir, 'reading-list'))
       expect(input?.id).toBe('reading-list')
-      return { id: input!.id!, addedAt: new Date().toISOString(), path, type: 'claude-code' }
+      return { id: input!.id!, addedAt: new Date().toISOString(), path, harness: 'claude-code' }
     },
     harnessFor: () => ({
       ...harnessFor('claude-code'),
@@ -203,7 +203,7 @@ test('restart reconciles an accepted first message without sending it twice', as
     workspacesRoot: () => root,
     getWorkspace: async (id: string) =>
       id === 'reading-list-2'
-        ? { id, path: join(dir, 'imported'), type: 'claude-code' as const, addedAt: '' }
+        ? { id, path: join(dir, 'imported'), harness: 'claude-code' as const, addedAt: '' }
         : null,
     provisionWorkspace: async (path: string) => {
       await Bun.write(join(path, '.keep'), '')
@@ -212,7 +212,7 @@ test('restart reconciles an accepted first message without sending it twice', as
     registerWorkspace: async (path: string, input?: { id?: string }) => ({
       id: input!.id!,
       path,
-      type: 'claude-code' as const,
+      harness: 'claude-code' as const,
       addedAt: new Date().toISOString()
     }),
     publishEvent: () => {},
@@ -267,17 +267,17 @@ test('restart reconciles an accepted first message without sending it twice', as
   expect(await Bun.file(existingFile).text()).toBe('Existing workspace')
 })
 
-for (const type of ['claude-code', 'codex'] as const) {
-  test(`discovery dispatches prompt and schema to ${type} and forwards cancellation`, async () => {
+for (const harness of ['claude-code', 'codex'] as const) {
+  test(`discovery dispatches prompt and schema to ${harness} and forwards cancellation`, async () => {
     let input: Pick<HarnessActionInput, 'prompt' | 'resultSchema' | 'signal'> | undefined
     let report: ((value: unknown) => Promise<void>) | undefined
     const result = Promise.withResolvers<unknown>()
     const jobs = createOnboardingJobs({
       directory: await directory(),
       harnessFor: selected => {
-        expect(selected).toBe(type)
+        expect(selected).toBe(harness)
         return {
-          ...harnessFor(type),
+          ...harnessFor(harness),
           runAction: async request => {
             expect(request.model).toBe('fast')
             input = request
@@ -290,7 +290,7 @@ for (const type of ['claude-code', 'codex'] as const) {
         }
       }
     })
-    const state = { ...progress(), harness: type }
+    const state = { ...progress(), harness: harness }
     await jobs.discoverIdeas(state)
     await settle(
       () => jobs.discoverIdeas(state),

@@ -7,13 +7,27 @@ import externalizeReact from '@/client/externalize-react'
 test('host bridge boots before React has been preloaded', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'moi-bridge-boot-'))
   try {
+    const reactImports = new Set<string>()
     const build = await Bun.build({
       entrypoints: [join(import.meta.dir, 'host-api.ts')],
       target: 'browser',
       outdir: directory,
-      plugins: [externalizeReact]
+      plugins: [
+        {
+          name: 'track-react-imports',
+          setup(build) {
+            build.onResolve({ filter: /^(react(-dom)?(\/.*)?|@tanstack\/react-query)$/ }, args => {
+              reactImports.add(args.path)
+              return undefined
+            })
+          }
+        },
+        externalizeReact
+      ]
     })
     expect(build.success).toBe(true)
+    // Dev HMR evaluates imports that a production build can tree-shake away.
+    expect([...reactImports]).toEqual([])
     const source = `
       if (globalThis.__esm) throw new Error('Test requires React to be absent');
       globalThis.window = {};

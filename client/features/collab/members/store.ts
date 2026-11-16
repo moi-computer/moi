@@ -1,4 +1,4 @@
-import { replaceEqualDeep } from '@tanstack/react-query'
+import { replaceEqualDeep } from '@tanstack/query-core'
 import { queryClient } from '@/client/api/query-client'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { getWorkspaceAddress } from '@/client/features/workspace/remote'

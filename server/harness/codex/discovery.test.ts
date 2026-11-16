@@ -47,7 +47,7 @@ describe('discoverCodexWorkspaces', () => {
     )
 
     const found = await discoverCodexWorkspaces(new Set(), root)
-    expect(found).toEqual([{ path: projectA, type: 'codex' }])
+    expect(found).toEqual([{ path: projectA, harness: 'codex' }])
   })
 
   test('skips registered paths and cwds that no longer exist', async () => {
@@ -71,7 +71,7 @@ describe('discoverCodexWorkspaces', () => {
     await writeRollout('2026/06/01/rollout-nocwd.jsonl', JSON.stringify({ type: 'session_meta' }))
 
     const found = await discoverCodexWorkspaces(new Set(), root)
-    expect(found).toEqual([{ path: flat, type: 'codex' }])
+    expect(found).toEqual([{ path: flat, harness: 'codex' }])
   })
 
   test('regex fallback recovers an escaped cwd from a truncated meta line', async () => {
@@ -83,7 +83,7 @@ describe('discoverCodexWorkspaces', () => {
     await writeRollout('2026/05/01/rollout-truncated.jsonl', truncated)
 
     const found = await discoverCodexWorkspaces(new Set(), root)
-    expect(found).toEqual([{ path: dir, type: 'codex' }])
+    expect(found).toEqual([{ path: dir, harness: 'codex' }])
   })
 
   test('returns nothing when the sessions dir does not exist', async () => {

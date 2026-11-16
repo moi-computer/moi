@@ -578,10 +578,10 @@ server/harness/hermes/
 ```
 
 Touch points outside the folder are small and already enumerated by the Codex
-precedent: `lib/types.ts` (`WorkspaceType` union), `lib/workspace-types.ts`
+precedent: `lib/types.ts` (`HarnessType` union), `lib/harness-types.ts`
 (ordering), `lib/format.ts` (`provider` union), `server/harness/registry.ts`,
 `server/harness/executable.ts` (PATH lookup), `server/api/index.ts`
-(`CREATABLE_TYPES`), and a handful of client files that branch on provider
+(`CREATABLE_HARNESSES`), and a handful of client files that branch on provider
 (`client/features/chat/messages/tool-group/format/index.ts`,
 `client/features/workspace/setup/workspace-login-state.tsx`,
 `client/features/dev/harness-debug-page.tsx`).

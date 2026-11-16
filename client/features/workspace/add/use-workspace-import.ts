@@ -1,11 +1,11 @@
 import { useState } from 'react'
 
 import { useImportWorkspace } from '@/client/features/workspace/add/api'
-import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
-import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
+import { HARNESS_ORDER } from '@/lib/harness-types'
+import type { DiscoveredWorkspace, WorkspaceEntry, HarnessType } from '@/lib/types'
 
-export function workspaceImportDefaultType(workspace: DiscoveredWorkspace): WorkspaceType {
-  return workspace.types[0] ?? WORKSPACE_TYPE_ORDER[0]
+export function workspaceImportDefaultType(workspace: DiscoveredWorkspace): HarnessType {
+  return workspace.harnesses[0] ?? HARNESS_ORDER[0]
 }
 
 type UseWorkspaceImportProps = {
@@ -14,7 +14,7 @@ type UseWorkspaceImportProps = {
 
 export type WorkspaceImportChoice = {
   workspace: DiscoveredWorkspace
-  selectedType: WorkspaceType
+  selectedHarness: HarnessType
 }
 
 export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
@@ -25,12 +25,12 @@ export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
     mutation.reset()
     setChoice({
       workspace,
-      selectedType: workspaceImportDefaultType(workspace)
+      selectedHarness: workspaceImportDefaultType(workspace)
     })
   }
 
-  function selectType(type: WorkspaceType) {
-    setChoice(current => (current ? { ...current, selectedType: type } : current))
+  function selectHarness(harness: HarnessType) {
+    setChoice(current => (current ? { ...current, selectedHarness: harness } : current))
   }
 
   function submit() {
@@ -38,7 +38,7 @@ export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
     mutation.mutate(
       {
         path: choice.workspace.path,
-        type: choice.selectedType
+        harness: choice.selectedHarness
       },
       { onSuccess }
     )
@@ -54,7 +54,7 @@ export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
     isPending: mutation.isPending,
     error: mutation.error,
     startImport,
-    selectType,
+    selectHarness,
     submit,
     reset
   }

@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 
 import { harnessInstructionMessage } from '@/lib/harness-instructions'
-import type { HarnessAvailability, HarnessInstallations, WorkspaceType } from '@/lib/types'
+import type { HarnessAvailability, HarnessInstallations, HarnessType } from '@/lib/types'
 
 import { cachedLoginShellPath, loginShellPath, mergeSearchPaths } from './shell-path'
 
@@ -17,7 +17,7 @@ type ExecutableConfig = {
   fallbackPaths?: readonly string[]
 }
 
-const executableConfig: Record<WorkspaceType, ExecutableConfig> = {
+const executableConfig: Record<HarnessType, ExecutableConfig> = {
   'claude-code': {
     command: 'claude',
     fallbackPaths: [
@@ -76,8 +76,8 @@ export function firstExecutable(paths: readonly string[]): string | null {
 
 // `path` is a test seam: when given, only that PATH is searched — no
 // login-shell merge, no bundle fallbacks.
-export function findHarnessExecutable(type: WorkspaceType, path?: string): string | null {
-  const config = executableConfig[type]
+export function findHarnessExecutable(harness: HarnessType, path?: string): string | null {
+  const config = executableConfig[harness]
   // bun run adds our dependency commands to PATH; those are not user installs.
   const searchPath = (path ?? mergeSearchPaths(cachedLoginShellPath(), process.env.PATH))
     .split(delimiter)
@@ -89,25 +89,25 @@ export function findHarnessExecutable(type: WorkspaceType, path?: string): strin
     : (executable ?? firstExecutable(config.fallbackPaths ?? []))
 }
 
-export function requireHarnessExecutable(type: WorkspaceType, path?: string): string {
-  const executable = findHarnessExecutable(type, path)
-  if (!executable) throw new Error(executableConfig[type].unavailableReason)
+export function requireHarnessExecutable(harness: HarnessType, path?: string): string {
+  const executable = findHarnessExecutable(harness, path)
+  if (!executable) throw new Error(executableConfig[harness].unavailableReason)
   return executable
 }
 
 export async function pathHarnessAvailability(
-  type: WorkspaceType,
+  harness: HarnessType,
   path?: string
 ): Promise<HarnessAvailability> {
   // Availability is asked per request (and long after startup), but await the
   // probe anyway so the very first request can't report a false negative.
   if (path === undefined) await loginShellPath()
-  return findHarnessExecutable(type, path)
+  return findHarnessExecutable(harness, path)
     ? { status: 'available' }
     : {
         status: 'unavailable',
         code: 'not-installed',
-        reason: executableConfig[type].unavailableReason
+        reason: executableConfig[harness].unavailableReason
       }
 }
 

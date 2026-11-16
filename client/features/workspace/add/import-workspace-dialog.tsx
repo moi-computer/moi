@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/client/components/ui/button'
 import { Dialog, DialogClose } from '@/client/components/ui/dialog'
 import { workspaceDisplayName } from '@/client/features/workspace/workspace-presentation'
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessType } from '@/lib/types'
 
 import { WorkspaceAgentSelector } from './workspace-agent-selector'
 import { useHarnessStatuses } from '@/client/features/harness/api'
@@ -15,7 +15,7 @@ type ImportWorkspaceDialogProps = {
   choice: WorkspaceImportChoice
   isPending: boolean
   errorMessage?: string
-  onTypeChange: (type: WorkspaceType) => void
+  onHarnessChange: (harness: HarnessType) => void
   onSubmit: () => void
   onReset: () => void
 }
@@ -24,7 +24,7 @@ export function ImportWorkspaceDialog({
   choice,
   isPending,
   errorMessage,
-  onTypeChange,
+  onHarnessChange,
   onSubmit,
   onReset
 }: ImportWorkspaceDialogProps) {
@@ -32,13 +32,13 @@ export function ImportWorkspaceDialog({
   const info = useHarnessStatuses()
   const isChecking = info.isPending || info.isFetching
   const installed = info.isError ? undefined : info.data
-  const options = getWorkspaceAgentOptions(installed, choice.workspace.types)
+  const options = getWorkspaceAgentOptions(installed, choice.workspace.harnesses)
   const detectionError = !isChecking && !installed ? 'Could not check installed agents.' : undefined
   const canImport =
     !isPending &&
     !isChecking &&
     !detectionError &&
-    options.some(option => option.type === choice.selectedType && !option.disabled)
+    options.some(option => option.harness === choice.selectedHarness && !option.disabled)
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen && isPending) return
@@ -58,7 +58,7 @@ export function ImportWorkspaceDialog({
       <WorkspaceDialogContent showCloseButton={!isPending}>
         <WorkspaceAgentSelector
           title={`Import ${workspaceDisplayName(choice.workspace)}`}
-          selectedType={choice.selectedType}
+          selectedHarness={choice.selectedHarness}
           options={options}
           isLoading={isChecking && !installed}
           isPending={isPending || isChecking || Boolean(detectionError)}
@@ -70,7 +70,7 @@ export function ImportWorkspaceDialog({
           }
           primaryLabel="Add workspace"
           pendingLabel={isPending ? 'Adding…' : undefined}
-          onTypeChange={onTypeChange}
+          onHarnessChange={onHarnessChange}
           onSubmit={() => {
             if (canImport) onSubmit()
           }}

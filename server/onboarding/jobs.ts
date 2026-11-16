@@ -208,7 +208,7 @@ export function createOnboardingJobs(overrides: Partial<typeof defaults> = {}) {
     }
     const ws = await deps.registerWorkspace(path, {
       id: job.workspaceId ?? basename(path),
-      type: progress.harness,
+      harness: progress.harness,
       name: idea.name
     })
     job.workspaceId = ws.id

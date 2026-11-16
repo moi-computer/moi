@@ -81,7 +81,7 @@ function normalizePreviewMessage(message: string | undefined): string | undefine
 }
 
 export type WorkspacePreviewOptions = {
-  getProviderPreview?: (includeFirstUserMessage: boolean) => Promise<{
+  getHarnessPreview?: (includeFirstUserMessage: boolean) => Promise<{
     firstUserMessage?: string
     updatedAt?: number
   }>
@@ -94,7 +94,7 @@ export type WorkspacePreviewOptions = {
 
 export async function getWorkspacePreview(
   workspacePath: string,
-  { getProviderPreview, viewIds = [], thumbnailUrl }: WorkspacePreviewOptions
+  { getHarnessPreview, viewIds = [], thumbnailUrl }: WorkspacePreviewOptions
 ): Promise<WorkspacePreview> {
   try {
     const layout = await loadLayout(workspacePath)
@@ -121,14 +121,12 @@ export async function getWorkspacePreview(
     // were never captured (never opened in a browser) still renders an empty
     // folder otherwise.
     const includeFirstUserMessage = thumbnails.length === 0
-    const providerPreview = await getProviderPreview?.(includeFirstUserMessage).catch(
-      () => undefined
-    )
-    const updatedAt = providerPreview?.updatedAt
+    const harnessPreview = await getHarnessPreview?.(includeFirstUserMessage).catch(() => undefined)
+    const updatedAt = harnessPreview?.updatedAt
     const theme = layout.theme
 
     if (includeFirstUserMessage) {
-      const firstUserMessage = normalizePreviewMessage(providerPreview?.firstUserMessage)
+      const firstUserMessage = normalizePreviewMessage(harnessPreview?.firstUserMessage)
       return {
         thumbnails,
         ...(firstUserMessage ? { firstUserMessage } : {}),

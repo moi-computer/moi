@@ -40,7 +40,7 @@ describe('detectHarness', () => {
         claudeCodeWorkspaces: async () => [WS]
       })
     )
-    expect(found?.type).toBe('hermes')
+    expect(found?.harness).toBe('hermes')
     expect(found?.agent).toEqual({ agentId: 'default', isDefault: true })
   })
 
@@ -53,7 +53,7 @@ describe('detectHarness', () => {
         claudeCodeWorkspaces: async () => [WS]
       })
     )
-    expect(found?.type).toBe('openclaw')
+    expect(found?.harness).toBe('openclaw')
     expect(found?.agent).toEqual({ agentId: 'ada', name: 'Ada', isDefault: false })
   })
 
@@ -62,16 +62,16 @@ describe('detectHarness', () => {
       WS,
       sources({ codexWorkspaces: async () => [WS], claudeCodeWorkspaces: async () => [WS] })
     )
-    expect(found?.type).toBe('codex')
+    expect(found?.harness).toBe('codex')
     expect(found?.agent).toBeUndefined()
   })
 
   test('falls back to Claude Code history, then a .claude/ directory', async () => {
     const byHistory = await detectHarness(WS, sources({ claudeCodeWorkspaces: async () => [WS] }))
-    expect(byHistory?.type).toBe('claude-code')
+    expect(byHistory?.harness).toBe('claude-code')
 
     const byConfigDir = await detectHarness(WS, sources({ hasClaudeConfigDir: () => true }))
-    expect(byConfigDir?.type).toBe('claude-code')
+    expect(byConfigDir?.harness).toBe('claude-code')
   })
 
   test('a different path is not a match', async () => {
@@ -88,7 +88,7 @@ describe('detectHarness', () => {
 
   test('relative and unnormalized paths resolve before matching', async () => {
     const found = await detectHarness('/tmp/ws/.', sources({ codexWorkspaces: async () => [WS] }))
-    expect(found?.type).toBe('codex')
+    expect(found?.harness).toBe('codex')
   })
 
   // The OpenClaw gateway being down (or the SDK throwing) must not abort
@@ -103,7 +103,7 @@ describe('detectHarness', () => {
         codexWorkspaces: async () => [WS]
       })
     )
-    expect(found?.type).toBe('codex')
+    expect(found?.harness).toBe('codex')
   })
 })
 

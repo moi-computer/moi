@@ -16,7 +16,7 @@ import type {
   WorkspaceLayout,
   WorkspaceSkillsStatus,
   WorkspaceSkillsUpdateFailure,
-  WorkspaceType
+  HarnessType
 } from '@/lib/types'
 
 export type { WorkspaceLayoutResponse } from '@/lib/types'
@@ -45,11 +45,14 @@ export function useWorkspaceLayout(workspaceId: string) {
       const owner = await client.fetchQuery(workspaceInfoOptions(local.apiBase))
       if (context.signal.aborted) throw context.signal.reason
       if (owner.isRemote) throw new Error('The owner address points to another remote reference')
+      // Shared content comes from the owner; the folder and agent are this visitor's.
       return {
         ...owner,
         apiBase: local.apiBase,
         isRemote: local.isRemote,
-        cwd: local.cwd
+        cwd: local.cwd,
+        harness: local.harness,
+        agentId: local.agentId
       }
     },
     ...WORKSPACE_RESOURCE_OPTIONS,
@@ -74,8 +77,6 @@ export function useWorkspaceHarness(workspaceId: string) {
   })
   return useQuery<WorkspaceHarness>({
     queryKey: workspaceKeys.harness(workspaceId),
-    // Remote chat support is deferred, so the visitor's agent is never consulted.
-    enabled: !isRemoteWorkspace(workspaceId, queryClient),
     queryFn: async ({ signal }) => {
       const previous = queryClient.getQueryData<WorkspaceHarness>(
         workspaceKeys.harness(workspaceId)
@@ -172,13 +173,13 @@ export function useSaveLayout(workspaceId: string) {
 export function useChangeWorkspaceHarness(workspaceId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (type: WorkspaceType) =>
+    mutationFn: (harness: HarnessType) =>
       requestJson<WorkspaceEntry>(
         `/api/workspaces/${workspaceId}/harness`,
-        jsonRequest('PATCH', { type })
+        jsonRequest('PATCH', { harness })
       ),
     onSuccess: entry => {
-      void receiveWorkspaceHarness(queryClient, workspaceId, entry.type ?? 'claude-code')
+      void receiveWorkspaceHarness(queryClient, workspaceId, entry.harness ?? 'claude-code')
     }
   })
 }

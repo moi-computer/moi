@@ -9,9 +9,9 @@ import {
   type LoginHarness
 } from './api'
 
-export function useHarnessLogin(type: LoginHarness) {
+export function useHarnessLogin(harness: LoginHarness) {
   const { environment, demo } = useAppConfig()
-  const auth = useHarnessStatus(type)
+  const auth = useHarnessStatus(harness)
   const queryClient = useQueryClient()
   const [code, setCode] = useState('')
   const [manualLogin, setManualLogin] = useState(false)
@@ -23,17 +23,17 @@ export function useHarnessLogin(type: LoginHarness) {
   const action = useMutation({
     mutationFn: async (kind: 'install' | 'start' | 'submit') => {
       if (kind === 'install') {
-        await installHarness(type)
+        await installHarness(harness)
         const refreshed = await auth.refetch({ throwOnError: true })
         if (refreshed.data?.availability.status === 'available') return
       }
       if (kind === 'start' || kind === 'install') {
         setManualLogin(false)
         setCode('')
-        await startHarnessLogin(type)
+        await startHarnessLogin(harness)
       }
       if (kind === 'submit' && pending) {
-        await submitHarnessLoginCode(type, pending.id, code)
+        await submitHarnessLoginCode(harness, pending.id, code)
         setCode('')
       }
     },

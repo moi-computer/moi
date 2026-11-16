@@ -33,14 +33,16 @@ test.each([false, true])(
       ...createDefaultWorkspaceLayout(),
       name: 'Owner board',
       apiBase: '/api/workspaces/board',
-      isRemote: false
+      isRemote: false,
+      harness: 'claude-code'
     }
     const visitor = {
       version: 2,
       remote,
       apiBase: '/api/workspaces/alice:board',
       isRemote: true,
-      cwd: '/visitor'
+      cwd: '/visitor',
+      harness: 'codex'
     }
     const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
       Object.assign(
@@ -88,7 +90,9 @@ test.each([false, true])(
         name: 'Owner board',
         apiBase: '/api/workspaces/alice:board',
         isRemote: true,
-        cwd: '/visitor'
+        cwd: '/visitor',
+        // The agent is the visitor's own, never the owner's.
+        harness: 'codex'
       })
       expect(reads.filter(url => url === visitor.apiBase)).toHaveLength(1)
       expect(document.body.textContent).toContain('Owner board')

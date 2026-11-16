@@ -16,8 +16,22 @@ New local and remote configs use version 2. Remote configs contain only `version
 The owner stores shared content, widgets, theme, name, and icon. Your Moi stores model defaults
 and per-chat settings in `DATA_DIR/workspaces/{localId}/state.json`, shared by every browser
 connected to it. Open tabs, the active tab, split/fullscreen mode, and panel widths are saved per
-workspace in browser localStorage; a newly opened workspace starts on Overview. Remote chat and
-settings UI remain unavailable.
+workspace in browser localStorage; a newly opened workspace starts on Overview.
+
+## Chat and agent
+
+Each member chats with their own agent on their own machine. The reference's entry in
+`DATA_DIR/workspaces.json` stores it as `harness`, as for a local workspace, and workspace settings
+change it. Registration accepts an optional `harness` (`claude-code` or `codex`).
+
+The agent runs in the reference folder, which holds no workspace files, and reaches the owner's
+files through the CLI ([Remote operations](remote-cli.md#remote-operations)).
+
+A view under construction is kept in the visitor's state; its source and build live on the owner.
+When the owner lists a view that is still pending locally, the visitor's browser clears it with
+`POST /api/workspaces/{localId}/views/{viewId}/complete`.
+
+Owner build events do not reach visitors; `moi refresh` re-reads the owner's widget and view lists.
 
 ## Routing
 
@@ -25,12 +39,12 @@ An unopened share uses `/workspace/{userId}:{workspaceId}`. It checks access thr
 
 Denied access creates no reference. A 404 shows “Workspace not found or you don’t have access” with **Back to home**. Temporary failures offer **Try again**, without repeating acceptance. Workspace info requests do not retry automatically.
 
-Registered workspaces use their local ID. Their info response provides `apiBase` and `isRemote`; the loader fetches owner content when needed and exposes the prefix through context:
+Registered workspaces use their local ID. Their info response provides `apiBase`, `isRemote`, and the visitor's `harness`; the loader fetches owner content when needed and exposes the prefix through context:
 
 - local: `/api/workspaces/{localId}`
 - remote: `/api/workspaces/{user_id}:{workspace_id}`
 
-The browser calls the remote prefix directly with its Batiok session. Batiok checks access and forwards to the owner's ordinary API; the visitor's Moi is not in the path. Applet RPC and file URLs follow the address the module was loaded from. For a remote reference, the visitor's own API serves only the reference and personal state. It answers 404 for shared content and rejects shared layout writes.
+The browser calls the remote prefix directly with its Batiok session. Batiok checks access and forwards to the owner's ordinary API; the visitor's Moi is not in the path. Applet RPC and file URLs follow the address the module was loaded from. For a remote reference, the visitor's own API serves only the reference and the visitor's own routes: `sessions`, `state`, `harness`, `skills`, `env`, `mcp`, `uploads`, `preview`, and pending-view writes. It answers 404 for shared content and rejects shared layout writes.
 
 The standalone Moi UI supports local workspaces only: it hides remote registrations and makes no Cloud discovery, sharing, or collaboration calls.
 

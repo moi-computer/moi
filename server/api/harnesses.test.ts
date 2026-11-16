@@ -84,7 +84,7 @@ test('checks and starts default authentication without creating a workspace', as
 })
 
 test('global authentication leaves workspace readiness independent', async () => {
-  const workspace = await registerWorkspace(dir, { type: 'codex' })
+  const workspace = await registerWorkspace(dir, { harness: 'codex' })
   workspaceId = workspace.id
   codexHarness.authStatus = async () => ({ status: 'available' })
   const status = await api.request('/api/harnesses/status?refresh=true')
@@ -124,7 +124,7 @@ test('code endpoint validates input and attempt identity', async () => {
 })
 
 test('workspace navigation does not probe shared authentication', async () => {
-  const workspace = await registerWorkspace(dir, { type: 'codex' })
+  const workspace = await registerWorkspace(dir, { harness: 'codex' })
   await Bun.write(join(dir, '.env'), 'DATABASE_URL=postgres://localhost/test\n')
   const auth = spyOn(codexHarness, 'authStatus')
   const availability = spyOn(codexHarness, 'availability')
@@ -157,7 +157,7 @@ test('shared recovery refreshes PATH and bypasses cached status', async () => {
 
 test('missing workspace folder is reported before starting the harness', async () => {
   const path = join(dir, 'missing-workspace')
-  const workspace = await registerWorkspace(path, { type: 'codex' })
+  const workspace = await registerWorkspace(path, { harness: 'codex' })
   workspaceId = workspace.id
   const availabilitySpy = spyOn(codexHarness, 'availability')
   const modelsSpy = spyOn(codexHarness, 'listModels')
@@ -198,7 +198,7 @@ test('installation refreshes cached auth and rejects cross-origin requests', asy
 })
 
 test('workspace environment readiness stays separate from the shared account', async () => {
-  const workspace = await registerWorkspace(dir, { type: 'codex' })
+  const workspace = await registerWorkspace(dir, { harness: 'codex' })
   workspaceId = workspace.id
   await Bun.write(join(dir, '.env'), 'OPENAI_API_KEY=test-workspace-key\n')
   codexHarness.authStatus = async () => ({ status: 'available' })
@@ -217,8 +217,8 @@ test('workspace environment readiness stays separate from the shared account', a
 })
 
 test('starting login does not fan out checks to registered workspaces', async () => {
-  await registerWorkspace(dir, { type: 'codex' })
-  await registerWorkspace(join(dir, 'second'), { type: 'codex' })
+  await registerWorkspace(dir, { harness: 'codex' })
+  await registerWorkspace(join(dir, 'second'), { harness: 'codex' })
   codexHarness.startLogin = async () => ({ id: 'shared', url: 'https://example.com/login' })
   const availability = spyOn(codexHarness, 'availability')
   try {

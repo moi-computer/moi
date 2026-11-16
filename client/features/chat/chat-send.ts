@@ -206,14 +206,14 @@ export function resolveChatRunOptions(
       ? pickedModel
       : undefined
   const modelInfo =
-    modelsData?.provider === 'codex'
+    modelsData?.harness === 'codex'
       ? resolveSelectedModel(modelsData.models, pickedModel)
       : models?.find(candidate => candidate.value === (savedModel ?? 'default'))
   // Omitting Codex's model inherits config.toml (or the resumed thread's
   // model), which can be unavailable even though the picker shows a supported
   // fallback. Always send the concrete model the Codex picker displays.
   const model =
-    modelsData?.provider === 'codex' && modelInfo
+    modelsData?.harness === 'codex' && modelInfo
       ? (modelInfo.resolvedModel ?? modelInfo.value)
       : savedModel
   const effort =

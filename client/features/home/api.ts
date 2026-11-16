@@ -47,9 +47,7 @@ export function useWorkspaceMetadata<T extends { remote?: RemoteWorkspaceTarget 
       ...entry,
       ...(info.name && { name: info.name }),
       icon: info.icon,
-      theme: info.theme,
-      type: info.provider,
-      agentId: info.agentId
+      theme: info.theme
     }
   })
 }

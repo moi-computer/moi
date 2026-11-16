@@ -1,4 +1,4 @@
-import type { HarnessStatuses, WorkspaceType } from '@/lib/types'
+import type { HarnessStatuses, HarnessType } from '@/lib/types'
 import { describe, expect, test } from 'bun:test'
 
 import {
@@ -17,21 +17,21 @@ describe('create workspace agent options', () => {
     }
     test(`handles installation combination ${mask}`, () => {
       const options = getWorkspaceAgentOptions(installed)
-      expect(options.map(option => option.type)).toEqual([
+      expect(options.map(option => option.harness)).toEqual([
         'claude-code',
         'codex',
         ...(installed.openclaw ? ['openclaw' as const] : []),
         ...(installed.hermes ? ['hermes' as const] : [])
       ])
-      expect(options.find(option => option.type === 'claude-code')?.disabled).toBe(
+      expect(options.find(option => option.harness === 'claude-code')?.disabled).toBe(
         !installed['claude-code']
       )
-      expect(options.find(option => option.type === 'codex')?.disabled).toBe(!installed.codex)
-      for (const type of ['openclaw', 'hermes'] as const) {
-        if (installed[type])
-          expect(options.find(option => option.type === type)).toMatchObject({
+      expect(options.find(option => option.harness === 'codex')?.disabled).toBe(!installed.codex)
+      for (const harness of ['openclaw', 'hermes'] as const) {
+        if (installed[harness])
+          expect(options.find(option => option.harness === harness)).toMatchObject({
             disabled: true,
-            disabledCommand: `moi ${type} init`
+            disabledCommand: `moi ${harness} init`
           })
       }
       expect(resolveWorkspaceAgentSelection(options, 'claude-code')).toBe(
@@ -89,38 +89,44 @@ describe('import workspace agent options', () => {
         'openclaw',
         'hermes'
       ])
-      expect(importOptions.map(option => option.type)).toEqual(
-        createOptions.map(option => option.type)
+      expect(importOptions.map(option => option.harness)).toEqual(
+        createOptions.map(option => option.harness)
       )
       expect(
-        importOptions.filter(option => option.type === 'claude-code' || option.type === 'codex')
+        importOptions.filter(
+          option => option.harness === 'claude-code' || option.harness === 'codex'
+        )
       ).toEqual(
-        createOptions.filter(option => option.type === 'claude-code' || option.type === 'codex')
+        createOptions.filter(
+          option => option.harness === 'claude-code' || option.harness === 'codex'
+        )
       )
       for (const option of importOptions) {
-        expect(option.disabled).toBe(!installed[option.type])
+        expect(option.disabled).toBe(!installed[option.harness])
       }
     })
   }
 
-  test.each(['openclaw', 'hermes'] as const)('only enables %s for folders it owns', type => {
+  test.each(['openclaw', 'hermes'] as const)('only enables %s for folders it owns', harness => {
     const installed: HarnessInstallations = {
       'claude-code': true,
       codex: true,
       openclaw: true,
       hermes: true
     }
-    expect(getWorkspaceAgentOptions(installed).find(option => option.type === type)).toMatchObject({
+    expect(
+      getWorkspaceAgentOptions(installed).find(option => option.harness === harness)
+    ).toMatchObject({
       disabled: true,
-      disabledCommand: `moi ${type} init`
+      disabledCommand: `moi ${harness} init`
     })
-    const options = getWorkspaceAgentOptions(installed, [type])
-    expect(options.find(option => option.type === type)).toMatchObject({
+    const options = getWorkspaceAgentOptions(installed, [harness])
+    expect(options.find(option => option.harness === harness)).toMatchObject({
       disabled: false,
       disabledReason: undefined,
       disabledCommand: undefined
     })
-    expect(resolveWorkspaceAgentSelection(options, type)).toBe(type)
+    expect(resolveWorkspaceAgentSelection(options, harness)).toBe(harness)
   })
 
   test('waits for installation data even when a folder has a detected agent', () => {
@@ -148,7 +154,7 @@ describe('import workspace agent options', () => {
 
 function getWorkspaceAgentOptions(
   installed?: HarnessInstallations,
-  detectedTypes: WorkspaceType[] = []
+  detectedHarnesses: HarnessType[] = []
 ) {
   const statuses =
     installed &&
@@ -162,5 +168,5 @@ function getWorkspaceAgentOptions(
         }
       ])
     ) as HarnessStatuses | undefined)
-  return optionsFromStatuses(statuses, detectedTypes)
+  return optionsFromStatuses(statuses, detectedHarnesses)
 }

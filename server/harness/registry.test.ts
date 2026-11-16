@@ -11,10 +11,10 @@ test('only Claude and Codex expose ephemeral actions through the registry', () =
   expect(harnessFor('hermes').runAction).toBeUndefined()
 })
 
-for (const type of ['claude-code', 'codex'] as const) {
-  test(`${type} rejects an already cancelled action before launching`, async () => {
+for (const harness of ['claude-code', 'codex'] as const) {
+  test(`${harness} rejects an already cancelled action before launching`, async () => {
     await expect(
-      harnessFor(type).runAction!({
+      harnessFor(harness).runAction!({
         prompt: 'unused',
         resultSchema: z.object({}),
         signal: AbortSignal.abort()

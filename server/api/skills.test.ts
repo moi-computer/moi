@@ -26,14 +26,14 @@ afterEach(async () => {
 })
 
 async function createOutdatedWorkspace(
-  type: 'claude-code' | 'codex',
-  registeredType: 'claude-code' | 'codex' = type
+  harness: 'claude-code' | 'codex',
+  registeredType: 'claude-code' | 'codex' = harness
 ) {
-  const workspaceRoot = join(tempRoot, type)
-  const skillDir = join(skillsDirFor(workspaceRoot, type), 'moi-workspace')
+  const workspaceRoot = join(tempRoot, harness)
+  const skillDir = join(skillsDirFor(workspaceRoot, harness), 'moi-workspace')
   await mkdir(skillDir, { recursive: true })
   await Bun.write(join(skillDir, 'SKILL.md'), '<moi-skill version="0.7.1" />\n')
-  return registerWorkspace(workspaceRoot, { type: registeredType })
+  return registerWorkspace(workspaceRoot, { harness: registeredType })
 }
 
 describe('workspace skills API', () => {
@@ -114,7 +114,7 @@ test('remote references update only the visitor skill copy', async () => {
       remote: { user_id: 'alice', workspace_id: owner.id }
     })
     await Bun.write(join(visitorRoot, '.moi', '.workspace.json'), config)
-    const visitor = await registerWorkspace(visitorRoot, { type: 'codex' })
+    const visitor = await registerWorkspace(visitorRoot, { harness: 'codex' })
     const base = `/api/workspaces/${visitor.id}`
     const before = await api.request(`${base}/skills`)
     expect(before.status).toBe(200)

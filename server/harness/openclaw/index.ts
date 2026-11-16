@@ -94,7 +94,7 @@ export const openclawHarness: Harness = {
       .map(
         (a): DiscoveredWorkspaceCandidate => ({
           path: a.path,
-          type: 'openclaw'
+          harness: 'openclaw'
         })
       )
   },

@@ -6,7 +6,7 @@ import {
   resolveDisplayedEffort,
   resolveEffortIndex,
   resolveSpeedMode,
-  sortModelsByProviderOrder
+  sortModelsByHarnessOrder
 } from '@/client/features/chat/composer/model-order'
 import type { Model } from '@/lib/types'
 
@@ -23,7 +23,7 @@ test('Ultrafast selection and defaults follow the selected model capabilities', 
   expect(resolveSpeedMode(model('no-speed-modes'), 'ultrafast')).toBe('normal')
 })
 
-describe('sortModelsByProviderOrder', () => {
+describe('sortModelsByHarnessOrder', () => {
   test('orders Anthropic model families while preserving SDK order within each family', () => {
     const models = [
       model('haiku', 'claude-haiku-4-5-20251001'),
@@ -34,7 +34,7 @@ describe('sortModelsByProviderOrder', () => {
       model('opus', 'claude-opus-4-8')
     ]
 
-    expect(sortModelsByProviderOrder(models, 'claude-code').map(item => item.value)).toEqual([
+    expect(sortModelsByHarnessOrder(models, 'claude-code').map(item => item.value)).toEqual([
       'fable',
       'opus-5',
       'opus[1m]',
@@ -47,7 +47,7 @@ describe('sortModelsByProviderOrder', () => {
   test('recognizes Anthropic aliases without a resolved model', () => {
     const models = [model('haiku'), model('opus[1m]'), model('fable'), model('sonnet')]
 
-    expect(sortModelsByProviderOrder(models, 'claude-code').map(item => item.value)).toEqual([
+    expect(sortModelsByHarnessOrder(models, 'claude-code').map(item => item.value)).toEqual([
       'fable',
       'opus[1m]',
       'sonnet',
@@ -63,7 +63,7 @@ describe('sortModelsByProviderOrder', () => {
       model('fable', 'claude-fable-5')
     ]
 
-    expect(sortModelsByProviderOrder(models, 'claude-code').map(item => item.value)).toEqual([
+    expect(sortModelsByHarnessOrder(models, 'claude-code').map(item => item.value)).toEqual([
       'new-model-b',
       'new-model-a',
       'fable',
@@ -74,7 +74,7 @@ describe('sortModelsByProviderOrder', () => {
   test('handles missing Anthropic model families', () => {
     const models = [model('sonnet', 'claude-sonnet-5'), model('fable', 'claude-fable-5')]
 
-    expect(sortModelsByProviderOrder(models, 'claude-code').map(item => item.value)).toEqual([
+    expect(sortModelsByHarnessOrder(models, 'claude-code').map(item => item.value)).toEqual([
       'fable',
       'sonnet'
     ])
@@ -87,13 +87,13 @@ describe('sortModelsByProviderOrder', () => {
       { ...model('gpt-5.6-terra'), displayName: '5.6 Terra' }
     ]
 
-    expect(sortModelsByProviderOrder(models, 'codex')).toEqual(models)
+    expect(sortModelsByHarnessOrder(models, 'codex')).toEqual(models)
   })
 
   test('preserves OpenClaw backend order while its configuration is empty', () => {
     const models = [model('provider/model-b'), model('provider/model-a')]
 
-    expect(sortModelsByProviderOrder(models, 'openclaw')).toEqual(models)
+    expect(sortModelsByHarnessOrder(models, 'openclaw')).toEqual(models)
   })
 })
 

@@ -3,13 +3,13 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { COLOR_THEMES, DEFAULT_PRIMARY_COLOR, deriveThemeColors } from '@/lib/themes'
 
-import { WorkspaceIcon, workspaceProviderIcon } from './workspace-icon'
+import { WorkspaceIcon, harnessIcon } from './workspace-icon'
 
 test('workspace icon paints themed glyphs with primary foreground', () => {
   const html = renderToStaticMarkup(
     <WorkspaceIcon
       icon={{ type: 'glyph', value: 'rocket', background: 'theme' }}
-      workspaceType="codex"
+      harness="codex"
       workspaceTheme={{ font: 'sans', color: 'rose', radius: 'soft', agent: 'boxy' }}
     />
   )
@@ -25,21 +25,21 @@ test('workspace icon renders uploads and provider fallbacks as images', () => {
   const upload = renderToStaticMarkup(
     <WorkspaceIcon
       icon={{ type: 'upload', value: 'data:image/webp;base64,upload' }}
-      workspaceType="codex"
+      harness="codex"
     />
   )
-  const provider = renderToStaticMarkup(<WorkspaceIcon workspaceType="codex" />)
+  const provider = renderToStaticMarkup(<WorkspaceIcon harness="codex" />)
 
   expect(upload).toContain('src="data:image/webp;base64,upload"')
-  expect(provider).toContain(`src="${workspaceProviderIcon.codex}"`)
+  expect(provider).toContain(`src="${harnessIcon.codex}"`)
 })
 
 test('renders a chosen glyph or emoji without falling back to the provider image', () => {
   const glyph = renderToStaticMarkup(
-    <WorkspaceIcon workspaceType="codex" icon={{ type: 'glyph', value: 'leaf' }} />
+    <WorkspaceIcon harness="codex" icon={{ type: 'glyph', value: 'leaf' }} />
   )
   const emoji = renderToStaticMarkup(
-    <WorkspaceIcon workspaceType="codex" icon={{ type: 'emoji', value: '💡' }} />
+    <WorkspaceIcon harness="codex" icon={{ type: 'emoji', value: '💡' }} />
   )
 
   expect(glyph).toContain('<svg')

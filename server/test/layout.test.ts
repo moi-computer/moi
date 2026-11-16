@@ -199,7 +199,7 @@ describe('getWorkspacePreview', () => {
     await withWorkspaceFile(base, async dir => {
       const message = `  ${'A'.repeat(260)}\nsecond line  `
       const preview = await getWorkspacePreview(dir, {
-        getProviderPreview: async includeFirstUserMessage => ({
+        getHarnessPreview: async includeFirstUserMessage => ({
           firstUserMessage: includeFirstUserMessage ? message : undefined,
           updatedAt: 900
         }),
@@ -222,7 +222,7 @@ describe('getWorkspacePreview', () => {
       },
       async dir => {
         const preview = await getWorkspacePreview(dir, {
-          getProviderPreview: async includeFirstUserMessage => {
+          getHarnessPreview: async includeFirstUserMessage => {
             expect(includeFirstUserMessage).toBe(true)
             return {
               firstUserMessage: 'Shown until a capture lands',
@@ -250,7 +250,7 @@ describe('getWorkspacePreview', () => {
       async dir => {
         await seedThumbnails(dir, [{ kind: 'widget', id: 'captured' }])
         const preview = await getWorkspacePreview(dir, {
-          getProviderPreview: async includeFirstUserMessage => {
+          getHarnessPreview: async includeFirstUserMessage => {
             expect(includeFirstUserMessage).toBe(false)
             return {
               firstUserMessage: 'Should stay hidden',
@@ -269,7 +269,7 @@ describe('getWorkspacePreview', () => {
     await withWorkspaceFile(base, async dir => {
       expect(
         await getWorkspacePreview(dir, {
-          getProviderPreview: async () => ({ firstUserMessage: ' \n ' }),
+          getHarnessPreview: async () => ({ firstUserMessage: ' \n ' }),
           thumbnailUrl
         })
       ).toEqual({
@@ -277,7 +277,7 @@ describe('getWorkspacePreview', () => {
       })
       expect(
         await getWorkspacePreview(dir, {
-          getProviderPreview: async () => {
+          getHarnessPreview: async () => {
             throw new Error('unreadable session')
           },
           thumbnailUrl

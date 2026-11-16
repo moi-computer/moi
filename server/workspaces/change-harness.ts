@@ -1,4 +1,4 @@
-import type { WorkspaceEntry, WorkspaceType } from '@/lib/types'
+import type { WorkspaceEntry, HarnessType } from '@/lib/types'
 import { harnessFor } from '../harness/registry'
 import { harnessStore } from '../harness/auth'
 import { getWorkspaceSkillsStatus } from '../skills/update'
@@ -11,13 +11,13 @@ import { installWorkspaceSkills } from '../skills/workspace'
 // Keep successful preparation for this server lifetime; failed attempts can retry.
 const preparation = new Map<string, Promise<void>>()
 export function prepareWorkspaceHarness(ws: WorkspaceEntry): Promise<void> {
-  const key = `${ws.path}:${ws.type ?? 'claude-code'}`
+  const key = `${ws.path}:${ws.harness ?? 'claude-code'}`
   let pending = preparation.get(key)
   if (!pending) {
-    pending = getWorkspaceSkillsStatus(ws.path, ws.type)
+    pending = getWorkspaceSkillsStatus(ws.path, ws.harness)
       .then(async status => {
         if (status.skills.some(skill => !skill.installed))
-          await installWorkspaceSkills(ws.path, ws.type)
+          await installWorkspaceSkills(ws.path, ws.harness)
       })
       .catch(error => {
         preparation.delete(key)
@@ -28,18 +28,18 @@ export function prepareWorkspaceHarness(ws: WorkspaceEntry): Promise<void> {
   return pending
 }
 
-export async function changeWorkspaceHarness(ws: WorkspaceEntry, type: WorkspaceType) {
+export async function changeWorkspaceHarness(ws: WorkspaceEntry, next: HarnessType) {
   return withHarnessTransition(ws, async () => {
     const current = await getWorkspace(ws.id)
     if (!current) throw new HarnessTransitionError('Workspace not found')
-    const previousType = current.type ?? 'claude-code'
+    const previousHarness = current.harness ?? 'claude-code'
     const harness = harnessFor(current)
     if (
-      !['claude-code', 'codex'].includes(previousType) ||
-      !['claude-code', 'codex'].includes(type)
+      !['claude-code', 'codex'].includes(previousHarness) ||
+      !['claude-code', 'codex'].includes(next)
     )
       throw new HarnessTransitionError('This workspace’s agent cannot be changed')
-    if (type === previousType) return current
+    if (next === previousHarness) return current
     if (harness.activeSessions().some(session => session.workspaceId === ws.id))
       throw new HarnessTransitionError('Wait for the agent to finish before changing it')
     const before = await updateWorkspaceState(current, state => {
@@ -56,7 +56,7 @@ export async function changeWorkspaceHarness(ws: WorkspaceEntry, type: Workspace
     })
     let updated: WorkspaceEntry
     try {
-      updated = await updateWorkspaceHarness(ws.id, type)
+      updated = await updateWorkspaceHarness(ws.id, next)
     } catch (error) {
       await updateWorkspaceState(current, state => Object.assign(state, before)).catch(error => {
         console.error('Could not restore workspace state', error)
@@ -71,7 +71,7 @@ export async function changeWorkspaceHarness(ws: WorkspaceEntry, type: Workspace
       console.error('Could not stop previous workspace runtime', error)
     }
     harnessStore.invalidate(current)
-    publishEvent({ type: 'workspace-harness:switched', workspaceId: ws.id, harness: type })
+    publishEvent({ type: 'workspace-harness:switched', workspaceId: ws.id, harness: next })
     return updated
   })
 }

@@ -85,10 +85,9 @@ function readNavigation(
                 setLayout: () => {},
                 name: null,
                 cwd: null,
-                provider: null,
+                harness: null,
                 workspaceId: 'abc',
                 apiBase: '/api/workspaces/abc',
-                chatAvailable: true,
                 isRemote: false,
                 isLoading: false
               }}

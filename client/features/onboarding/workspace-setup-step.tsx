@@ -57,7 +57,7 @@ export function WorkspaceSetupStep({
       }
       const workspaces = await requestJson<WorkspaceEntry[]>('/api/workspaces')
       if (workspaces.length > 0) return
-      const entry = await createWorkspace.mutateAsync({ type: harness })
+      const entry = await createWorkspace.mutateAsync({ harness: harness })
       return entry.id
     },
     onSuccess: id => onFinish(id)

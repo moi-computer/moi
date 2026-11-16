@@ -120,7 +120,7 @@ export const hermesHarness: Harness = {
     const profiles = await discoverHermesProfiles()
     return profiles
       .filter(p => !registeredPaths.has(p.path))
-      .map((p): DiscoveredWorkspaceCandidate => ({ path: p.path, type: 'hermes' }))
+      .map((p): DiscoveredWorkspaceCandidate => ({ path: p.path, harness: 'hermes' }))
   },
 
   availability: async (ws): Promise<HarnessAvailability> => {

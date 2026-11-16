@@ -71,14 +71,14 @@ moi remote exec 'pwd; ls -la'
 
 Ordinary workspace commands keep their usual arguments and output:
 
-| Commands                                                                             | Runs on                           | Through                                                |
-| ------------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------ |
-| `remote read`, `write`, `patch`, `file-upload`, `file-download`, `exec`              | owner                             | operations API                                         |
-| `bundle`, `check`, `views`, `theme`, `call-server-fn`, `debug logs`, `ui-components` | owner                             | operations API, returns `{ exitCode, stdout, stderr }` |
-| `config`, `tabs`, `scratch` reads and edits                                          | owner                             | ordinary workspace API                                 |
-| `refresh`, `navigate`, `scratch view`                                                | visitor's running Moi and browser | local control server                                   |
+| Commands                                                                    | Runs on                           | Through                                                |
+| --------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------ |
+| `remote read`, `write`, `patch`, `file-upload`, `file-download`, `exec`     | owner                             | operations API                                         |
+| `bundle`, `check`, `theme`, `call-server-fn`, `debug logs`, `ui-components` | owner                             | operations API, returns `{ exitCode, stdout, stderr }` |
+| `config`, `tabs`, `scratch` reads and edits                                 | owner                             | ordinary workspace API                                 |
+| `refresh`, `navigate`, `scratch view`, `views create`, `views set`          | visitor's running Moi and browser | local control server                                   |
 
-Only the last row needs a local Moi server. Skills, environment, start, stop, and install commands stay local.
+Only the last row needs a local Moi server. `views` commands edit a view under construction, which is the visitor's: see [Chat and agent](remote-workspaces.md#chat-and-agent). Skills, environment, start, stop, and install commands stay local.
 
 File paths are relative to the remote workspace root. Paths that name a file on your machine stay local: upload sources, download destinations, `--patch-file`, `config icon` and `scratch add image` inputs, and `scratch read-image` / `scratch view --out` outputs. `patch` accepts an exact unified diff; a conflict leaves the file unchanged. File access rejects traversal and symlinks.
 

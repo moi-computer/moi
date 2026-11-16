@@ -120,7 +120,7 @@ function tabItemFor(
 
 export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentProps) {
   const { environment } = useAppConfig()
-  const { layout, workspaceId, chatAvailable } = useWorkspaceLayoutCtx()
+  const { layout, workspaceId } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
   const viewActions = useViewActions()
   const frame = useWorkspaceFrame()
@@ -220,7 +220,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   const startupPending = !pinnedSessionId && activePendingView?.status === 'starting'
   const visibleChatLoaded = chatLoaded && !startupPending
   const canAnnotate =
-    chatAvailable &&
     widgetMode === 'idle' &&
     ((activeTab === 'overview' && hasAppletWidgets) || activeView !== undefined)
   const {
@@ -340,7 +339,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   }
 
   const openChat = (intent?: string) => {
-    if (!chatAvailable) return
     if (intent !== undefined) {
       useUiStore
         .getState()
@@ -362,13 +360,11 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   useAppletChatMessage({ sessionId, send, revealChat: openChat, agentAvailability })
   useAppletChatAttachment(composerSessionId, openChat)
 
-  const onCreateView = chatAvailable ? createView : undefined
-  const onCreateWidget = chatAvailable
-    ? () => {
-        selectSession(null)
-        openChat('Create widget')
-      }
-    : undefined
+  const onCreateView = createView
+  const onCreateWidget = () => {
+    selectSession(null)
+    openChat('Create widget')
+  }
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!openSet.has('scratchpad')
@@ -584,10 +580,10 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     <WorkspaceFrame
       frame={frame}
       workspace={workspacePanel}
-      chat={chatAvailable ? dockedChat : undefined}
+      chat={dockedChat}
       onClick={onNavigationClick}
     >
-      {chatAvailable && mode === 'fullscreen' && (
+      {mode === 'fullscreen' && (
         <ChatPopup
           agent={theme.agent}
           loading={hasRunningSession}

@@ -12,7 +12,6 @@ import {
   useMoiUserMessageContext
 } from '@/client/features/workspace/moi-context'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
-import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import { sendMessage } from '@/client/features/chat/connection/chat-connection'
 import {
   type ChatSendOptions,
@@ -51,7 +50,6 @@ const EMPTY: ViewState = emptyViewState()
 export function useChat(address: WorkspaceTabAddress) {
   const workspaceId = useWorkspaceId()
   const qc = useQueryClient()
-  const { chatAvailable } = useWorkspaceLayoutCtx()
   const [selectedSession, selectSession] = useSelectedSession(address.activeTab)
   const modelsData = useWorkspaceHarness(workspaceId).data
   // A newly forked/native session can precede the provider's session listing.
@@ -109,7 +107,6 @@ export function useChat(address: WorkspaceTabAddress) {
   // the text in, so a keystroke re-renders only the composer.
   const send = useCallback(
     (draft: string, options?: ChatSendOptions) => {
-      if (!chatAvailable) return
       const text = draft.trim()
       // Attachments stay with the selected session. Only fully-uploaded ones are
       // sent; the composer disables send while any are still uploading, so in
@@ -186,7 +183,6 @@ export function useChat(address: WorkspaceTabAddress) {
       }
     },
     [
-      chatAvailable,
       address.activeTab,
       composerSessionId,
       selectedSessionId,

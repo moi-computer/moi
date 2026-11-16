@@ -20,7 +20,7 @@ type BroadcastFrame = { seq: number; ts: number; frame: unknown }
 type ProcessInfo = { running: boolean; pid?: number; binary: string | null }
 
 type DebugPayload = {
-  provider: string
+  harness: string
   process: ProcessInfo | null
   wire: WireFrame[]
   broadcasts: BroadcastFrame[]
@@ -231,7 +231,7 @@ export function HarnessDebugPage() {
     [setSearchParams]
   )
 
-  const provider = workspaces.find(w => w.id === workspaceId)?.type ?? 'claude-code'
+  const harness = workspaces.find(w => w.id === workspaceId)?.harness ?? 'claude-code'
 
   // Model list for the selected workspace.
   useEffect(() => {
@@ -388,7 +388,7 @@ export function HarnessDebugPage() {
           {workspaces.length === 0 && <option value="">no workspaces</option>}
           {workspaces.map(w => (
             <option key={w.id} value={w.id}>
-              {`${w.name ?? w.displayPath ?? w.path} · ${w.type ?? 'claude-code'}`}
+              {`${w.name ?? w.displayPath ?? w.path} · ${w.harness ?? 'claude-code'}`}
             </option>
           ))}
         </select>
@@ -421,7 +421,7 @@ export function HarnessDebugPage() {
           stream
         </label>
         <span className="grow" />
-        {provider === 'codex' && (
+        {harness === 'codex' && (
           <span
             className={cn(
               'rounded px-1.5 py-0.5 font-mono text-[10px]',
@@ -472,11 +472,11 @@ export function HarnessDebugPage() {
         {/* Dynamic drag geometry can't be a static Tailwind class */}
         <div className="flex min-w-0" style={{ width: `${leftPct}%` }}>
           <Pane
-            title={provider === 'codex' ? 'App-server wire' : 'Harness wire'}
+            title={harness === 'codex' ? 'App-server wire' : 'Harness wire'}
             hint={
-              provider === 'codex'
+              harness === 'codex'
                 ? 'raw JSON-RPC, both directions'
-                : provider === 'openclaw'
+                : harness === 'openclaw'
                   ? 'no wire tap for OpenClaw yet'
                   : 'raw Agent SDK messages + enqueued inputs'
             }

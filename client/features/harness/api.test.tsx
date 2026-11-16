@@ -45,7 +45,7 @@ test('workspaces and onboarding share status; auth events and harness switches u
   )
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const requests: string[] = []
-  let provider = 'claude-code'
+  let harness = 'claude-code'
   let signedOut = false
   let pending: Promise<Response> | undefined
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
@@ -61,7 +61,7 @@ test('workspaces and onboarding share status; auth events and harness switches u
           })
         }
         return Response.json({
-          provider,
+          harness,
           availability: { status: 'available' },
           models: [],
           supportsStreaming: true
@@ -97,10 +97,10 @@ test('workspaces and onboarding share status; auth events and harness switches u
   }
   function Workspace({ id }: WorkspaceProps) {
     const workspace = useWorkspaceHarness(id)
-    const status = useHarnessStatus(workspace.data?.provider)
+    const status = useHarnessStatus(workspace.data?.harness)
     return (
       <span data-workspace>
-        {workspace.data?.provider}:{status.data?.availability.status}
+        {workspace.data?.harness}:{status.data?.availability.status}
       </span>
     )
   }
@@ -176,7 +176,7 @@ test('workspaces and onboarding share status; auth events and harness switches u
     await Bun.sleep(20)
   })
   const readsBeforeSwitch = requests.filter(path => path.includes('/harnesses/')).length
-  provider = 'codex'
+  harness = 'codex'
   await act(async () => {
     await client.resetQueries({ queryKey: workspaceKeys.harness('one') })
     await Bun.sleep(20)

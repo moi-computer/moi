@@ -401,7 +401,7 @@ if (import.meta.main) {
   ).catch(error => {
     if (error.code !== 'EEXIST') throw error
   })
-  await registerWorkspace(owner, { id: 'owner-board', type: 'claude-code' })
+  await registerWorkspace(owner, { id: 'owner-board', harness: 'claude-code' })
   const layout = await loadLayout(owner)
   if (!layout.name || layout.name === 'Shared counter') {
     await saveLayout(

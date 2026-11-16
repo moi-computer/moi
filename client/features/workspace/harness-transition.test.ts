@@ -21,7 +21,7 @@ beforeEach(() => {
   client = new QueryClient()
   client.setQueryData(workspaceKeys.layout('one'), {
     ...createDefaultWorkspaceLayout(),
-    provider: 'claude-code'
+    harness: 'claude-code'
   })
   client.setQueryData(workspaceKeys.state('one'), {
     revision: 1,
@@ -39,9 +39,9 @@ afterEach(() => {
 
 test('refreshes only harness-dependent queries and preserves a selection after a duplicate event', async () => {
   client.setQueryData(workspaceKeys.events('one', 'old'), ['transcript'])
-  client.setQueryData(workspaceKeys.harness('one'), { provider: 'claude-code' })
+  client.setQueryData(workspaceKeys.harness('one'), { harness: 'claude-code' })
   client.setQueryData(workspaceKeys.widgets('one'), ['widget'])
-  client.setQueryData(workspaceKeys.harness('two'), { provider: 'codex' })
+  client.setQueryData(workspaceKeys.harness('two'), { harness: 'codex' })
   await receiveWorkspaceHarness(client, 'one', 'codex')
   expect(client.getQueryData(workspaceKeys.harness('one'))).toBeUndefined()
   expect(client.getQueryState(workspaceKeys.harness('two'))?.isInvalidated).toBe(false)
@@ -62,7 +62,7 @@ test('detects a missed event after the layout has already refreshed on reconnect
   await receiveWorkspaceHarness(client, 'one', 'claude-code')
   client.setQueryData(workspaceKeys.layout('one'), {
     ...createDefaultWorkspaceLayout(),
-    provider: 'codex'
+    harness: 'codex'
   })
   await receiveWorkspaceHarness(client, 'one', 'codex')
   expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('one'))?.selected).toEqual({})
@@ -71,9 +71,9 @@ test('detects a missed event after the layout has already refreshed on reconnect
 test('an implicit Claude layout switches and clears its old transcript and selection', async () => {
   client.setQueryData(workspaceKeys.layout('one'), createDefaultWorkspaceLayout())
   client.setQueryData(workspaceKeys.events('one', 'old'), ['transcript'])
-  client.setQueryData(workspaceKeys.harness('one'), { provider: 'claude-code' })
+  client.setQueryData(workspaceKeys.harness('one'), { harness: 'claude-code' })
   await receiveWorkspaceHarness(client, 'one', 'codex')
-  expect(client.getQueryData(workspaceKeys.layout('one'))).toMatchObject({ provider: 'codex' })
+  expect(client.getQueryData(workspaceKeys.layout('one'))).toMatchObject({ harness: 'codex' })
   expect(client.getQueryData(workspaceKeys.harness('one'))).toBeUndefined()
   expect(client.getQueryData(workspaceKeys.events('one', 'old'))).toBeUndefined()
   expect(client.getQueryData<WorkspaceState>(workspaceKeys.state('one'))?.selected).toEqual({})
@@ -91,7 +91,7 @@ test('an absent layout is not treated as an implicit Claude workspace', async ()
 test('discards the previous agent connector list even while its settings tab is closed', async () => {
   client.setQueryData(workspaceKeys.layout('one'), {
     ...createDefaultWorkspaceLayout(),
-    provider: 'codex'
+    harness: 'codex'
   })
   client.setQueryData(workspaceKeys.mcp('one'), [{ name: 'codex_apps', status: 'connected' }])
   client.setQueryData(workspaceKeys.mcp('two'), [{ name: 'other', status: 'connected' }])

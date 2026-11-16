@@ -65,12 +65,12 @@ test('failed installations release the lock for queued calls and later retries',
   expect((await getWorkspaceSkillsStatus(workspace)).updateAvailable).toBe(false)
 })
 
-for (const type of ['claude-code', 'codex'] as const) {
-  test(`${type} init installs one skill, and its relative link survives moving the workspace`, async () => {
+for (const harness of ['claude-code', 'codex'] as const) {
+  test(`${harness} init installs one skill, and its relative link survives moving the workspace`, async () => {
     const { root, workspace, canonical, claude } = await fixture()
     // Skip dependency installation while exercising the real init entry point.
     await Bun.write(join(workspace, '.moi', 'package.json'), '{}\n')
-    await provisionWorkspace(workspace, type)
+    await provisionWorkspace(workspace, harness)
     expect((await lstat(canonical)).isDirectory()).toBe(true)
     expect(await readlink(claude)).toBe('../../.agents/skills/moi-workspace')
     expect(await realpath(claude)).toBe(await realpath(canonical))
@@ -82,7 +82,7 @@ for (const type of ['claude-code', 'codex'] as const) {
       expect(status.updateAvailable).toBe(false)
       for (const skill of status.skills) expect(skill.installed).toBe(skill.bundled)
     }
-    expect((await updateWorkspaceSkills(moved, type)).changedSkills).toEqual([])
+    expect((await updateWorkspaceSkills(moved, harness)).changedSkills).toEqual([])
   })
 }
 
@@ -132,9 +132,9 @@ for (const existing of [false, true]) {
     expect(await Bun.file(join(workspace, '.claude', 'skills', 'custom', 'SKILL.md')).text()).toBe(
       'keep'
     )
-    for (const type of ['claude-code', 'codex'] as const) {
-      expect((await getWorkspaceSkillsStatus(workspace, type)).updateAvailable).toBe(false)
-      expect((await updateWorkspaceSkills(workspace, type)).changedSkills).toEqual([])
+    for (const harness of ['claude-code', 'codex'] as const) {
+      expect((await getWorkspaceSkillsStatus(workspace, harness)).updateAvailable).toBe(false)
+      expect((await updateWorkspaceSkills(workspace, harness)).changedSkills).toEqual([])
     }
   })
 }

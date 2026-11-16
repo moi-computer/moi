@@ -40,7 +40,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'moi-e2e-'))
 setRegistryPath(join(tmp, 'workspaces.json'))
 setWorkspaceStateRoot(join(tmp, 'workspaces'))
 const wsDir = mkdtempSync(join(tmpdir(), 'moi-ws-'))
-const workspace = await registerWorkspace(wsDir, { type: 'claude-code' })
+const workspace = await registerWorkspace(wsDir, { harness: 'claude-code' })
 const WID = workspace.id
 
 const server = Bun.serve({

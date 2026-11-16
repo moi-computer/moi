@@ -100,7 +100,7 @@ export async function discoverCodexWorkspaces(
     } catch {
       continue // directory deleted since the session ran
     }
-    out.push({ path: cwd, type: 'codex' })
+    out.push({ path: cwd, harness: 'codex' })
   }
   return out
 }

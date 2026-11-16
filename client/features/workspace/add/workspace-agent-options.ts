@@ -1,13 +1,13 @@
-import { workspaceTypeDescription } from '@/client/features/workspace/workspace-presentation'
+import { harnessDescription } from '@/client/features/harness/harness-presentation'
 import { HARNESS_INSTRUCTIONS } from '@/lib/harness-instructions'
-import type { HarnessStatuses, WorkspaceType } from '@/lib/types'
-import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
+import type { HarnessStatuses, HarnessType } from '@/lib/types'
+import { HARNESS_ORDER } from '@/lib/harness-types'
 
 type WorkspaceAgentConfig = {
   importOnly: boolean
 }
 
-const workspaceAgents: Record<WorkspaceType, WorkspaceAgentConfig> = {
+const workspaceAgents: Record<HarnessType, WorkspaceAgentConfig> = {
   'claude-code': { importOnly: false },
   codex: { importOnly: false },
   openclaw: { importOnly: true },
@@ -19,22 +19,23 @@ import type { HarnessOption as WorkspaceAgentOption } from '@/client/features/ha
 
 export function getWorkspaceAgentOptions(
   statuses?: HarnessStatuses,
-  detectedTypes: WorkspaceType[] = []
+  detectedHarnesses: HarnessType[] = []
 ): WorkspaceAgentOption[] {
   if (!statuses) return []
-  const installed = (type: WorkspaceType) => {
-    const availability = statuses[type].availability
+  const installed = (harness: HarnessType) => {
+    const availability = statuses[harness].availability
     return availability.status !== 'unavailable' || availability.code !== 'not-installed'
   }
-  return WORKSPACE_TYPE_ORDER.filter(
-    type => installed(type) || !workspaceAgents[type].importOnly
-  ).map(type => {
-    const config = workspaceAgents[type]
-    const instruction = HARNESS_INSTRUCTIONS[type]
-    const disabled = !installed(type) || (config.importOnly && !detectedTypes.includes(type))
+  return HARNESS_ORDER.filter(
+    harness => installed(harness) || !workspaceAgents[harness].importOnly
+  ).map(harness => {
+    const config = workspaceAgents[harness]
+    const instruction = HARNESS_INSTRUCTIONS[harness]
+    const disabled =
+      !installed(harness) || (config.importOnly && !detectedHarnesses.includes(harness))
     return {
-      type,
-      description: workspaceTypeDescription[type],
+      harness,
+      description: harnessDescription[harness],
       disabled,
       disabledReason: disabled ? instruction.reason : undefined,
       disabledCommand: disabled ? instruction.command : undefined
@@ -44,9 +45,9 @@ export function getWorkspaceAgentOptions(
 
 export function resolveWorkspaceAgentSelection(
   options: WorkspaceAgentOption[],
-  selectedType: WorkspaceType
-): WorkspaceType | undefined {
-  const selected = options.find(option => option.type === selectedType)
-  if (selected && !selected.disabled) return selected.type
-  return options.find(option => !option.disabled)?.type
+  selectedHarness: HarnessType
+): HarnessType | undefined {
+  const selected = options.find(option => option.harness === selectedHarness)
+  if (selected && !selected.disabled) return selected.harness
+  return options.find(option => !option.disabled)?.harness
 }

@@ -132,7 +132,7 @@ describe('startOptimisticSession', () => {
 
 describe('resolveChatRunOptions', () => {
   const models: WorkspaceHarness = {
-    provider: 'claude-code',
+    harness: 'claude-code',
     availability: { status: 'available' },
     supportsStreaming: true,
     models: [
@@ -225,7 +225,7 @@ describe('resolveChatRunOptions', () => {
 
 describe('Codex model selection', () => {
   const catalog: WorkspaceHarness = {
-    provider: 'codex',
+    harness: 'codex',
     availability: { status: 'available' },
     models: [
       { value: 'default', resolvedModel: 'gpt-5.6-sol', displayName: '5.6 Sol' },

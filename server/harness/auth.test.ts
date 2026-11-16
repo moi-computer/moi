@@ -308,7 +308,7 @@ test('workspace invalidation does not clear global harness login', async () => {
     loginPollMs: 10_000
   })
   await store.startLogin('codex')
-  store.invalidate({ ...ws, type: 'codex' })
+  store.invalidate({ ...ws, harness: 'codex' })
   expect(store.getLogin('codex')?.state).toBe('pending')
   expect(store.getLogin('claude-code')).toBeUndefined()
   store.invalidate('codex')
@@ -335,7 +335,7 @@ test('invalidating a context during login startup prevents a stale watcher', asy
 })
 
 test('one global login updates multiple workspaces without sharing their readiness', async () => {
-  const first = { ...ws, type: 'codex' as const }
+  const first = { ...ws, harness: 'codex' as const }
   const second = { ...first, id: 'w2', path: '/tmp/w2' }
   const events: HarnessUpdatedEvent[] = []
   let loggedIn = false

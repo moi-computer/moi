@@ -208,7 +208,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
     >
       <WorkspaceIcon
         icon={workspace.icon}
-        workspaceType={workspace.type}
+        harness={workspace.harness}
         workspaceTheme={workspace.theme}
         className="size-7 shrink-0 rounded-md transition-[border-radius] duration-100 ease-out motion-reduce:transition-none"
       />

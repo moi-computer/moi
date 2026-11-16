@@ -462,7 +462,7 @@ function applyCompletionMeta(
 
 // A failed send may reflect an external logout. Refresh the cached banner now.
 function refreshAvailability(workspaceId: string, workspacePath: string) {
-  void harnessStore.refresh({ id: workspaceId, path: workspacePath, type: 'codex' })
+  void harnessStore.refresh({ id: workspaceId, path: workspacePath, harness: 'codex' })
 }
 
 function handleNotification(rec: SessionRecord, method: string, params: Record<string, unknown>) {

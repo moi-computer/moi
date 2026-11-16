@@ -93,7 +93,7 @@ const hermesInit = defineCommand({
     }
 
     const entry = await registerWorkspace(target.path, {
-      type: 'hermes',
+      harness: 'hermes',
       name: target.name,
       agentId: target.agentId,
       isDefault: target.isDefault

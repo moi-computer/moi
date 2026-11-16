@@ -27,7 +27,7 @@ import type {
   UploadInfo,
   WorkspaceHarness,
   WorkspaceEntry,
-  WorkspaceType
+  HarnessType
 } from '@/lib/types'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 
@@ -209,10 +209,10 @@ one.use('*', withWorkspace)
 one.patch('/harness', async c => {
   if (getAppConfig().demo) return c.text('Changing agents is unavailable in the demo', 403)
   const body = await c.req.json().catch(() => null)
-  if (!body || !['claude-code', 'codex'].includes(body.type))
+  if (!body || !['claude-code', 'codex'].includes(body.harness))
     return c.text('Invalid agent selection', 400)
   try {
-    return c.json(await changeWorkspaceHarness(c.get('ws'), body.type))
+    return c.json(await changeWorkspaceHarness(c.get('ws'), body.harness))
   } catch (error) {
     if (error instanceof HarnessTransitionError) return c.text(error.message, 409)
     throw error
@@ -334,7 +334,7 @@ one.post('/views/:viewId/submit', async c => {
     if (!getUpload(ws.id, attachment.uploadId))
       return c.text('Attachment not found or expired', 400)
   }
-  const availability = await workspaceTypeAvailability(ws.type ?? 'claude-code')
+  const availability = await harnessTypeAvailability(ws.harness ?? 'claude-code')
   if (availability.status !== 'available') return c.text(availability.reason, 400)
   try {
     const result = await submitView(ws, c.req.param('viewId'), {
@@ -667,7 +667,7 @@ one.get('/harness/debug', async c => {
   const sinceWire = Number(c.req.query('sinceWire') ?? 0) || 0
   const sinceBroadcast = Number(c.req.query('sinceBroadcast') ?? 0) || 0
   return c.json({
-    provider: harness.id,
+    harness: harness.id,
     process: (await harness.debugInfo?.(ws)) ?? null,
     wire: getWireLog(harness.wireScope?.(ws) ?? ws.id, sinceWire),
     broadcasts: getClientFrameLog(ws.id, sinceBroadcast)
@@ -707,12 +707,12 @@ one.put('/env', async c => {
 
 one.get('/skills', async c => {
   const ws = c.get('ws')
-  return c.json(await getWorkspaceSkillsStatus(ws.path, ws.type))
+  return c.json(await getWorkspaceSkillsStatus(ws.path, ws.harness))
 })
 
 one.post('/skills/update', async c => {
   const ws = c.get('ws')
-  const result = await updateWorkspaceSkills(ws.path, ws.type ?? 'claude-code')
+  const result = await updateWorkspaceSkills(ws.path, ws.harness ?? 'claude-code')
   return c.json(result.status)
 })
 
@@ -722,7 +722,7 @@ one.get('/harness', async c => {
   const ws = c.get('ws')
   const harness = harnessFor(ws)
   const capabilities = {
-    provider: harness.id,
+    harness: harness.id,
     supportsStreaming: harness.capabilities.supportsStreaming,
     supportsArchiving: Boolean(harness.archiveSession)
   }
@@ -928,7 +928,7 @@ one.get('/', async c => {
     // Resolved display name: the settings override, or the folder name.
     name: layout.name || basename(ws.path),
     cwd: ws.path,
-    provider: ws.type,
+    harness: ws.harness,
     agentId: ws.agentId
   } satisfies WorkspaceInfoResponse)
 })
@@ -1098,15 +1098,15 @@ workspaces.post('/', async c => {
     }
   }
   if (!body?.path) return c.text('Missing path', 400)
-  const requestedType: unknown = body?.type ?? 'claude-code'
-  if (!isHarnessType(requestedType)) return c.text('Unknown workspace type', 400)
-  const type: WorkspaceType = requestedType
-  const availability = await workspaceTypeAvailability(type)
+  const requestedHarness: unknown = body?.harness ?? 'claude-code'
+  if (!isHarnessType(requestedHarness)) return c.text('Unknown workspace type', 400)
+  const harness: HarnessType = requestedHarness
+  const availability = await harnessTypeAvailability(harness)
   if (availability.status !== 'available') return c.text(availability.reason, 400)
   const path = resolve(String(body.path))
   let metadata: WorkspaceImportMetadata
   try {
-    metadata = await resolveWorkspaceImportMetadata(path, type)
+    metadata = await resolveWorkspaceImportMetadata(path, harness)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return c.text(message, 400)
@@ -1115,13 +1115,13 @@ workspaces.post('/', async c => {
   // skills dir) and the `.moi/` scaffold, exactly like `moi init` — a workspace
   // added from the UI must be indistinguishable from one added via the CLI.
   try {
-    await provisionWorkspace(path, type)
+    await provisionWorkspace(path, harness)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return c.text(`Could not initialize workspace: ${message}`, 500)
   }
   const entry = await registerWorkspace(path, {
-    type,
+    harness,
     ...metadata
   })
   return c.json((await mergeWorkspaceList([entry]))[0], 201)
@@ -1139,7 +1139,7 @@ workspaces.get('/previews', async c => {
       if (ws.remote) return [ws.id, { thumbnails: [] }] as const
       const views = await listCompiledViews(ws.path).catch(() => [])
       const preview = await getWorkspacePreview(ws.path, {
-        getProviderPreview: includeFirstUserMessage =>
+        getHarnessPreview: includeFirstUserMessage =>
           harnessFor(ws).workspacePreview(ws, includeFirstUserMessage),
         viewIds: views.map(view => view.id),
         // Capture time in base36 keeps the versioned segment short and URL-safe.
@@ -1154,10 +1154,10 @@ workspaces.get('/previews', async c => {
 
 // Backends the create dialog can provision from scratch. OpenClaw workspaces
 // belong to their agents and arrive via discovery.
-const CREATABLE_TYPES = new Set<WorkspaceType>(['claude-code', 'codex'])
+const CREATABLE_HARNESSES = new Set<HarnessType>(['claude-code', 'codex'])
 
-async function workspaceTypeAvailability(type: WorkspaceType): Promise<HarnessAvailability> {
-  return (await harnessFor(type).availability?.()) ?? { status: 'available' }
+async function harnessTypeAvailability(harness: HarnessType): Promise<HarnessAvailability> {
+  return (await harnessFor(harness).availability?.()) ?? { status: 'available' }
 }
 
 // Create a brand-new workspace: a fresh folder under createdWorkspacesRoot(),
@@ -1165,15 +1165,15 @@ async function workspaceTypeAvailability(type: WorkspaceType): Promise<HarnessAv
 workspaces.post('/create', async c => {
   if (getAppConfig().demo) return c.text(DEMO_CREATE_BLOCKED, 403)
   const body = await c.req.json()
-  const requestedType: unknown = body?.type ?? 'claude-code'
-  if (!isHarnessType(requestedType)) {
+  const requestedHarness: unknown = body?.harness ?? 'claude-code'
+  if (!isHarnessType(requestedHarness)) {
     return c.text('Unknown workspace type', 400)
   }
-  const type: WorkspaceType = requestedType
-  if (!CREATABLE_TYPES.has(type)) {
+  const harness: HarnessType = requestedHarness
+  if (!CREATABLE_HARNESSES.has(harness)) {
     return c.text('Workspaces of this type arrive through discovery, not creation', 400)
   }
-  const availability = await workspaceTypeAvailability(type)
+  const availability = await harnessTypeAvailability(harness)
   if (availability.status !== 'available') return c.text(availability.reason, 400)
   const name =
     body?.name === undefined
@@ -1185,13 +1185,13 @@ workspaces.post('/create', async c => {
   if (invalid) return c.text(invalid, 400)
   const path = await createWorkspaceDirectory(name, createdWorkspacesRoot())
   try {
-    await provisionWorkspace(path, type)
+    await provisionWorkspace(path, harness)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return c.text(`Could not create workspace: ${message}`, 500)
   }
   await setWorkspaceConfig(path, { name })
-  const entry = await registerWorkspace(path, { id: basename(path), type, name })
+  const entry = await registerWorkspace(path, { id: basename(path), harness, name })
   // Nudge every connected client (the sidebar list) to refetch.
   publishEvent({ type: 'workspaces-list:updated' })
   return c.json(entry, 201)

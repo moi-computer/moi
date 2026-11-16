@@ -59,10 +59,9 @@ const layoutCtxValue: WorkspaceLayoutContextValue = {
   setLayout: () => {},
   name: 'moi',
   cwd: DEV_CWD,
-  provider: 'openclaw',
+  harness: 'openclaw',
   workspaceId: DEV_WORKSPACE_ID,
   apiBase: '/api/workspaces/test',
-  chatAvailable: true,
   isRemote: false,
   isLoading: false
 }

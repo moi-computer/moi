@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessType } from '@/lib/types'
 
 import { discoverHermesProfiles } from '../harness/hermes/discovery'
 import type { HermesProfile } from '../harness/hermes/discovery'
@@ -49,12 +49,12 @@ async function resolveHermesImportMetadata(
 
 export async function resolveWorkspaceImportMetadata(
   path: string,
-  type: WorkspaceType,
+  harness: HarnessType,
   discoverAgents: DiscoverOpenClawAgents = discoverOpenClawAgents,
   discoverProfiles: DiscoverHermesProfiles = discoverHermesProfiles
 ): Promise<WorkspaceImportMetadata> {
-  if (type === 'hermes') return resolveHermesImportMetadata(path, discoverProfiles)
-  if (type !== 'openclaw') return {}
+  if (harness === 'hermes') return resolveHermesImportMetadata(path, discoverProfiles)
+  if (harness !== 'openclaw') return {}
 
   const normalizedPath = resolve(path)
   const agent = (await discoverAgents())

@@ -8,7 +8,7 @@ alwaysApply: true
 - Omit trailing periods in labels, tooltips, captions, and short standalone messages, including errors and validation messages. Use normal punctuation for paragraphs and multiple sentences.
 - Prefer the product nouns workspace, chat, agent, model, widget, view, connector, session, and run.
 - Use agent in UI copy for supported coding tools, such as “Connect an agent”.
-- Display `claude-code` as **Claude** and `codex` as **ChatGPT** in user-facing labels and copy. Reuse `workspaceTypeLabel` in the client. Keep Anthropic and OpenAI as company subtitles.
+- Display `claude-code` as **Claude** and `codex` as **ChatGPT** in user-facing labels and copy. Reuse `harnessLabel` in the client. Keep Anthropic and OpenAI as company subtitles.
 - Keep Claude Code/Codex naming in internal harness identifiers, APIs, filenames, commands, and developer documentation. Preserve exact external setting names (for example, “Enable device code sign-in for Codex”), provider messages, and model names.
 - Use harness for internal integration and authentication names, including types, functions, files, API routes, and events: `HarnessLoginState`, `startHarnessLogin`, `/api/harnesses/:type/auth`.
 - Keep agent for actual agent identities, subagents, and provider-native terminology such as OpenClaw’s `agentId`; do not rename those to harness.

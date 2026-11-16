@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useUiStore } from '@/client/store/ui'
-import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
+import type { DiscoveredWorkspace, WorkspaceEntry, HarnessType } from '@/lib/types'
 
 export function upsertWorkspaceEntry(
   entries: WorkspaceEntry[] | undefined,
@@ -21,7 +21,7 @@ export function useImportWorkspace() {
     mutationFn: input =>
       requestJson('/api/workspaces', jsonRequest('POST', input), 'Failed to add workspace'),
     onSuccess: (entry, input) => {
-      // Remote chat support is deferred, so there is no analysis to start.
+      // A remote reference holds no local project files to analyze.
       if (!entry.remote) useUiStore.getState().markWorkspacePendingAnalysis(entry.id)
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         upsertWorkspaceEntry(previous, entry)
@@ -35,12 +35,12 @@ export function useImportWorkspace() {
 
 export type ImportWorkspaceInput = {
   path: string
-  type: WorkspaceType
+  harness: HarnessType
 }
 
 export type CreateWorkspaceInput = {
   name?: string
-  type: WorkspaceType
+  harness: HarnessType
 }
 
 export function useCreateWorkspace() {
