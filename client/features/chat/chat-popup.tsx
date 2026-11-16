@@ -7,7 +7,7 @@ import { Resizable } from 'react-resizable'
 import { AgentBlobatar } from '@/client/components/shared/agent-blobatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
 import { cn } from '@/client/lib/cn'
-import { usePersonalLayout } from '@/client/features/workspace/personal-layout'
+import { useWorkspaceUi } from '@/client/features/workspace/personal-layout'
 import type { AgentTheme } from '@/lib/types'
 
 type ChatPopupProps = {
@@ -28,7 +28,7 @@ export function ChatPopup({
   children
 }: ChatPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null)
-  const [layout, setLayout] = usePersonalLayout()
+  const [layout, setLayout] = useWorkspaceUi()
   const popupChatWidth = layout.popupChatWidth
   const setPopupChatWidth = (popupChatWidth: number) => setLayout({ popupChatWidth })
   const [size, setSize] = useState({ width: popupChatWidth, min: 0, max: popupChatWidth })

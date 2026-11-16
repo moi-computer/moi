@@ -312,18 +312,10 @@ export type WorkspaceSessionState = {
   fork?: SessionFork
 }
 
-export type PersonalWorkspaceLayout = {
-  tabs: WorkspaceTabsState
-  layoutMode: LayoutMode
-  chatOpen: boolean
-  dockedChatWidth: number
-  popupChatWidth: number
-}
-
 // Personal state on this Moi installation, shared across its browser windows.
 // GET /api/workspaces/:id/state; writes publish `state:changed`.
 export type WorkspaceState = {
-  layout?: PersonalWorkspaceLayout
+  tabs?: WorkspaceTabsState
   // Personal defaults for new chats on this Moi installation.
   chatDefaults?: SessionConfig
   // Goes up by one with every saved change. Lets clients drop an older copy

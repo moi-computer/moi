@@ -1,6 +1,6 @@
 import type { MouseEventHandler, ReactNode } from 'react'
 
-import { usePersonalLayout } from './personal-layout'
+import { useWorkspaceUi } from './personal-layout'
 import type { LayoutMode } from '@/lib/types'
 
 import { useFitsSplitLayout } from './use-fits-split-layout'
@@ -10,7 +10,7 @@ import { WorkspaceSplitLayout } from './workspace-split-layout'
 export function useWorkspaceFrame(expanded = false) {
   const { chatAvailable } = useWorkspaceLayoutCtx()
   const { ref, fits, constraints } = useFitsSplitLayout<HTMLDivElement>()
-  const [layout, setLayout] = usePersonalLayout()
+  const [layout, setLayout] = useWorkspaceUi()
   const chatWidth = layout.dockedChatWidth
   const setChatWidth = (dockedChatWidth: number) => setLayout({ dockedChatWidth })
   const mode: LayoutMode =

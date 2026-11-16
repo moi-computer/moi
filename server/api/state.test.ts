@@ -176,7 +176,7 @@ test.each([false, true])('chat defaults stay in personal state (remote: %s)', as
 })
 
 test.each([false, true])(
-  'personal layout stays on this Moi and survives reload (remote: %s)',
+  'personal tabs stay on this Moi and survive reload (remote: %s)',
   async remote => {
     const appConfig = await import('../app-config')
     const layout = await import('../workspaces/layout')
@@ -193,36 +193,21 @@ test.each([false, true])(
       else await layout.saveLayout(await layout.loadLayout(workspace.path), workspace.path)
       const before = await Bun.file(layout.getLayoutPath(workspace.path)).text()
       const tabs: WorkspaceTabsState = { open: ['overview', 'scratchpad'], active: 'scratchpad' }
-      const saved = await state(
-        call('/state/layout', 'PATCH', {
-          tabs,
-          layoutMode: 'fullscreen',
-          chatOpen: true,
-          dockedChatWidth: 480
-        })
-      )
-      expect(saved.layout).toEqual({
-        tabs,
-        layoutMode: 'fullscreen',
-        chatOpen: true,
-        dockedChatWidth: 480,
-        popupChatWidth: 440
-      })
-      const next = await state(call('/state/layout', 'PATCH', { popupChatWidth: 600 }))
-      expect(next.layout).toEqual({ ...saved.layout!, popupChatWidth: 600 })
+      const saved = await state(call('/state/tabs', 'PATCH', tabs))
+      expect(saved.tabs).toEqual(tabs)
       setWorkspaceStateRoot(join(tempDir, 'state'))
-      expect((await state(call('/state'))).layout).toEqual(next.layout)
+      expect((await state(call('/state'))).tabs).toEqual(saved.tabs)
       expect(await Bun.file(layout.getLayoutPath(workspace.path)).text()).toBe(before)
       for (const patch of [
-        { layoutMode: 'invalid' },
-        { tabs: { open: ['nope'], active: 'overview' } },
-        { chatOpen: 'yes' },
-        { popupChatWidth: -1 },
+        { layoutMode: 'fullscreen' },
+        { open: ['nope'], active: 'overview' },
+        { chatOpen: true },
+        { popupChatWidth: 600 },
         { widgetGrid: [] }
       ]) {
-        expect((await call('/state/layout', 'PATCH', patch)).status).toBe(400)
+        expect((await call('/state/tabs', 'PATCH', patch)).status).toBe(400)
       }
-      expect((await state(call('/state'))).layout).toEqual(next.layout)
+      expect((await state(call('/state'))).tabs).toEqual(saved.tabs)
     } finally {
       cloud.mockRestore()
     }

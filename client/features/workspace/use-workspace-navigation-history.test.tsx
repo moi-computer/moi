@@ -10,7 +10,7 @@ import { Link, Route, Router } from 'wouter'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { resolveUrl } from '@/lib/navigation'
-import { createDefaultWorkspaceLayout, createDefaultPersonalLayout } from '@/lib/workspace-layout'
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import type {
   SessionSummary,
   WorkspaceState,
@@ -79,7 +79,7 @@ function mountNavigation(
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   // The fake server's copy of the workspace state.
   let server: WorkspaceState = {
-    layout: { ...createDefaultPersonalLayout(), tabs },
+    tabs,
     revision: 1,
     selected: { overview: 'previous' },
     pinnedSessionId: 'other',
@@ -102,11 +102,11 @@ function mountNavigation(
         const method = init?.method ?? 'GET'
         if (url.endsWith('/sessions')) return Response.json(await responses.sessions)
         if (url.endsWith('/state') && method === 'GET') return Response.json(server)
-        if (url.endsWith('/state/layout')) {
+        if (url.endsWith('/state/tabs')) {
           server = {
             ...server,
             revision: server.revision + 1,
-            layout: { ...server.layout!, ...JSON.parse(String(init?.body)) }
+            tabs: JSON.parse(String(init?.body))
           }
           return Response.json(server)
         }
@@ -340,7 +340,7 @@ describe('mounted chat links', () => {
     expect(params.get('literal')).toBe('%2F')
     await clickTab('orders')
     expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(2)
-    expect(fixture.cachedState()?.layout?.tabs.active).toBe('views/orders')
+    expect(fixture.cachedState()?.tabs?.active).toBe('views/orders')
   })
 
   test.each([undefined, 'other'])(
@@ -484,7 +484,7 @@ test('remote tab navigation persists in personal state without changing the refe
     Object.assign(click, { button: 0 })
     fixture.document.querySelector('button[data-tab="scratchpad"]')!.dispatchEvent(click)
   })
-  expect(fixture.cachedState()?.layout?.tabs.active).toBe('scratchpad')
+  expect(fixture.cachedState()?.tabs?.active).toBe('scratchpad')
   expect(fixture.writes()).toEqual([])
 })
 
@@ -498,24 +498,21 @@ test.each([false, true])(
       active: 'scratchpad' as const
     }
     await act(async () => {
-      fixture.setState({ layout: { ...createDefaultPersonalLayout(), tabs } })
+      fixture.setState({ tabs })
       await Bun.sleep(10)
     })
     expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
     expect(fixture.document.getElementById('active-tab')?.textContent).toBe('scratchpad')
-    expect(fixture.cachedState()?.layout?.tabs).toEqual(tabs)
+    expect(fixture.cachedState()?.tabs).toEqual(tabs)
     expect(fixture.history.at(-1)?.kind).toBe('replace')
     await act(async () => {
       fixture.setState({
-        layout: {
-          ...createDefaultPersonalLayout(),
-          tabs: { open: ['overview'], active: 'overview' }
-        }
+        tabs: { open: ['overview'], active: 'overview' }
       })
       await Bun.sleep(10)
     })
     expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/overview')
-    expect(fixture.cachedState()?.layout?.tabs.open).toEqual(['overview'])
+    expect(fixture.cachedState()?.tabs?.open).toEqual(['overview'])
     expect(fixture.fetchSpy.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toEqual([])
   }
 )

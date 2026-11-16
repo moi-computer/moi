@@ -1,10 +1,25 @@
+import type { LayoutMode } from '@/lib/types'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type { StateStorage } from 'zustand/middleware'
 
 // Per-browser UI preferences and onboarding markers, persisted to localStorage
 // so they survive reloads. Server-backed per-user app state belongs in DATA_DIR.
+export type WorkspaceUi = {
+  layoutMode: LayoutMode
+  dockedChatWidth: number
+  popupChatWidth: number
+}
+
+export const defaultWorkspaceUi: WorkspaceUi = {
+  layoutMode: 'split',
+  dockedChatWidth: 360,
+  popupChatWidth: 440
+}
+
 type UiStore = {
+  workspaces: Record<string, WorkspaceUi>
+  setWorkspaceUi: (workspaceId: string, patch: Partial<WorkspaceUi>) => void
   discoveredWorkspacesOpen: boolean
   hasSentMessageFromMoi: boolean
   workspaceIdsPendingAnalysis: string[]
@@ -20,6 +35,14 @@ export const createUiStore = (storage?: StateStorage) =>
   create<UiStore>()(
     persist(
       set => ({
+        workspaces: {},
+        setWorkspaceUi: (workspaceId, patch) =>
+          set(state => ({
+            workspaces: {
+              ...state.workspaces,
+              [workspaceId]: { ...(state.workspaces[workspaceId] ?? defaultWorkspaceUi), ...patch }
+            }
+          })),
         discoveredWorkspacesOpen: true,
         hasSentMessageFromMoi: false,
         workspaceIdsPendingAnalysis: [],

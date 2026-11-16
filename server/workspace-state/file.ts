@@ -1,4 +1,4 @@
-import { createDefaultPersonalLayout, parsePersonalLayoutPatch } from '@/lib/workspace-layout'
+import { parseWorkspaceTabs } from '@/lib/workspace-layout'
 import { isSpeedMode } from '@/lib/speed-mode'
 import { mkdir, rename, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
@@ -100,8 +100,8 @@ export function normalizeWorkspaceState(
     state.revision = value.revision
   if (isRecord(value.chatDefaults))
     state.chatDefaults = normalizeSession({ config: value.chatDefaults }).config ?? {}
-  const layout = parsePersonalLayoutPatch(value.layout)
-  if (layout) state.layout = { ...createDefaultPersonalLayout(), ...layout }
+  const tabs = parseWorkspaceTabs(value.tabs)
+  if (tabs) state.tabs = tabs
   const pinned = optionalString(value.pinnedSessionId)
   if (pinned) state.pinnedSessionId = pinned
   if (isRecord(value.selected)) {

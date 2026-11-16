@@ -6,7 +6,7 @@ import { toast } from '@/client/components/ui/toast'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type { WorkspaceState } from '@/lib/types'
 
-// Personal state for one workspace: layout, tabs, pin, selected chats, chat
+// Personal state for one workspace: tabs, pin, selected chats, chat
 // settings and fork history, and views being built. One cache, kept current by
 // write replies and `state:changed` events instead of refetches.
 

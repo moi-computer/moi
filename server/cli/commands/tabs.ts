@@ -6,7 +6,7 @@ import pc from '../pc'
 import { columns } from '../ui'
 
 // The listing behind `moi tabs`: every tab (static + views), one per row, the
-// saved default (`state.layout.tabs.active`) marked. The
+// saved default (`state.tabs.active`) marked. The
 // addresses are documented in docs/navigation.md.
 function runTabsList(dir: string) {
   const path = resolve(dir)

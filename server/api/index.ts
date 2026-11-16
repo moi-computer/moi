@@ -1,4 +1,4 @@
-import { createDefaultPersonalLayout, parsePersonalLayoutPatch } from '@/lib/workspace-layout'
+import { parseWorkspaceTabs } from '@/lib/workspace-layout'
 import { openSharedWorkspace } from '../workspaces/shared'
 import { executeScratchOp } from '../scratchpad/executor'
 import type { ScratchOp, WorkspaceInfoResponse } from '@/lib/types'
@@ -519,12 +519,12 @@ one.get('/uploads/:uploadId', c => {
 // state; other clients get it as `state:changed`.
 one.get('/state', async c => c.json(await getWorkspaceState(c.get('ws'))))
 
-one.patch('/state/layout', async c => {
-  const patch = parsePersonalLayoutPatch(await c.req.json().catch(() => undefined))
-  if (!patch) return c.text('Invalid personal layout', 400)
+one.patch('/state/tabs', async c => {
+  const tabs = parseWorkspaceTabs(await c.req.json().catch(() => undefined))
+  if (!tabs) return c.text('Invalid workspace tabs', 400)
   const ws = c.get('ws')
   await updateWorkspaceState(ws, state => {
-    state.layout = { ...(state.layout ?? createDefaultPersonalLayout()), ...patch }
+    state.tabs = tabs
   })
   return c.json(await getWorkspaceState(ws))
 })
@@ -1008,7 +1008,7 @@ one.put('/', async c => {
     )
   }
 
-  if (body.version !== 1) return c.text('Bad request', 400)
+  if (body.version !== 2) return c.text('Bad request', 400)
   const existing = await loadLayout(ws.path)
   const next = mergeLayoutForSave(existing, layout)
   await saveLayout(next, ws.path)

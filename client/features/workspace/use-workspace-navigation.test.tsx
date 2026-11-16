@@ -15,7 +15,7 @@ import type {
   WorkspaceTabId,
   WorkspaceTabsState
 } from '@/lib/types'
-import { createDefaultWorkspaceLayout, createDefaultPersonalLayout } from '@/lib/workspace-layout'
+import { createDefaultWorkspaceLayout, createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
 import { useWorkspaceNavigation } from './use-workspace-navigation'
@@ -40,7 +40,7 @@ function readNavigation(
     navigate,
     queryClient = new QueryClient(),
     onOpenChat = () => {},
-    tabs = createDefaultPersonalLayout().tabs
+    tabs = createDefaultWorkspaceTabs()
   }: ReadNavigationOptions = {}
 ) {
   const previous = queryClient.getQueryData<WorkspaceState>(workspaceKeys.state('abc'))
@@ -50,7 +50,7 @@ function readNavigation(
     sessions: {},
     pendingViews: {},
     ...previous,
-    layout: { ...createDefaultPersonalLayout(), tabs }
+    tabs
   })
   const queryKey = workspaceKeys.views('abc')
   if (!queryClient.getQueryDefaults(queryKey).queryFn)

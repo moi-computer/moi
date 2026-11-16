@@ -1,4 +1,3 @@
-import { usePersonalLayout } from './personal-layout'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { AnimatePresence } from 'motion/react'
@@ -127,12 +126,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   const frame = useWorkspaceFrame()
   const { mode, canUseSplit, setMode } = frame
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
-  const [personalLayout, savePersonalLayout] = usePersonalLayout()
-  const floatingChatOpen = personalLayout.chatOpen
-  const setFloatingChatOpen = useCallback(
-    (chatOpen: boolean) => savePersonalLayout({ chatOpen }),
-    [savePersonalLayout]
-  )
+  const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
   const pendingViewRefs = useRef(new Map<string, PendingViewHandle>())
   const sessionActivity = useLive(state => state.activity)

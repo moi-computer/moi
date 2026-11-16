@@ -333,7 +333,7 @@ export const control = Bun.serve({
           ws.send(
             JSON.stringify({
               ok: true,
-              tabs: assembleTabRows(views, state.layout?.tabs.active ?? 'overview')
+              tabs: assembleTabRows(views, state.tabs?.active ?? 'overview')
             })
           )
           return

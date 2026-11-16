@@ -16,6 +16,7 @@ beforeEach(() => {
   useUiStore.setState({
     hasSentMessageFromMoi: false,
     workspaceIdsPendingAnalysis: [],
+    workspaces: {},
     composerDrafts: {}
   })
 })
@@ -121,4 +122,28 @@ test('a pending view draft follows chat creation and native renames, including e
   })
   useUiStore.getState().moveComposerDraft(native, draft)
   expect(useUiStore.getState().composerDrafts[draft]).toBe('')
+})
+
+test('chat layout persists per workspace in one browser and stays independent of another', () => {
+  const patch = {
+    layoutMode: 'fullscreen' as const,
+    dockedChatWidth: 480,
+    popupChatWidth: 520
+  }
+  useUiStore.getState().setWorkspaceUi('one', patch)
+  useUiStore.getState().setWorkspaceUi('two', { popupChatWidth: 600 })
+  useUiStore.getState().setWorkspaceUi('one', { popupChatWidth: 560 })
+  const restored = createUiStore(localStorage).getState()
+  expect(restored.workspaces.one).toEqual({ ...patch, popupChatWidth: 560 })
+  expect(restored.workspaces.two).toEqual({
+    layoutMode: 'split',
+    dockedChatWidth: 360,
+    popupChatWidth: 600
+  })
+  const otherBrowser = createUiStore({
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {}
+  })
+  expect(otherBrowser.getState().workspaces).toEqual({})
 })

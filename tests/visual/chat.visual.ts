@@ -1,4 +1,3 @@
-import { createDefaultPersonalLayout } from '@/lib/workspace-layout'
 import type { WorkspaceState } from '@/lib/types'
 import { expect, takeSnapshot } from '@uiverify/bun'
 
@@ -119,35 +118,23 @@ describe('Chat', () => {
 })
 
 test(
-  'personal chat placement survives reload',
+  'chat placement survives reload while the popup starts closed',
   async page => {
-    const state: WorkspaceState = {
-      revision: 1,
-      selected: {},
-      sessions: {},
-      pendingViews: {},
-      layout: {
-        ...createDefaultPersonalLayout(),
-        layoutMode: 'fullscreen',
-        chatOpen: true,
-        popupChatWidth: 520
-      }
-    }
-    await page.route(`**/api/workspaces/${WORKSPACE}/state`, route =>
-      route.fulfill({ json: state })
-    )
-    await page.route(`**/api/workspaces/${WORKSPACE}/state/layout`, async route => {
-      expect(route.request().method()).toBe('PATCH')
-      state.layout = { ...state.layout!, layoutMode: 'split' }
-      state.revision++
-      return route.fulfill({ json: state })
+    await page.route(`**/api/workspaces/${WORKSPACE}/state/tabs`, () => {
+      throw new Error('Chat placement must stay in browser storage')
     })
     await page.goto(WORKSPACE_PAGE)
+    await page.getByRole('button', { name: 'Undock chat', exact: true }).click()
+    await page.getByRole('button', { name: 'Agent', exact: true }).click()
     const resize = page.getByRole('separator', { name: 'Resize chat popup' })
-    await expect(resize).toHaveAttribute('aria-valuenow', '520')
+    await expect(resize).toHaveAttribute('aria-valuenow', '440')
+    await page.goto('/')
+    await page.goto(`/?reopen=popup#/workspace/${WORKSPACE}`)
+    await expect(page.getByRole('button', { name: 'Dock chat', exact: true })).not.toBeVisible()
+    await page.getByRole('button', { name: 'Agent', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Dock chat', exact: true })).toBeVisible()
     await takeSnapshot('saved popup')
     await page.getByRole('button', { name: 'Dock chat', exact: true }).click()
-    await page.waitUntil('chat placement saved', () => state.layout?.layoutMode === 'split')
     await expect(page.getByRole('button', { name: 'Dock chat', exact: true })).not.toBeVisible()
     await page.goto('/')
     await page.goto(`/?reopen=1#/workspace/${WORKSPACE}`)
