@@ -8,6 +8,7 @@ import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react
 import { Link, Route, Router } from 'wouter'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { defaultWorkspaceUi, useUiStore } from '@/client/store/ui'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { resolveUrl } from '@/lib/navigation'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
@@ -78,8 +79,9 @@ function mountNavigation(
   seedWorkspaceInfo('abc', remote ? { user_id: 'alice', workspace_id: 'board' } : undefined)
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   // The fake server's copy of the workspace state.
+  useUiStore.setState({ workspaces: { abc: { ...defaultWorkspaceUi, tabs } } })
+  const savedTabs = () => useUiStore.getState().workspaces.abc?.tabs
   let server: WorkspaceState = {
-    tabs,
     revision: 1,
     selected: { overview: 'previous' },
     pinnedSessionId: 'other',
@@ -102,14 +104,6 @@ function mountNavigation(
         const method = init?.method ?? 'GET'
         if (url.endsWith('/sessions')) return Response.json(await responses.sessions)
         if (url.endsWith('/state') && method === 'GET') return Response.json(server)
-        if (url.endsWith('/state/tabs')) {
-          server = {
-            ...server,
-            revision: server.revision + 1,
-            tabs: JSON.parse(String(init?.body))
-          }
-          return Response.json(server)
-        }
         const write = url.match(/\/sessions\/([^/]+)\/(pin|selection)$/)
         if (!write) throw new Error(`Unexpected request: ${method} ${url}`)
         const sessionId = decodeURIComponent(write[1]!)
@@ -259,6 +253,7 @@ function mountNavigation(
     queryClient,
     fetchSpy,
     writes,
+    savedTabs,
     cachedState,
     setState,
     responses,
@@ -340,7 +335,7 @@ describe('mounted chat links', () => {
     expect(params.get('literal')).toBe('%2F')
     await clickTab('orders')
     expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(2)
-    expect(fixture.cachedState()?.tabs?.active).toBe('views/orders')
+    expect(fixture.savedTabs()?.active).toBe('views/orders')
   })
 
   test.each([undefined, 'other'])(
@@ -476,7 +471,7 @@ describe('mounted chat links', () => {
   )
 })
 
-test('remote tab navigation persists in personal state without changing the reference', async () => {
+test('remote tab navigation saves in the browser and sends nothing', async () => {
   const fixture = mountNavigation('overview', undefined, true)
   await fixture.render()
   await act(async () => {
@@ -484,35 +479,25 @@ test('remote tab navigation persists in personal state without changing the refe
     Object.assign(click, { button: 0 })
     fixture.document.querySelector('button[data-tab="scratchpad"]')!.dispatchEvent(click)
   })
-  expect(fixture.cachedState()?.tabs?.active).toBe('scratchpad')
-  expect(fixture.writes()).toEqual([])
+  expect(fixture.savedTabs()?.active).toBe('scratchpad')
+  expect(fixture.fetchSpy.mock.calls.filter(([, init]) => init?.method)).toEqual([])
 })
 
-test.each([false, true])(
-  'another browser changes the active tab without navigation bouncing back (remote: %s)',
-  async remote => {
-    const fixture = mountNavigation('overview', { open: ['overview'], active: 'overview' }, remote)
-    await fixture.render()
-    const tabs = {
-      open: ['overview', 'scratchpad'] as WorkspaceTabId[],
-      active: 'scratchpad' as const
-    }
-    await act(async () => {
-      fixture.setState({ tabs })
-      await Bun.sleep(10)
-    })
-    expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
-    expect(fixture.document.getElementById('active-tab')?.textContent).toBe('scratchpad')
-    expect(fixture.cachedState()?.tabs).toEqual(tabs)
-    expect(fixture.history.at(-1)?.kind).toBe('replace')
-    await act(async () => {
-      fixture.setState({
-        tabs: { open: ['overview'], active: 'overview' }
-      })
-      await Bun.sleep(10)
-    })
-    expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/overview')
-    expect(fixture.cachedState()?.tabs?.open).toEqual(['overview'])
-    expect(fixture.fetchSpy.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toEqual([])
+test('tabs saved elsewhere update the open set and leave this window on its tab', async () => {
+  const fixture = mountNavigation('overview', { open: ['overview'], active: 'overview' })
+  await fixture.render()
+  const entries = fixture.history.length
+  const tabs = {
+    open: ['overview', 'scratchpad'] as WorkspaceTabId[],
+    active: 'scratchpad' as const
   }
-)
+  await act(async () => {
+    useUiStore.getState().setWorkspaceUi('abc', { tabs })
+    await Bun.sleep(10)
+  })
+  expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/overview')
+  expect(fixture.document.getElementById('active-tab')?.textContent).toBe('overview')
+  expect(fixture.history).toHaveLength(entries)
+  // The other window's choice stays saved as the landing tab.
+  expect(fixture.savedTabs()).toEqual(tabs)
+})

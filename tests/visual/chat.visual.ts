@@ -120,9 +120,6 @@ describe('Chat', () => {
 test(
   'chat placement survives reload while the popup starts closed',
   async page => {
-    await page.route(`**/api/workspaces/${WORKSPACE}/state/tabs`, () => {
-      throw new Error('Chat placement must stay in browser storage')
-    })
     await page.goto(WORKSPACE_PAGE)
     await page.getByRole('button', { name: 'Undock chat', exact: true }).click()
     await page.getByRole('button', { name: 'Agent', exact: true }).click()

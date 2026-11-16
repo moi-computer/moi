@@ -124,8 +124,11 @@ test('a pending view draft follows chat creation and native renames, including e
   expect(useUiStore.getState().composerDrafts[draft]).toBe('')
 })
 
-test('chat layout persists per workspace in one browser and stays independent of another', () => {
+test('tabs and chat layout persist per workspace in one browser, independent of another', () => {
+  const tabs = { open: ['overview' as const, 'scratchpad' as const], active: 'scratchpad' as const }
+  const defaultTabs = { open: ['overview' as const], active: 'overview' as const }
   const patch = {
+    tabs,
     layoutMode: 'fullscreen' as const,
     dockedChatWidth: 480,
     popupChatWidth: 520
@@ -136,6 +139,7 @@ test('chat layout persists per workspace in one browser and stays independent of
   const restored = createUiStore(localStorage).getState()
   expect(restored.workspaces.one).toEqual({ ...patch, popupChatWidth: 560 })
   expect(restored.workspaces.two).toEqual({
+    tabs: defaultTabs,
     layoutMode: 'split',
     dockedChatWidth: 360,
     popupChatWidth: 600

@@ -30,16 +30,3 @@ export function createDefaultWorkspaceLayout(): WorkspaceLayout {
     widgetGrid: createDefaultWidgetGrid()
   }
 }
-
-export function parseWorkspaceTabs(value: unknown): WorkspaceTabsState | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return
-  const tabs = value as Record<string, unknown>
-  if (
-    Object.keys(tabs).some(key => key !== 'open' && key !== 'active') ||
-    !Array.isArray(tabs.open) ||
-    !tabs.open.every(isWorkspaceTabId) ||
-    !isWorkspaceTabId(tabs.active)
-  )
-    return
-  return normalizeWorkspaceTabs(tabs)
-}

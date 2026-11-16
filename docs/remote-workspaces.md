@@ -13,11 +13,11 @@ A remote workspace is a registered local folder whose `.moi/.workspace.json` poi
 
 New local and remote configs use version 2. Remote configs contain only `version` and `remote`.
 
-The owner stores shared content, widgets, theme, name, and icon. Your Moi stores personal tabs,
-active tab, model defaults, and per-chat settings in
-`DATA_DIR/workspaces/{localId}/state.json`. All browsers connected to that Moi share this state.
-Split/fullscreen mode and panel widths are saved per workspace in browser
-localStorage. Remote chat and settings UI remain unavailable.
+The owner stores shared content, widgets, theme, name, and icon. Your Moi stores model defaults
+and per-chat settings in `DATA_DIR/workspaces/{localId}/state.json`, shared by every browser
+connected to it. Open tabs, the active tab, split/fullscreen mode, and panel widths are saved per
+workspace in browser localStorage; a newly opened workspace starts on Overview. Remote chat and
+settings UI remain unavailable.
 
 ## Routing
 
@@ -30,7 +30,7 @@ Registered workspaces use their local ID. Their info response provides `apiBase`
 - local: `/api/workspaces/{localId}`
 - remote: `/api/workspaces/{user_id}:{workspace_id}`
 
-The browser calls the remote prefix directly with its Batiok session. Batiok checks access and forwards to the owner's ordinary API; the visitor's Moi is not in the path. Applet RPC and file URLs follow the address the module was loaded from. For a remote reference, the visitor's own API serves only the reference and personal state. It answers 404 for shared content and rejects shared layout writes. Personal tabs use `/api/workspaces/{localId}/state/tabs` and are stored directly as `state.tabs`.
+The browser calls the remote prefix directly with its Batiok session. Batiok checks access and forwards to the owner's ordinary API; the visitor's Moi is not in the path. Applet RPC and file URLs follow the address the module was loaded from. For a remote reference, the visitor's own API serves only the reference and personal state. It answers 404 for shared content and rejects shared layout writes.
 
 The standalone Moi UI supports local workspaces only: it hides remote registrations and makes no Cloud discovery, sharing, or collaboration calls.
 

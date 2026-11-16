@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { WorkspaceEntry, WorkspaceState, WorkspaceTabsState } from '@/lib/types'
+import type { WorkspaceEntry, WorkspaceState } from '@/lib/types'
 // The API module first: it loads the harness registry before a single harness.
 import { api } from './index'
 import * as events from '../events'
@@ -174,42 +174,3 @@ test.each([false, true])('chat defaults stay in personal state (remote: %s)', as
     cloud.mockRestore()
   }
 })
-
-test.each([false, true])(
-  'personal tabs stay on this Moi and survive reload (remote: %s)',
-  async remote => {
-    const appConfig = await import('../app-config')
-    const layout = await import('../workspaces/layout')
-    const cloud = spyOn(appConfig, 'getAppConfig').mockReturnValue({
-      ...appConfig.getAppConfig(),
-      environment: 'cloud'
-    })
-    try {
-      if (remote)
-        await layout.initializeRemoteWorkspaceConfig(workspace.path, {
-          user_id: 'alice',
-          workspace_id: 'board'
-        })
-      else await layout.saveLayout(await layout.loadLayout(workspace.path), workspace.path)
-      const before = await Bun.file(layout.getLayoutPath(workspace.path)).text()
-      const tabs: WorkspaceTabsState = { open: ['overview', 'scratchpad'], active: 'scratchpad' }
-      const saved = await state(call('/state/tabs', 'PATCH', tabs))
-      expect(saved.tabs).toEqual(tabs)
-      setWorkspaceStateRoot(join(tempDir, 'state'))
-      expect((await state(call('/state'))).tabs).toEqual(saved.tabs)
-      expect(await Bun.file(layout.getLayoutPath(workspace.path)).text()).toBe(before)
-      for (const patch of [
-        { layoutMode: 'fullscreen' },
-        { open: ['nope'], active: 'overview' },
-        { chatOpen: true },
-        { popupChatWidth: 600 },
-        { widgetGrid: [] }
-      ]) {
-        expect((await call('/state/tabs', 'PATCH', patch)).status).toBe(400)
-      }
-      expect((await state(call('/state'))).tabs).toEqual(saved.tabs)
-    } finally {
-      cloud.mockRestore()
-    }
-  }
-)

@@ -25,7 +25,7 @@ export async function remoteControl(
     const { views }: { views: ViewInfo[] } = await (
       await request('/views?includePending=true')
     ).json()
-    return { tabs: assembleTabRows(views, 'overview') }
+    return { tabs: assembleTabRows(views) }
   }
   if (payload.type === 'config') {
     if (typeof payload.iconPath === 'string') {

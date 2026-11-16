@@ -19,6 +19,7 @@ import { createDefaultWorkspaceLayout, createDefaultWorkspaceTabs } from '@/lib/
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
 import { useWorkspaceNavigation } from './use-workspace-navigation'
+import { defaultWorkspaceUi, useUiStore } from '@/client/store/ui'
 
 beforeEach(() => seedWorkspaceInfo('abc'))
 afterEach(() => appQueryClient.removeQueries({ queryKey: workspaceKeys.layout('abc') }))
@@ -49,9 +50,9 @@ function readNavigation(
     selected: {},
     sessions: {},
     pendingViews: {},
-    ...previous,
-    tabs
+    ...previous
   })
+  useUiStore.setState({ workspaces: { abc: { ...defaultWorkspaceUi, tabs } } })
   const queryKey = workspaceKeys.views('abc')
   if (!queryClient.getQueryDefaults(queryKey).queryFn)
     queryClient.setQueryDefaults(queryKey, { queryFn: async () => views, retry: false })

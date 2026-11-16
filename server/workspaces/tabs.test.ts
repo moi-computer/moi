@@ -10,14 +10,13 @@ const views: ViewInfo[] = [
 ]
 
 describe('assembleTabRows', () => {
-  test('lists static tabs then views, marking the saved default', () => {
-    const rows = assembleTabRows(views, 'views/roadmap')
+  test('lists static tabs then views', () => {
+    const rows = assembleTabRows(views)
     expect(rows.map(r => r.id)).toEqual(['overview', 'scratchpad', 'views/roadmap', 'views/orders'])
-    expect(rows.find(r => r.isDefault)?.id).toBe('views/roadmap')
   })
 
   test('falls back to the view id when the title is empty', () => {
-    const rows = assembleTabRows(views, 'overview')
+    const rows = assembleTabRows(views)
     expect(rows.find(r => r.id === 'views/orders')?.title).toBe('orders')
     expect(rows.find(r => r.id === 'views/roadmap')?.title).toBe('Roadmap')
   })
@@ -29,17 +28,16 @@ describe('assembleTabRows', () => {
       title: 'Draft view',
       requirements: ''
     }
-    const rows = assembleTabRows([...views, pending], 'views/draft')
+    const rows = assembleTabRows([...views, pending])
     expect(rows.find(row => row.id === 'views/draft')).toMatchObject({
       title: 'Draft view',
-      isDefault: true,
       href: 'moi:/views/draft'
     })
   })
 })
 
 test('every discovered tab has a portable address', () => {
-  const rows = assembleTabRows(views, 'overview')
+  const rows = assembleTabRows(views)
   expect(rows.find(row => row.id === 'views/orders')?.href).toBe('moi:/views/orders')
   expect(rows.map(row => row.href)).toEqual([
     'moi:/overview',

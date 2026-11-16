@@ -5,25 +5,18 @@ import { sendControl } from '../control'
 import pc from '../pc'
 import { columns } from '../ui'
 
-// The listing behind `moi tabs`: every tab (static + views), one per row, the
-// saved default (`state.tabs.active`) marked. The
+// The listing behind `moi tabs`: every tab (static + views), one per row. The
 // addresses are documented in docs/navigation.md.
 function runTabsList(dir: string) {
   const path = resolve(dir)
   sendControl(path, { type: 'tabs', path }, res => {
-    type Row = { title: string; isDefault: boolean; href: string }
+    type Row = { title: string; href: string }
     const rows: Row[] = Array.isArray(res.tabs) ? (res.tabs as Row[]) : []
-    console.log(
-      '\n' + pc.bold('moi tabs') + pc.dim(' — workspace tabs, the default one marked') + '\n'
-    )
+    console.log('\n' + pc.bold('moi tabs') + pc.dim(' — workspace tabs') + '\n')
     console.log(
       columns(
-        ['', 'title', 'address'].map(h => pc.dim(h)),
-        rows.map(row => [
-          row.isDefault ? pc.green('●') : ' ',
-          row.isDefault ? pc.bold(row.title) : row.title,
-          row.href
-        ])
+        ['title', 'address'].map(h => pc.dim(h)),
+        rows.map(row => [row.title, row.href])
       )
     )
     console.log('\n' + pc.dim('  Open one: moi navigate <address>') + '\n')

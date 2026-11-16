@@ -545,17 +545,22 @@ test(
   'failed owner view discovery can be retried',
   async page => {
     let unavailable = true
-    await page.route(`**${remoteBase}/state`, route =>
-      route.fulfill({
-        json: {
-          revision: 1,
-          selected: {},
-          sessions: {},
-          pendingViews: {},
-          tabs: { open: ['overview', 'views/counter'], active: 'views/counter' }
-        }
-      })
-    )
+    // Tabs are a per-browser preference: this browser last had the view open.
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'moi:ui',
+        JSON.stringify({
+          state: {
+            workspaces: {
+              'shared-board': {
+                tabs: { open: ['overview', 'views/counter'], active: 'views/counter' }
+              }
+            }
+          },
+          version: 0
+        })
+      )
+    })
     await page.route(`**${ownerBase}/views`, route =>
       route.fulfill(
         unavailable
