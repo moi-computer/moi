@@ -552,13 +552,7 @@ test(
           selected: {},
           sessions: {},
           pendingViews: {},
-          layout: {
-            tabs: { open: ['overview', 'views/counter'], active: 'views/counter' },
-            layoutMode: 'fullscreen',
-            chatOpen: false,
-            dockedChatWidth: 360,
-            popupChatWidth: 440
-          }
+          tabs: { open: ['overview', 'views/counter'], active: 'views/counter' }
         }
       })
     )

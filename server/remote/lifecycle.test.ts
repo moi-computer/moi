@@ -227,7 +227,8 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
     server.stop(true)
     await rm(dir, { recursive: true, force: true })
   }
-})
+  // Runs the real CLI several times; slow CI runners need more than the default 5s.
+}, 30_000)
 
 test('human credentials cannot be overwritten by an agent invitation', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'moi-human-'))

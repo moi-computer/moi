@@ -84,7 +84,7 @@ function loadApplet(
   return promise
 }
 
-function useApplet(kind: AppletKindSpec, name: string): AppletState {
+function useApplet(kind: AppletKindSpec, name: string, revision?: string): AppletState {
   const workspaceId = useWorkspaceId()
   const { base } = useRouter()
   const key = appletKey(kind.segment, workspaceId, name)
@@ -147,26 +147,29 @@ function useApplet(kind: AppletKindSpec, name: string): AppletState {
     }
   })
 
-  // Owner events don't reach visitors yet, so a remote applet reloads on focus.
+  // Owner events don't reach visitors yet. The applet lists refetch on window
+  // focus and carry each bundle's revision, so a remote applet reloads only when
+  // its build changed: a reload remounts it and keeps the old module in memory.
   const remote = isRemoteWorkspace(workspaceId)
+  const seen = useRef({ key, revision })
   useEffect(() => {
-    if (!remote) return
-    const refresh = () => {
-      invalidateApplet(kind.segment, workspaceId, name)
-      load()
-    }
-    window.addEventListener('focus', refresh)
-    return () => window.removeEventListener('focus', refresh)
-  }, [remote, kind.segment, workspaceId, name, load])
+    const previous = seen.current
+    seen.current = { key, revision }
+    if (!remote || previous.key !== key || previous.revision === revision) return
+    if (previous.revision === undefined || revision === undefined) return
+    invalidateApplet(kind.segment, workspaceId, name)
+    load()
+  }, [remote, key, revision, kind.segment, workspaceId, name, load])
   return state
 }
 
-export function useWidget(name: string): AppletState {
-  return useApplet(WIDGET_KIND, name)
+// `revision` is the bundle revision from the widgets/views list.
+export function useWidget(name: string, revision?: string): AppletState {
+  return useApplet(WIDGET_KIND, name, revision)
 }
 
-export function useView(name: string): AppletState {
-  return useApplet(VIEW_KIND, name)
+export function useView(name: string, revision?: string): AppletState {
+  return useApplet(VIEW_KIND, name, revision)
 }
 
 // Mount once per workspace (in the workspace route). Invalidates the shared

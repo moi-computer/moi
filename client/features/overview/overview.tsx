@@ -236,7 +236,7 @@ export function Overview({
       showOnboarding
     })
     if (defaultWidget) return defaultWidget
-    return <WidgetShell name={id} />
+    return <WidgetShell name={id} revision={widgetById.get(id)?.revision} />
   }
 
   function hide(id: string) {

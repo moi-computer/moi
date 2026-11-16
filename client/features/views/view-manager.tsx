@@ -129,7 +129,7 @@ type ViewSlotProps = {
 // place, so it is current the moment the user comes back to it.
 function ViewSlot({ view, active, params }: ViewSlotProps) {
   const workspaceId = useWorkspaceId()
-  const bundle = useView(view.id)
+  const bundle = useView(view.id, view.revision)
   const { current, outgoing } = useLoadedBundle(bundle, active)
   // A parked view keeps rendering with the params it was last shown with: the
   // active view's URL state is not its to render.

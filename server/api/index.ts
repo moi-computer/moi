@@ -183,17 +183,16 @@ const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
       release = reserveWorkspaceOperation(id)
     const ws = await getWorkspace(id)
     if (!ws) return c.text('Workspace not found', 404)
-    const config = await loadWorkspaceFileConfig(ws.path)
     const suffix = (c.req.path.split(`/workspaces/${encodeURIComponent(id)}`)[1] ?? '').replace(
       /\/$/,
       ''
     )
     const personal = PERSONAL_ROUTE_RE.test(suffix)
-    if (config.remote && suffix === '' && c.req.method === 'DELETE')
+    if (ws.remote && suffix === '' && c.req.method === 'DELETE')
       return c.text('Leaving remote workspaces is not available yet', 403)
-    if (config.remote && getAppConfig().environment !== 'cloud')
+    if (ws.remote && getAppConfig().environment !== 'cloud')
       return c.text('Remote workspaces require Cloud mode', 403)
-    if (config.remote && suffix !== '' && !personal)
+    if (ws.remote && suffix !== '' && !personal)
       return c.text('Use the owner workspace address', 404)
     c.set('ws', ws)
     await next()
@@ -994,23 +993,20 @@ one.put('/applet-thumbnails', async c => {
 
 one.put('/', async c => {
   const ws = c.get('ws')
-  const body = await c.req.json()
-  if (!body) return c.text('Bad request', 400)
-  // `origin` is the writing tab's id, echoed so that tab skips its own event.
-  const { origin, harness: _harness, apiBase: _apiBase, isRemote: _isRemote, ...layout } = body
-  // Preserve server-owned identity (name/icon) across a grid/theme save so the
-  // client's PUT can't erase a `moi config`-set name. See mergeLayoutForSave.
-  const config = await loadWorkspaceFileConfig(ws.path)
-  if (config.remote) {
+  if (ws.remote) {
     return c.text(
       'Remote references contain only the owner address; save shared content to the owner',
       403
     )
   }
-
-  if (body.version !== 2) return c.text('Bad request', 400)
+  const body = await c.req.json()
+  if (!body || body.version !== 2) return c.text('Bad request', 400)
+  // `origin` is the writing tab's id, echoed so that tab skips its own event.
+  const { origin } = body
+  // Only widgets and theme are taken from the body, so a grid/theme save can't
+  // erase a `moi config`-set name or icon. See mergeLayoutForSave.
   const existing = await loadLayout(ws.path)
-  const next = mergeLayoutForSave(existing, layout)
+  const next = mergeLayoutForSave(existing, body)
   await saveLayout(next, ws.path)
   if (
     JSON.stringify(resolveWorkspaceTheme(existing.theme)) !==
@@ -1032,6 +1028,11 @@ one.delete('/', async c => {
 
 // ---- workspace collection: /api/workspaces ----------------------------------
 const workspaces = new Hono<ApiEnv>()
+
+// Standalone Moi lists local workspaces only; remote references need Cloud.
+function visibleWorkspaces(entries: WorkspaceEntry[]) {
+  return getAppConfig().environment === 'cloud' ? entries : entries.filter(entry => !entry.remote)
+}
 
 async function mergeWorkspaceList(entries: WorkspaceEntry[]) {
   return Promise.all(
@@ -1077,11 +1078,7 @@ workspaces.get('/', async c => {
   // Merge each workspace's live identity and theme over the registry snapshot
   // so app-wide workspace lists render the same presentation as the workspace.
   const entries = await listWorkspaces()
-  return c.json(
-    await mergeWorkspaceList(
-      getAppConfig().environment === 'cloud' ? entries : entries.filter(entry => !entry.remote)
-    )
-  )
+  return c.json(await mergeWorkspaceList(visibleWorkspaces(entries)))
 })
 
 workspaces.put('/order', async c => {
@@ -1090,20 +1087,16 @@ workspaces.put('/order', async c => {
     return c.text('Expected { ids: string[] }', 400)
   }
   try {
-    const hiddenIds =
-      getAppConfig().environment === 'cloud'
-        ? []
-        : (await listWorkspaces()).filter(entry => entry.remote).map(entry => entry.id)
+    // Hidden remote references keep their place after the visible ones.
+    const all = await listWorkspaces()
+    const visible = new Set(visibleWorkspaces(all).map(entry => entry.id))
+    const hiddenIds = all.filter(entry => !visible.has(entry.id)).map(entry => entry.id)
     const entries = await reorderWorkspaces([...body.ids, ...hiddenIds])
     // List-only change: a narrow event so clients refetch just the sidebar
     // list, not every per-workspace query (`workspace:updated` also triggers
     // layout refetches in open workspaces).
     publishEvent({ type: 'workspaces-list:updated', origin: eventOrigin(body.origin) })
-    return c.json(
-      await mergeWorkspaceList(
-        getAppConfig().environment === 'cloud' ? entries : entries.filter(entry => !entry.remote)
-      )
-    )
+    return c.json(await mergeWorkspaceList(visibleWorkspaces(entries)))
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return c.text(message, 400)
@@ -1157,12 +1150,8 @@ workspaces.get('/previews', async c => {
   const entries = await listWorkspaces()
   const previews = await Promise.all(
     entries.map(async ws => {
-      const config = await loadWorkspaceFileConfig(ws.path).catch(() => null)
-      if (!config) return [ws.id, { thumbnails: [] }] as const
-      if (config.remote) {
-        return [ws.id, { thumbnails: [] }] as const
-      }
-
+      // A remote reference has no local content to preview.
+      if (ws.remote) return [ws.id, { thumbnails: [] }] as const
       const views = await listCompiledViews(ws.path).catch(() => [])
       const preview = await getWorkspacePreview(ws.path, {
         getProviderPreview: includeFirstUserMessage =>

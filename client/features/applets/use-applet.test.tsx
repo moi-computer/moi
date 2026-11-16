@@ -9,7 +9,7 @@ import * as journal from './applet-log'
 import { Workspace } from '../workspace/workspace-context'
 import { queryClient } from '@/client/api/query-client'
 
-test('focus refresh keeps a view visible and ignores stale loads after navigation', async () => {
+test('a remote view reloads only when its revision changes, staying visible meanwhile', async () => {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = {
     window,
@@ -29,43 +29,40 @@ test('focus refresh keeps a view visible and ignores stale loads after navigatio
   const load = spyOn(cache, 'getCachedApplet').mockImplementation(() => next)
   const log = spyOn(journal, 'reportAppletError').mockImplementation(() => {})
   seedWorkspaceInfo('visitor', { user_id: 'alice', workspace_id: 'board' })
-  type ProbeProps = { name: string }
-  function Probe({ name }: ProbeProps) {
-    const state = useView(name)
+  type ProbeProps = { name: string; revision: string }
+  function Probe({ name, revision }: ProbeProps) {
+    const state = useView(name, revision)
     return state.status === 'ready' ? <state.Component /> : <p>{state.status}</p>
   }
   const root = createRoot(document.getElementById('root')!)
-  try {
-    await act(async () =>
+  const render = (name: string, revision: string) =>
+    act(async () =>
       root.render(
         <Workspace id="visitor">
-          <Probe name="first" />
+          <Probe name={name} revision={revision} />
         </Workspace>
       )
     )
+  try {
+    await render('first', 'a')
     expect(document.body.textContent).toContain('First view')
+    // An unchanged revision (a list refetch on focus) loads nothing.
+    const loads = load.mock.calls.length
+    await render('first', 'a')
+    expect(load.mock.calls.length).toBe(loads)
     next = new Promise(resolve => {
       finish = resolve
     })
-    await act(async () => {
-      window.dispatchEvent(new window.Event('focus'))
-    })
+    await render('first', 'b')
+    expect(load.mock.calls.length).toBe(loads + 1)
     expect(document.body.textContent).toContain('First view')
     next = Promise.resolve(second)
-    await act(async () =>
-      root.render(
-        <Workspace id="visitor">
-          <Probe name="second" />
-        </Workspace>
-      )
-    )
+    await render('second', 'a')
     expect(document.body.textContent).toContain('Second view')
     await act(async () => finish(first))
     expect(document.body.textContent).toContain('Second view')
     next = Promise.reject(new Error('Owner unavailable'))
-    await act(async () => {
-      window.dispatchEvent(new window.Event('focus'))
-    })
+    await render('second', 'b')
     expect(document.body.textContent).toContain('Second view')
     expect(log).toHaveBeenCalled()
   } finally {

@@ -8,11 +8,13 @@ import { WidgetErrorBoundary } from './widget-error-boundary'
 
 type WidgetShellProps = {
   name: string
+  // Bundle revision from the widgets list.
+  revision?: string
 }
 
-export function WidgetShell({ name }: WidgetShellProps) {
+export function WidgetShell({ name, revision }: WidgetShellProps) {
   const workspaceId = useWorkspaceId()
-  const widget = useWidget(name)
+  const widget = useWidget(name, revision)
 
   return (
     <AnimatePresence mode="wait" initial={false}>
