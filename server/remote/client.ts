@@ -1,8 +1,4 @@
-import {
-  workspaceAddress,
-  workspaceApiBase,
-  parseRemoteWorkspaceTarget
-} from '@/lib/workspace-config'
+import { parseRemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { decodeJwt } from 'jose'
 import { Mutex } from 'async-mutex'
 import { lock } from 'proper-lockfile'
@@ -11,7 +7,7 @@ import { access as fileAccess, chmod, mkdir, rename, rm } from 'node:fs/promises
 import { accessSync, constants, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { canUseDataDir, DATA_DIR } from '../data-dir'
-import { allowedCloudRequest } from './allowed'
+import { allowedCloudRequest, cloudRoutes } from './routes'
 import { controlBroker } from './broker-client'
 import { CloudSignInRequired } from './errors'
 import { PACKAGE_ROOT } from '../version'
@@ -451,7 +447,7 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
     schema: z.ZodType<T>,
     method?: string
   ) {
-    return answer(await send('api' + path, jsonRequest(body, method)), schema)
+    return answer(await send(path, jsonRequest(body, method)), schema)
   }
 
   /** The saved login's kind and Cloud URL, for a server lending it to callers. */
@@ -485,7 +481,7 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
   async function invitations() {
     return (
       await request(
-        '/workspaces/invitations',
+        cloudRoutes.invitations.path(),
         undefined,
         z.object({ invitations: z.array(invitationSchema) })
       )
@@ -521,7 +517,7 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
       .transform(parseRemoteWorkspaceTarget),
     membershipId: z.string()
   })
-  const acceptPath = (id: string) => `/invitations/${encodeURIComponent(id)}/accept`
+  const acceptPath = (id: string) => cloudRoutes.acceptInvitation.path({ id })
   async function accept(value: string, name?: string, client?: string) {
     if (client !== undefined && !agentClientSchema.safeParse(client).success)
       throw new Error(`Invalid client — choose ${AGENT_CLIENTS.join(', ')}`)
@@ -555,7 +551,7 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
           response: await localSend(
             config,
             pair,
-            'api' + acceptPath(target.id),
+            acceptPath(target.id),
             jsonRequest(target.token ? { token: target.token } : {})
           ),
           agent: isAgent(pair)
@@ -647,12 +643,11 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
   async function renameAgent(name: string) {
     const { login } = await activeLogin()
     if (login === 'human') throw new Error('This command is for agents')
-    return request('/me', { name }, agentProfileSchema, 'PATCH')
+    return request(cloudRoutes.me.path(), { name }, agentProfileSchema, 'PATCH')
   }
   async function leave(ownerId: string, workspaceId: string) {
-    parseRemoteWorkspaceTarget({ user_id: ownerId, workspace_id: workspaceId })
     return request(
-      `/workspaces/${workspaceAddress(workspaceId, ownerId)}/leave`,
+      cloudRoutes.leave.path({ workspace: { user_id: ownerId, workspace_id: workspaceId } }),
       {},
       z.object({ success: z.literal(true) })
     )
@@ -662,42 +657,13 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
    * Refreshes credentials automatically; requires no browser or running Moi server.
    */
   async function fetchSharedWorkspaces(): Promise<SharedWorkspace[]> {
-    return (await request('/workspaces/shared', undefined, workspacesSchema)).workspaces
+    return (await request(cloudRoutes.sharedWorkspaces.path(), undefined, workspacesSchema))
+      .workspaces
   }
 
-  /** Byte-preserving operations transport; writes are never automatically replayed. */
-  async function operation(
-    ownerId: string,
-    workspaceId: string,
-    suffix: string,
-    options: RemoteRequestOptions = {}
-  ): Promise<Response> {
-    parseRemoteWorkspaceTarget({ user_id: ownerId, workspace_id: workspaceId })
-    if (!/^\/(?:files\/|exec$|commands$)/.test(suffix)) throw new Error('Invalid remote operation')
-    return transport(
-      `api/workspaces/${workspaceAddress(workspaceId, ownerId)}/ops${suffix}`,
-      options
-    )
-  }
-
-  async function workspaceRequest(
-    ownerId: string,
-    workspaceId: string,
-    suffix: string,
-    options: RemoteRequestOptions = {}
-  ) {
-    parseRemoteWorkspaceTarget({ user_id: ownerId, workspace_id: workspaceId })
-    const base = new URL(workspaceApiBase(workspaceId, ownerId), 'http://workspace.local')
-    const url = new URL(base.href + suffix)
-    if (
-      url.origin !== base.origin ||
-      (url.pathname !== base.pathname && !url.pathname.startsWith(base.pathname + '/'))
-    )
-      throw new Error('Invalid workspace path')
-    return transport(url.pathname + url.search, options)
-  }
-
-  async function transport(path: string, options: RemoteRequestOptions) {
+  /** Send a request built from `cloudRoutes` and answer with Cloud's response.
+   * Bytes are preserved and writes are never automatically replayed. */
+  async function remoteRequest(path: string, options: RemoteRequestOptions = {}) {
     const { response } = await send(path, options)
     if (!response.ok) {
       await response.body?.cancel()
@@ -712,8 +678,8 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
 
   async function remoteStatus(): Promise<RemoteStatus> {
     const [me, shared] = await Promise.all([
-      request('/me', undefined, profileSchema),
-      request('/workspaces/shared', undefined, workspacesSchema)
+      request(cloudRoutes.me.path(), undefined, profileSchema),
+      request(cloudRoutes.sharedWorkspaces.path(), undefined, workspacesSchema)
     ])
     return { me, workspaces: shared.workspaces }
   }
@@ -726,9 +692,8 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
     login,
     logout,
     fetchSharedWorkspaces,
-    workspaceRequest,
+    remoteRequest,
     remoteStatus,
-    operation,
     invitations,
     accept,
     renameAgent,
@@ -746,9 +711,8 @@ export const {
   login,
   logout,
   fetchSharedWorkspaces,
-  workspaceRequest,
+  remoteRequest,
   remoteStatus,
-  operation,
   invitations,
   accept,
   renameAgent,

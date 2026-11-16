@@ -6,6 +6,7 @@ import type { WorkspaceEntry } from '@/lib/types'
 import { createRemoteBroker } from './broker'
 import { BROKER_CALLER_HEADER, createControlBroker } from './broker-client'
 import { CloudSignInRequired, createRemoteClient } from './client'
+import { cloudRoutes } from './routes'
 
 // A Moi server signed in to Cloud, and a caller on the same machine that has
 // its own, empty data directory: the agent's OS user on a managed machine.
@@ -24,6 +25,8 @@ const cloudUrl = () => cloud.url.origin + '/cloud'
 const linked = [
   { id: 'w1', path: '/workspaces/board', remote: { user_id: 'owner', workspace_id: 'board' } }
 ] as WorkspaceEntry[]
+const board = { user_id: 'owner', workspace_id: 'board' }
+const file = (name: string, workspace = board) => cloudRoutes.files.path({ workspace, file: name })
 
 async function signIn(directory: string, name: string) {
   await Bun.write(join(directory, 'config.json'), JSON.stringify({ remote: { url: cloudUrl() } }))
@@ -116,7 +119,7 @@ test('a caller with no login reaches Cloud through the server and never holds a 
 
 test('uploads, downloads, and workspace API calls keep their bytes, type, and status', async () => {
   const bytes = crypto.getRandomValues(new Uint8Array(200_000))
-  const uploaded = await caller.operation('owner', 'board', '/files/assets/photo.bin', {
+  const uploaded = await caller.remoteRequest(file('assets/photo.bin'), {
     method: 'PUT',
     body: new Blob([bytes]),
     contentType: 'application/octet-stream'
@@ -127,10 +130,8 @@ test('uploads, downloads, and workspace API calls keep their bytes, type, and st
     method: 'PUT',
     path: '/cloud/api/workspaces/owner:board/ops/files/assets/photo.bin'
   })
-  expect(await (await caller.operation('owner', 'board', '/files/notes.txt')).text()).toBe(
-    'file bytes'
-  )
-  await caller.workspaceRequest('owner', 'board', '/config', {
+  expect(await (await caller.remoteRequest(file('notes.txt'))).text()).toBe('file bytes')
+  await caller.remoteRequest(cloudRoutes.config.path({ workspace: board }), {
     method: 'PUT',
     body: '{"name":"Board"}',
     contentType: 'application/json'
@@ -140,14 +141,14 @@ test('uploads, downloads, and workspace API calls keep their bytes, type, and st
     path: '/api/workspaces/owner:board/config',
     body: '{"name":"Board"}'
   })
-  await expect(caller.operation('owner', 'board', '/files/missing.txt')).rejects.toThrow(
+  await expect(caller.remoteRequest(file('missing.txt'))).rejects.toThrow(
     'Remote operation failed (404)'
   )
 })
 
 test('cancelling a streamed command reaches Cloud', async () => {
   const controller = new AbortController()
-  const response = await caller.operation('owner', 'board', '/exec', {
+  const response = await caller.remoteRequest(cloudRoutes.exec.path({ workspace: board }), {
     method: 'POST',
     body: '{"command":"sleep 60"}',
     contentType: 'application/json',
@@ -175,9 +176,9 @@ test('the server refuses unlisted requests, unlinked workspaces, and web pages',
     expect(refused.status).toBe(502)
     expect(await refused.json()).toMatchObject({ error: 'This Cloud request is not allowed' })
   }
-  await expect(caller.operation('owner', 'other', '/files/notes.txt')).rejects.toThrow(
-    'This workspace is not linked on this machine'
-  )
+  await expect(
+    caller.remoteRequest(file('notes.txt', { user_id: 'owner', workspace_id: 'other' }))
+  ).rejects.toThrow('This workspace is not linked on this machine')
   expect((await ask('api/me', { headers: { origin: 'https://evil.example' } })).status).toBe(403)
   expect(
     (await fetch(`${moi.url.origin}/remote/request?path=api%2Fme`, { method: 'POST' })).status

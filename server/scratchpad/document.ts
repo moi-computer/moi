@@ -1,5 +1,6 @@
 import type { WorkspaceApiTarget } from '../workspaces/api'
 import { requestWorkspace } from '../workspaces/api'
+import { cloudRoutes } from '../remote/routes'
 import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 
@@ -294,7 +295,7 @@ export async function readScratchpadShapes(
 async function readSnapshot(workspace: string | WorkspaceApiTarget): Promise<ScratchpadSnapshot> {
   return typeof workspace === 'string'
     ? loadScratchpadDoc(workspace)
-    : (await requestWorkspace(workspace, '/scratchpad')).json()
+    : (await requestWorkspace(cloudRoutes.scratchpad.path({ workspace: workspace.remote }))).json()
 }
 
 async function readAsset(
@@ -303,7 +304,9 @@ async function readAsset(
 ): Promise<Blob | undefined> {
   if (typeof workspace !== 'string')
     return (
-      await requestWorkspace(workspace, `/scratchpad/assets/${encodeURIComponent(fileName)}`)
+      await requestWorkspace(
+        cloudRoutes.scratchpadAsset.path({ workspace: workspace.remote, name: fileName })
+      )
     ).blob()
   const asset = scratchpadAssetFile(workspace, fileName)
   if (!asset || !(await asset.file.exists())) return undefined

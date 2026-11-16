@@ -2,7 +2,8 @@ import { defineCommand } from 'citty'
 import { mkdir, rename, rm } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { z } from 'zod'
-import { operation } from '../remote/client'
+import { remoteRequest } from '../remote/client'
+import { cloudRoutes } from '../remote/routes'
 import { currentRemoteWorkspace } from '../remote/workspace'
 
 const path = { type: 'string' as const, description: 'Local linked workspace folder' }
@@ -26,7 +27,7 @@ async function printCommandResult(response: Response, json = false) {
 export async function runLinkedWorkspaceCommand(command: string, args: string[], folder: string) {
   const linked = await currentRemoteWorkspace(folder)
   if (!linked) return false
-  const response = await operation(linked.user_id, linked.workspace_id, '/commands', {
+  const response = await remoteRequest(cloudRoutes.commands.path({ workspace: linked }), {
     method: 'POST',
     body: JSON.stringify({ command, args }),
     contentType: 'application/json'
@@ -39,24 +40,19 @@ const execEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('stderr'), data: z.string() }),
   z.object({ type: z.literal('exit'), code: z.number().int() })
 ])
-const fileSuffix = (value: string) => {
-  if (
-    !value ||
-    value.startsWith('/') ||
-    value.includes('\\') ||
-    value.split('/').some(p => p === '.' || p === '..' || !p)
-  )
-    throw new Error('Use a file path relative to the remote workspace')
-  return '/files/' + value.split('/').map(encodeURIComponent).join('/')
-}
 async function target(folder?: string) {
   const current = await currentRemoteWorkspace(folder)
   if (!current)
     throw new Error(
       'This folder is not a remote workspace — run moi init --remote ownerId:workspaceId first'
     )
-  return (suffix: string, options?: Parameters<typeof operation>[3]) =>
-    operation(current.user_id, current.workspace_id, suffix, options)
+  type Options = Parameters<typeof remoteRequest>[1]
+  return {
+    file: (file: string, options?: Options) =>
+      remoteRequest(cloudRoutes.files.path({ workspace: current, file }), options),
+    exec: (options?: Options) =>
+      remoteRequest(cloudRoutes.exec.path({ workspace: current }), options)
+  }
 }
 async function stdin() {
   if (process.stdin.isTTY) throw new Error('Supply content or pipe it on stdin')
@@ -69,7 +65,7 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
     args: { file: { type: 'positional', required: true }, path },
     run: ({ args }) =>
       report(async () => {
-        const response = await (await target(args.path))(fileSuffix(args.file))
+        const response = await (await target(args.path)).file(args.file)
         if (response.body)
           for await (const chunk of response.body) await Bun.write(Bun.stdout, chunk)
       })
@@ -86,7 +82,7 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
       report(async () => {
         const response = await (
           await target(args.path)
-        )(fileSuffix(args.file), {
+        ).file(args.file, {
           method: 'PUT',
           body: args.content ?? (await stdin()),
           contentType: 'application/octet-stream'
@@ -112,7 +108,7 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
           : await stdin()
         const response = await (
           await target(args.path)
-        )(fileSuffix(args.file), {
+        ).file(args.file, {
           method: 'PATCH',
           body: JSON.stringify({ patch: diff }),
           contentType: 'application/json'
@@ -134,7 +130,7 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
         if (!(await file.exists())) throw new Error('Local source file not found')
         const response = await (
           await target(args.path)
-        )(fileSuffix(args.destination), {
+        ).file(args.destination, {
           method: 'PUT',
           body: file,
           contentType: 'application/octet-stream'
@@ -157,7 +153,7 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
     },
     run: ({ args }) =>
       report(async () => {
-        const response = await (await target(args.path))(fileSuffix(args.source))
+        const response = await (await target(args.path)).file(args.source)
         const destination = resolve(args.destination),
           temporary = `${destination}.${crypto.randomUUID()}.tmp`
         await mkdir(dirname(destination), { recursive: true })
@@ -187,12 +183,13 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
         const id = crypto.randomUUID()
         let cancellation: Promise<void> | undefined
         const interrupt = () => {
-          cancellation ??= request('/exec', {
-            method: 'POST',
-            body: JSON.stringify({ cancel: id }),
-            contentType: 'application/json',
-            signal: AbortSignal.timeout(10_000)
-          })
+          cancellation ??= request
+            .exec({
+              method: 'POST',
+              body: JSON.stringify({ cancel: id }),
+              contentType: 'application/json',
+              signal: AbortSignal.timeout(10_000)
+            })
             .then(async response => {
               await response.body?.cancel()
             })
@@ -203,7 +200,7 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
         }
         process.once('SIGINT', interrupt)
         try {
-          const response = await request('/exec', {
+          const response = await request.exec({
             method: 'POST',
             body: JSON.stringify({ command: args.command, id }),
             contentType: 'application/json',

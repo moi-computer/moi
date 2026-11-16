@@ -3,6 +3,9 @@ import { mkdir, mkdtemp, rm, stat, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRemoteClient, resolveRemoteConfig } from './client'
+import { cloudRoutes } from './routes'
+
+const board = { user_id: 'alice', workspace_id: 'board' }
 
 let directory: string
 let server: ReturnType<typeof Bun.serve>
@@ -230,14 +233,16 @@ test('development requires a target; published installs default to production', 
 
 test('workspace content requests authenticate and refresh through the same client', async () => {
   await credentials()
-  const response = await client.workspaceRequest('alice', 'board', '/config')
+  const response = await client.remoteRequest(cloudRoutes.config.path({ workspace: board }))
   expect(response.status).toBe(200)
   expect(refreshes).toBe(1)
 })
 
 test('requests that are not on the allowlist never reach Cloud', async () => {
   await credentials(Date.now() / 1000 + 3600)
-  await expect(client.workspaceRequest('alice', 'board', '/widgets')).rejects.toThrow('not allowed')
+  await expect(client.remoteRequest('/api/workspaces/alice:board/widgets')).rejects.toThrow(
+    'not allowed'
+  )
   await expect(client.send('api/cloud/dangerous-moi-action', { method: 'POST' })).rejects.toThrow(
     'not allowed'
   )
@@ -246,10 +251,12 @@ test('requests that are not on the allowlist never reach Cloud', async () => {
 
 test('workspace content requests reject path escapes and authenticated redirects', async () => {
   await credentials(Date.now() / 1000 + 3600)
-  await expect(client.workspaceRequest('alice', 'board', '/../../leak')).rejects.toThrow(
-    'Invalid workspace path'
+  await expect(client.remoteRequest('/api/workspaces/alice:board/../../leak')).rejects.toThrow(
+    'not allowed'
   )
   responseMode = 'redirect'
-  await expect(client.workspaceRequest('alice', 'board', '/config')).rejects.toThrow()
+  await expect(
+    client.remoteRequest(cloudRoutes.config.path({ workspace: board }))
+  ).rejects.toThrow()
   expect(requests).toBe(1)
 })

@@ -36,14 +36,14 @@ test('agent operations sign exact binary bytes and reject oversize uploads local
     const bytes = crypto.getRandomValues(new Uint8Array(10_000))
     expect(
       (
-        await client.operation('owner', 'workspace', '/files/photo.bin', {
+        await client.remoteRequest('api/workspaces/owner:workspace/ops/files/photo.bin', {
           method: 'PUT',
           body: new Blob([bytes])
         })
       ).status
     ).toBe(200)
     await expect(
-      client.operation('owner', 'workspace', '/files/large.bin', {
+      client.remoteRequest('api/workspaces/owner:workspace/ops/files/large.bin', {
         method: 'PUT',
         body: new Blob([new Uint8Array(16 * 1024 * 1024 + 1)])
       })

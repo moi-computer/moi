@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { allowedCloudRequest } from './allowed'
+import { allowedCloudRequest, cloudRoutes } from './routes'
 
 const workspace = { user_id: 'owner', workspace_id: 'board' }
 
@@ -57,4 +57,25 @@ test('refuses everything else', () => {
     ['GET', '']
   ] as const)
     expect(() => allowedCloudRequest(method, path)).toThrow('This Cloud request is not allowed')
+})
+
+test('every path a route builds is allowed for each of its methods', () => {
+  const values = { id: 'inv_1', workspace, file: 'assets/my photo (1).png', name: 'image 1.png' }
+  for (const route of Object.values(cloudRoutes)) {
+    const path = (route.path as (params: typeof values) => string)(values)
+    for (const method of route.methods)
+      expect(allowedCloudRequest(method, path)).toEqual(
+        path.includes('owner:board') ? { workspace } : {}
+      )
+  }
+})
+
+test('builders refuse values that would change the path', () => {
+  for (const file of ['', '/etc/passwd', '../secret', 'a//b', 'a/./b', 'a\\b'])
+    expect(() => cloudRoutes.files.path({ workspace, file })).toThrow('relative to the remote')
+  expect(() => cloudRoutes.scratchpadAsset.path({ workspace, name: 'a/b.png' })).toThrow()
+  expect(() => cloudRoutes.acceptInvitation.path({ id: 'a/b' })).toThrow('Invalid invitation ID')
+  expect(() =>
+    cloudRoutes.leave.path({ workspace: { user_id: 'a/b', workspace_id: 'board' } })
+  ).toThrow('Invalid remote owner ID')
 })

@@ -1,7 +1,7 @@
 import type { WorkspaceEntry } from '@/lib/types'
 import { DATA_DIR } from '../data-dir'
 import { listWorkspaces } from '../workspaces/registry'
-import { allowedCloudRequest } from './allowed'
+import { allowedCloudRequest } from './routes'
 import { BROKER_CALLER_HEADER, BROKER_ERROR_HEADER, BROKER_LOGIN_HEADER } from './broker-client'
 import { createRemoteClient } from './client'
 import { CloudSignInRequired } from './errors'
@@ -12,7 +12,7 @@ import { CloudSignInRequired } from './errors'
 // so the credential never leaves this process. Three checks bound what a
 // caller can do with it:
 //
-// - the request must be on the list in allowed.ts
+// - the request must be on the list in routes.ts
 // - a request that names a workspace must name one linked on this machine
 // - the caller must be a program, not a web page (see BROKER_CALLER_HEADER)
 
