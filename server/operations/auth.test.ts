@@ -49,6 +49,16 @@ test('agent operations sign exact binary bytes and reject oversize uploads local
       })
     ).rejects.toThrow('16 MiB')
     expect(requests).toBe(1)
+    // A body that arrives as a stream, as it does through the server, is signed the same way.
+    expect(
+      (
+        await client.remoteRequest('api/workspaces/owner:workspace/ops/files/photo.bin', {
+          method: 'PUT',
+          body: new Blob([bytes]).stream()
+        })
+      ).status
+    ).toBe(200)
+    expect(requests).toBe(2)
   } finally {
     server.stop(true)
     await rm(dir, { recursive: true, force: true })

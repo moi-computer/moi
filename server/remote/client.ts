@@ -22,7 +22,9 @@ import {
 
 export type RemoteRequestOptions = {
   method?: string
-  body?: string | Blob | Uint8Array<ArrayBuffer>
+  body?: string | Blob | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>
+  /** Byte length of a stream body, so the upload keeps a known length. */
+  contentLength?: string
   signal?: AbortSignal
   contentType?: string
 }
@@ -125,6 +127,10 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
       () => true,
       () => false
     )
+  // Sign-in and changes to the account belong to whoever holds the login.
+  function ownDirectory() {
+    if (!usable()) throw new Error('This is only available to the user that runs Moi')
+  }
   // A directory that does not exist yet can still be created and used.
   function usable(): boolean {
     try {
@@ -383,25 +389,31 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
   ): Promise<Response> {
     const url = new URL(path, config.url.replace(/\/+$/, '') + '/').href
     const method = options.method ?? 'GET'
+    const limit = 16 * 1024 * 1024
+    const tooLarge = () => new Error('Agent uploads are limited to 16 MiB')
     let body = options.body
-    if (isAgent(pair) && body instanceof Blob) {
-      if (body.size > 16 * 1024 * 1024) throw new Error('Agent uploads are limited to 16 MiB')
-      body = new Uint8Array(await body.arrayBuffer())
+    let authorization = isAgent(pair) ? '' : `Bearer ${pair.accessToken}`
+    if (isAgent(pair)) {
+      // Agent Auth signs the exact bytes, so they are read before sending.
+      let bytes: string | Uint8Array<ArrayBuffer> = ''
+      if (body instanceof ReadableStream) {
+        if (Number(options.contentLength) > limit) throw tooLarge()
+        const chunks: Uint8Array[] = []
+        let size = 0
+        for await (const chunk of body) {
+          if ((size += chunk.byteLength) > limit) throw tooLarge()
+          chunks.push(chunk)
+        }
+        bytes = new Uint8Array(Buffer.concat(chunks))
+      } else if (body instanceof Blob) {
+        if (body.size > limit) throw tooLarge()
+        bytes = new Uint8Array(await body.arrayBuffer())
+      } else if (body !== undefined) bytes = body
+      if ((typeof bytes === 'string' ? Buffer.byteLength(bytes) : bytes.byteLength) > limit)
+        throw tooLarge()
+      if (body !== undefined) body = bytes
+      authorization = await agentAuthorization(pair, url, method, bytes)
     }
-    if (
-      isAgent(pair) &&
-      body &&
-      (typeof body === 'string'
-        ? Buffer.byteLength(body)
-        : body instanceof Blob
-          ? body.size
-          : body.byteLength) >
-        16 * 1024 * 1024
-    )
-      throw new Error('Agent uploads are limited to 16 MiB')
-    const authorization = isAgent(pair)
-      ? await agentAuthorization(pair, url, method, body instanceof Blob ? '' : (body ?? ''))
-      : `Bearer ${pair.accessToken}`
     return fetch(url, {
       method,
       body,
@@ -409,7 +421,10 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
       signal: options.signal,
       headers: {
         authorization,
-        ...(options.contentType ? { 'content-type': options.contentType } : {})
+        ...(options.contentType ? { 'content-type': options.contentType } : {}),
+        ...(body instanceof ReadableStream && options.contentLength
+          ? { 'content-length': options.contentLength }
+          : {})
       }
     })
   }
@@ -417,8 +432,9 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
   /** Send a listed Cloud request with this directory's login, or through the
    * running Moi server when the caller has no login of its own. */
   async function send(path: string, options: RemoteRequestOptions = {}): Promise<RemoteReply> {
-    allowedCloudRequest(options.method ?? 'GET', path)
-    if (broker && !(await ownLogin())) {
+    const { access: allowed } = allowedCloudRequest(options.method ?? 'GET', path)
+    if (allowed === 'own login') ownDirectory()
+    else if (broker && !(await ownLogin())) {
       const brokered = await broker.fetch(path, options)
       if (brokered) return brokered
       if (!usable()) throw new Error('Moi is not running, so this user cannot reach Moi Cloud')
@@ -521,28 +537,7 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
   async function accept(value: string, name?: string, client?: string) {
     if (client !== undefined && !agentClientSchema.safeParse(client).success)
       throw new Error(`Invalid client — choose ${AGENT_CLIENTS.join(', ')}`)
-    // No login of its own: the running server accepts with its login, unless
-    // this is a new agent identity that this directory can hold itself.
-    const server = broker && !(await ownLogin()) ? await broker.info() : undefined
-    if (server) {
-      const target = invitation(value, server)
-      const creating =
-        target.agent &&
-        usable() &&
-        ((await Bun.file(pendingFile).exists()) || (name !== undefined && client !== undefined))
-      if (!creating && (server.login || !usable())) {
-        if (!server.login)
-          throw new CloudSignInRequired('Moi is signed out of Moi Cloud on this machine')
-        if (
-          server.login !== 'agent' &&
-          (target.agent || name !== undefined || client !== undefined)
-        )
-          throw new Error(
-            'Already signed in as a human — use a separate Moi data directory for this agent'
-          )
-        return request(acceptPath(target.id), target.token ? { token: target.token } : {}, accepted)
-      }
-    }
+    ownDirectory()
     const config = await remoteConfig(),
       target = invitation(value, config)
     const acceptWith = async (pair: Credentials) =>
@@ -641,8 +636,8 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
     })
   }
   async function renameAgent(name: string) {
-    const { login } = await activeLogin()
-    if (login === 'human') throw new Error('This command is for agents')
+    ownDirectory()
+    if (!isAgent(await access(await remoteConfig()))) throw new Error('This command is for agents')
     return request(cloudRoutes.me.path(), { name }, agentProfileSchema, 'PATCH')
   }
   async function leave(ownerId: string, workspaceId: string) {

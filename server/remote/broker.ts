@@ -12,7 +12,8 @@ import { CloudSignInRequired } from './errors'
 // so the credential never leaves this process. Three checks bound what a
 // caller can do with it:
 //
-// - the request must be on the list in routes.ts
+// - the request must be listed in routes.ts, and not as one that needs the
+//   caller's own login
 // - a request that names a workspace must name one linked on this machine
 // - the caller must be a program, not a web page (see BROKER_CALLER_HEADER)
 
@@ -46,7 +47,8 @@ export function createRemoteBroker(
         })
       }
       const path = url.searchParams.get('path') ?? ''
-      const { workspace } = allowedCloudRequest(request.method, path)
+      const { workspace, access } = allowedCloudRequest(request.method, path)
+      if (access === 'own login') throw new Error('This request needs your own Cloud login')
       if (
         workspace &&
         !(await workspaces()).some(
@@ -58,8 +60,9 @@ export function createRemoteBroker(
         throw new Error('This workspace is not linked on this machine')
       const { response, agent } = await client.send(path, {
         method: request.method,
-        // Sent whole so the upload keeps its length and an agent login can sign it.
-        body: request.body ? await request.blob() : undefined,
+        // Passed on as it arrives, so a large upload is never held in memory.
+        body: request.body ?? undefined,
+        contentLength: request.headers.get('content-length') ?? undefined,
         contentType: request.headers.get('content-type') ?? undefined,
         signal: request.signal
       })

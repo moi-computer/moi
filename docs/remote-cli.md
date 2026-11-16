@@ -17,9 +17,11 @@ A remote command picks its login in this order:
 2. Otherwise, the Moi server running on this machine sends the request with its login. The caller never sees a credential.
 3. Otherwise, the caller is signed out.
 
-Step 2 is how the agent works on a [managed machine](config.md#managed-machines), where its OS user cannot open Moi's data directory. A caller that sets `MOI_DATA_DIR` to a directory it can open always stops at step 1 or 3, so a standalone bot never borrows another user's login. `login`, `logout`, and creating a new agent identity always use the caller's own data directory.
+Step 2 is how the agent works on a [managed machine](config.md#managed-machines), where its OS user cannot open Moi's data directory. A caller that sets `MOI_DATA_DIR` to a directory it can open always stops at step 1 or 3, so a standalone bot never borrows another user's login.
 
-The server lends its login only for requests listed in `server/remote/routes.ts`, and only for workspaces linked on this machine. The CLI checks the same list before sending with its own login. Callers build their paths from that same table, so a request has to be added there before the CLI can make it. Uploads through the server are held in its memory while they are sent.
+`login`, `logout`, `accept`, `leave`, and `rename-agent` always use the caller's own data directory: the server never signs in, or changes the account, on a caller's behalf.
+
+The server lends its login only for requests listed in `server/remote/routes.ts`, and only for workspaces linked on this machine. The CLI checks the same list before sending with its own login. Callers build their paths from that same table, so a request has to be added there before the CLI can make it.
 
 ## Invitations and workspace setup
 
