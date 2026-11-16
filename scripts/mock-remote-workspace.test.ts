@@ -217,10 +217,10 @@ test('proxy supports invitation → accept → discovery and leaves registration
   const remote = { user_id: 'alice', workspace_id: 'owner-board' }
   expect(
     await (
-      await request('/api/workspaces/shared/open', { method: 'POST', body: JSON.stringify(remote) })
+      await request('/api/workspaces', { method: 'POST', body: JSON.stringify({ remote }) })
     ).json()
-  ).toEqual(remote)
-  expect(forwarded).toContain('/api/workspaces/shared/open')
+  ).toEqual({ remote })
+  expect(forwarded).toContain('/api/workspaces')
   const owner = await request(
     '/api/workspaces/alice:owner-board/rpc/counter/increment?revision=2',
     { method: 'POST', body: '[]' }

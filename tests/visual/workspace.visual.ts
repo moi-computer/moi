@@ -312,7 +312,9 @@ for (const state of ['loading', 'error'] as const) {
 test(
   'shared workspace opening',
   async page => {
-    await page.route('**/api/workspaces/shared/open', () => new Promise(() => {}))
+    await page.route('**/api/workspaces', route =>
+      route.request().method() === 'POST' ? new Promise(() => {}) : route.fallback()
+    )
     await page.goto('/#/workspace/alice:board')
     await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
   },
@@ -322,7 +324,8 @@ test(
   'shared workspace setup failure can be retried after access succeeds',
   async page => {
     let attempts = 0
-    await page.route('**/api/workspaces/shared/open', route => {
+    await page.route('**/api/workspaces', route => {
+      if (route.request().method() !== 'POST') return route.fallback()
       attempts++
       return route.fulfill(
         attempts === 1
@@ -347,7 +350,8 @@ test(
     await page.route(`**${ownerBase}`, route =>
       route.fulfill({ status: 404, json: { error: 'Workspace not available' } })
     )
-    await page.route('**/api/workspaces/shared/open', route => {
+    await page.route('**/api/workspaces', route => {
+      if (route.request().method() !== 'POST') return route.fallback()
       registrations++
       return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
     })
@@ -377,7 +381,8 @@ test(
       checkedAccess = true
       return route.fulfill({ json: remoteAnswers[ownerBase] })
     })
-    await page.route('**/api/workspaces/shared/open', route => {
+    await page.route('**/api/workspaces', route => {
+      if (route.request().method() !== 'POST') return route.fallback()
       expect(checkedAccess).toBe(true)
       registrations++
       expect(route.request().method()).toBe('POST')
@@ -421,7 +426,9 @@ test(
 test(
   'home mixes unopened shares with registered workspaces',
   async page => {
-    await page.route('**/api/workspaces/shared/open', () => new Promise(() => {}))
+    await page.route('**/api/workspaces', route =>
+      route.request().method() === 'POST' ? new Promise(() => {}) : route.fallback()
+    )
     await page.goto('/#/')
     const cards = page.getByRole('link', { name: /^Open / })
     await expect(cards).toHaveCount(3)
@@ -495,7 +502,8 @@ test(
           : { status: 404, json: { error: 'Workspace not available' } }
       )
     })
-    await page.route('**/api/workspaces/shared/open', route => {
+    await page.route('**/api/workspaces', route => {
+      if (route.request().method() !== 'POST') return route.fallback()
       expect(accepted && checkedAccess).toBe(true)
       registrations++
       expect(route.request().method()).toBe('POST')

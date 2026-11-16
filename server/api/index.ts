@@ -1,7 +1,7 @@
 import { openSharedWorkspace } from '../workspaces/shared'
 import { executeScratchOp } from '../scratchpad/executor'
 import type { ScratchOp, WorkspaceInfoResponse } from '@/lib/types'
-import { workspaceApiBase } from '@/lib/workspace-config'
+import { workspaceApiBase, parseRemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { loadWorkspaceFileConfig } from '../workspaces/layout'
 import { resolveWorkspaceEnv } from '../workspaces/env'
 import { changeWorkspaceHarness } from '../workspaces/change-harness'
@@ -1042,27 +1042,6 @@ async function mergeWorkspaceList(entries: WorkspaceEntry[]) {
   )
 }
 
-workspaces.post('/shared/open', async c => {
-  if (getAppConfig().demo || getAppConfig().environment !== 'cloud')
-    return c.text('Shared workspaces require Cloud mode', 403)
-  const body = await c.req.json().catch(() => null)
-  if (
-    !body ||
-    typeof body.user_id !== 'string' ||
-    typeof body.workspace_id !== 'string' ||
-    !body.user_id ||
-    !body.workspace_id
-  )
-    return c.text('Invalid shared workspace', 400)
-  try {
-    return c.json(
-      await openSharedWorkspace({ user_id: body.user_id, workspace_id: body.workspace_id })
-    )
-  } catch (error) {
-    return c.text(error instanceof Error ? error.message : 'Could not open shared workspace', 503)
-  }
-})
-
 workspaces.get('/', async c => {
   // Merge each workspace's live identity and theme over the registry snapshot
   // so app-wide workspace lists render the same presentation as the workspace.
@@ -1100,7 +1079,24 @@ const DEMO_CREATE_BLOCKED = 'Workspace creation is not available in the Moi demo
 
 workspaces.post('/', async c => {
   if (getAppConfig().demo) return c.text(DEMO_CREATE_BLOCKED, 403)
-  const body = await c.req.json()
+  const body = await c.req.json().catch(() => null)
+  if (body && typeof body === 'object' && 'remote' in body) {
+    if (getAppConfig().environment !== 'cloud')
+      return c.text('Shared workspaces require Cloud mode', 403)
+    if (Object.keys(body).some(key => key !== 'remote'))
+      return c.text('Remote registration expects only remote', 400)
+    let remote
+    try {
+      remote = parseRemoteWorkspaceTarget(body.remote)
+    } catch (error) {
+      return c.text(error instanceof Error ? error.message : 'Invalid remote workspace', 400)
+    }
+    try {
+      return c.json(await openSharedWorkspace(remote), 201)
+    } catch (error) {
+      return c.text(error instanceof Error ? error.message : 'Could not open shared workspace', 503)
+    }
+  }
   if (!body?.path) return c.text('Missing path', 400)
   const requestedType: unknown = body?.type ?? 'claude-code'
   if (!isHarnessType(requestedType)) return c.text('Unknown workspace type', 400)

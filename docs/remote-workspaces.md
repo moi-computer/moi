@@ -21,7 +21,7 @@ settings UI remain unavailable.
 
 ## Routing
 
-An unopened share uses `/workspace/{userId}:{workspaceId}`. It checks access through a fresh owner info request, creates or reuses the local reference, then redirects to `/workspace/{localId}`, preserving the path and query. Accepting in Moi opens this route immediately. Shares accepted in Batiok or the CLI use it when clicked.
+An unopened share uses `/workspace/{userId}:{workspaceId}`. It checks access through a fresh owner info request, registers the reference with `POST /api/workspaces` and `{ remote: { user_id, workspace_id } }`, then redirects to `/workspace/{localId}`, preserving the path and query. Accepting in Moi opens this route immediately. Shares accepted in Batiok or the CLI use it when clicked.
 
 Denied access creates no reference. A 404 shows “Workspace not found or you don’t have access” with **Back to home**. Temporary failures offer **Try again**, without repeating acceptance. Workspace info requests do not retry automatically.
 

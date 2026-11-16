@@ -246,10 +246,10 @@ test('standalone hides remote registrations and refuses remote opening', async (
     ).toBe(false)
     expect(
       (
-        await api.request('/api/workspaces/shared/open', {
+        await api.request('/api/workspaces', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ user_id: 'alice', workspace_id: ownerId })
+          body: JSON.stringify({ remote: { user_id: 'alice', workspace_id: ownerId } })
         })
       ).status
     ).toBe(403)
@@ -271,4 +271,26 @@ test('standalone can reorder visible workspaces while preserving remote registra
   expect((await response.json()).map((entry: { id: string }) => entry.id)).toEqual([ownerId])
   const { listWorkspaces } = await import('../workspaces/registry')
   expect((await listWorkspaces()).map(entry => entry.id)).toEqual([ownerId, visitorId])
+})
+
+test('remote registration reuses the existing reference and validates its input', async () => {
+  const register = (body: unknown) =>
+    api.request('/api/workspaces', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+  const remote = { user_id: 'alice', workspace_id: ownerId }
+  const response = await register({ remote })
+  expect(response.status).toBe(201)
+  expect((await response.json()).id).toBe(visitorId)
+  expect((await (await register({ remote })).json()).id).toBe(visitorId)
+  for (const body of [
+    { remote: null },
+    { remote: {} },
+    { remote, path: owner },
+    { remote, type: 'claude-code' }
+  ]) {
+    expect((await register(body)).status).toBe(400)
+  }
 })

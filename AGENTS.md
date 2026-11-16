@@ -37,10 +37,9 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 
 - Each workspace added/imported to Moi stores its settings in a `.moi/.workspace.json` file in the workspace folder (hidden filename; `server/workspaces/layout.ts` is its sole reader/writer).
 - Workspace source and shared configuration under `.moi/` can be committed. `.build/` (bundler output) and `.cache/` (derived artifacts such as applet thumbnails, see `server/applets/thumbnails.ts`) are re-creatable and safe to delete or gitignore. `.scratchpad/` holds the image/video bytes referenced by `.scratchpad.json`; preserve both when sharing or backing up a canvas. Those assets cannot be recreated from the snapshot alone.
-- Prefer `.moi/.workspace.json` for state that describes the workspace itself rather than the person or device using it — e.g. widget layout, theme, connectors. Litmus test: anyone who clones the workspace should get the same value.
-- Store per-user app state that should follow the local Moi installation in the server-side `DATA_DIR`. This includes chat/model settings and selected chats. Expose it through the API and use React Query for client caching and optimistic updates.
-- Store per-browser UI preferences in `client/store/ui.ts`, including each workspace's open tabs, active tab, split/fullscreen mode, and panel widths. A window follows its own URL; the saved active tab only decides where a bare `/workspace/:id` lands.
-- Decide ownership before adding persistence. Selected sessions and other user-specific choices do not belong in `.moi/`.
+- Store shared workspace settings in `.moi/.workspace.json`: widget layout, theme, and connectors.
+- Store personal chat settings and selected chats in `DATA_DIR`, exposed through the API and cached with React Query.
+- Store per-browser tabs, layout mode, and panel widths in `client/store/ui.ts`. Keep temporary UI state in components.
 
 ## Main app design
 

@@ -6,7 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { RESERVED_WORKSPACE_IDS } from '@/lib/ids'
+import { RESERVED_WORKSPACE_IDS, validateWorkspaceId } from '@/lib/ids'
 
 import { api } from './index'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
@@ -49,4 +49,8 @@ test('a reserved id is refused before it can shadow its route', async () => {
     setRegistryPath(DEFAULT_REGISTRY_PATH)
     await rm(tempDir, { recursive: true, force: true })
   }
+})
+
+test('shared is available as a workspace id', () => {
+  expect(validateWorkspaceId('shared')).toBeNull()
 })

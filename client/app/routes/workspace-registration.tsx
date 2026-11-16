@@ -29,8 +29,8 @@ export function WorkspaceRegistration({ userId, workspaceId }: WorkspaceRegistra
         staleTime: 0
       })
       return requestJson<WorkspaceEntry>(
-        '/api/workspaces/shared/open',
-        jsonRequest('POST', { user_id: userId, workspace_id: workspaceId })
+        '/api/workspaces',
+        jsonRequest('POST', { remote: { user_id: userId, workspace_id: workspaceId } })
       )
     },
     enabled: cloud,
