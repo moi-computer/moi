@@ -109,19 +109,47 @@ for (const name of ['Weekly Review', '', '   ']) {
 }
 
 function RemoteMembersProbe() {
-  const id = 'visitor-board'
-  seedWorkspaceInfo(id, { user_id: 'alice', workspace_id: 'board' })
-  const members = useWorkspaceMembers(id)
-  return <span data-enabled>{String(members.isEnabled)}</span>
+  const members = useWorkspaceMembers('visitor-board')
+  return <pre data-members>{JSON.stringify(members.data)}</pre>
 }
 
-test('remote workspace membership queries address the owner', async () => {
+test('a shared workspace reads the list published under its owner address', async () => {
   const ui = await mountAccount({ children: <RemoteMembersProbe /> })
   await ui.settle()
-  expect(ui.document.querySelector('[data-enabled]')?.textContent).toBe('true')
-  expect(ui.calls.some(call => call.path === '/cloud/api/workspaces/alice:board/members')).toBe(
-    true
+  const rendered = () => ui.document.querySelector('[data-members]')?.textContent
+  // Its address is unknown until the workspace info loads.
+  await act(async () => {
+    seedWorkspaceInfo('visitor-board', { user_id: 'alice', workspace_id: 'board' })
+  })
+  await ui.settle()
+  // No sharing record for someone else's workspace means no access, not owner-only.
+  expect(rendered()).toBe(JSON.stringify({ members: [], invitations: [] }))
+  await act(async () =>
+    setWorkspaceMembers('alice:board', { members: [tony, me], invitations: [] })
   )
+  await ui.settle()
+  expect(rendered()).toContain('Tony')
+  await act(async () => setAllWorkspaceMembers([]))
+  await ui.settle()
+  expect(rendered()).not.toContain('Tony')
+  expect(ui.calls.some(call => call.path.endsWith('/members'))).toBe(false)
+})
+
+test('a confirmed invite stays listed without requesting the member list', async () => {
+  const ui = await mountAccount({ children: <Probe /> })
+  await ui.settle()
+  await ui.click('Invite Tony')
+  expect(ui.document.querySelector('[data-members]')?.textContent).toContain('tony@example.com')
+  // The host's snapshot then brings the real invitation in its place.
+  ui.setMembership({
+    members: [me],
+    invitations: [{ id: 'invite-new', email: 'tony@example.com', expiresAt: '2030-01-01' }]
+  })
+  await ui.settle()
+  const rendered = ui.document.querySelector('[data-members]')?.textContent
+  expect(rendered).toContain('"id":"invite-new"')
+  expect(rendered).not.toContain('pending')
+  expect(ui.calls.some(call => call.path.endsWith('/members'))).toBe(false)
 })
 
 test('remote invitations use the resolved owner name', async () => {

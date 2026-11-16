@@ -1,21 +1,12 @@
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import type { WorkspaceLayoutResponse } from '@/lib/types'
-import { useAppConfig } from '@/client/api/app-config'
-import { CloudApiError } from '../../account/api'
-import { isRemoteWorkspace } from '@/client/features/workspace/remote'
-import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSyncExternalStore } from 'react'
+import { useMutation, useMutationState, useQueryClient } from '@tanstack/react-query'
 import { useWorkspaces } from '../../home/api'
 import { getAccountGeneration } from '../../identity/store'
 import { useIdentity } from '../../identity/use-identity'
-import { ownerOnlyWorkspaceMembers, removeWorkspaceMembers } from './store'
-import { memberKeys } from './keys'
-import { identityKey } from '../../identity/types'
-import {
-  fetchWorkspaceMembers,
-  inviteWorkspaceMember,
-  removeWorkspaceMember,
-  revokeWorkspaceInvitation
-} from './api'
+import { getWorkspaceMembers, subscribeWorkspaceDirectory, updateWorkspaceMembers } from './store'
+import { inviteWorkspaceMember, removeWorkspaceMember, revokeWorkspaceInvitation } from './api'
 import type { WorkspaceMembers } from './types'
 
 export type MembershipAction =
@@ -43,41 +34,13 @@ export function applyPendingMembership(
   }
   return { members, invitations }
 }
+// Member lists are published by the cloud host; this only reads what it last sent.
 export function useWorkspaceMembers(workspaceId: string | undefined) {
-  const cloud = useAppConfig().environment === 'cloud'
-  const identity = useIdentity()
-  const accountId = identity ? identityKey(identity) : undefined
-  const remote = workspaceId ? isRemoteWorkspace(workspaceId) : undefined
-  const enabled = cloud && !!workspaceId && identity?.type === 'user' && !identity.isAnonymous
-  const accountGeneration = getAccountGeneration()
-  const mutationKey = ['workspace-members-action', accountGeneration, workspaceId]
-  const query = useQuery({
-    queryKey: memberKeys.workspace(accountId, workspaceId ?? ''),
-    initialData: remote ? undefined : ownerOnlyWorkspaceMembers,
-    queryFn: async ({ signal }) => {
-      try {
-        const snapshot = await fetchWorkspaceMembers(workspaceId!, signal)
-        if (signal.aborted || accountGeneration !== getAccountGeneration())
-          throw new Error('Identity changed')
-        return snapshot
-      } catch (error) {
-        if (
-          remote &&
-          !signal.aborted &&
-          accountGeneration === getAccountGeneration() &&
-          error instanceof CloudApiError &&
-          (error.status === 403 || error.status === 404)
-        ) {
-          removeWorkspaceMembers(workspaceId!)
-        }
-        throw error
-      }
-    },
-    enabled,
-    retry: false,
-    staleTime: 30_000,
-    refetchInterval: 30_000
-  })
+  // The owner-only list is built from the identity, so follow it too.
+  useIdentity()
+  const mutationKey = ['workspace-members-action', getAccountGeneration(), workspaceId]
+  const read = () => (workspaceId ? getWorkspaceMembers(workspaceId) : undefined)
+  const published = useSyncExternalStore(subscribeWorkspaceDirectory, read, read)
   const pending = useMutationState({
     filters: { mutationKey, status: 'pending', exact: true },
     select: mutation => ({
@@ -85,14 +48,20 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
       action: mutation.state.variables as MembershipAction
     })
   })
-  const data = applyPendingMembership(query.data, pending)
-  return { ...query, data, members: data?.members, invitations: data?.invitations }
+  const data = applyPendingMembership(published, pending)
+  return {
+    data,
+    members: data?.members,
+    invitations: data?.invitations,
+    // Unknown until the host publishes its first snapshot for this account.
+    isPending: !published,
+    isSuccess: !!published
+  }
 }
 export function useMembershipAction(workspaceId: string) {
   const workspaces = useWorkspaces()
 
   const identity = useIdentity()
-  const accountId = identity ? identityKey(identity) : undefined
   const accountGeneration = getAccountGeneration()
   const client = useQueryClient()
   return useMutation({
@@ -117,13 +86,13 @@ export function useMembershipAction(workspaceId: string) {
       if (action.type === 'remove') return removeWorkspaceMember(workspaceId, action.membershipId)
       return revokeWorkspaceInvitation(workspaceId, action.invitationId)
     },
-    onSuccess: async () => {
+    // The optimistic overlay ends here, so keep its result until the host's next snapshot.
+    onSuccess: (_response, action) => {
       if (accountGeneration !== getAccountGeneration()) return
-      // Keep the optimistic overlay until the canonical snapshot has caught up.
-      await client.invalidateQueries({
-        queryKey: memberKeys.workspace(accountId, workspaceId),
-        exact: true
-      })
+      updateWorkspaceMembers(
+        workspaceId,
+        current => applyPendingMembership(current, [{ id: Date.now(), action }])!
+      )
     }
   })
 }

@@ -5,7 +5,7 @@ import { act } from 'react'
 import { toast } from '@/client/components/ui/toast'
 import { cleanupAccount, mountAccount } from '../../account/account-test-utils'
 import { useWorkspaceMembers } from '../members/hooks'
-import { setWorkspaceMembers } from '../members/store'
+import { setAllWorkspaceMembers, setWorkspaceMembers } from '../members/store'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { IconLayoutDashboard, IconScribble } from '@tabler/icons-react'
 import { Router } from 'wouter'
@@ -179,7 +179,7 @@ test('menu stays visible without a current user', () => {
 describe('workspace sharing', () => {
   afterEach(cleanupAccount)
 
-  test('disabled presence loads workspace members and reflects membership updates', async () => {
+  test('disabled presence shows published workspace members and reflects membership updates', async () => {
     const ui = await mountAccount({
       children: (
         <CollabProvider workspaceId="one" enabled={false}>
@@ -189,7 +189,7 @@ describe('workspace sharing', () => {
     })
     await ui.settle()
     await ui.click('Users in this workspace')
-    expect(ui.calls.some(call => call.path.endsWith('/workspaces/one/members'))).toBe(true)
+    expect(ui.calls.some(call => call.path.endsWith('/members'))).toBe(false)
     expect(ui.document.body.textContent).toContain('Alex')
     expect(ui.document.body.textContent).not.toContain('Offline')
     expect(ui.document.body.textContent).not.toContain('Invite your agent')
@@ -214,7 +214,7 @@ describe('workspace sharing', () => {
     expect(ui.document.querySelector('[aria-label="Users in this workspace"]')).not.toBeNull()
   })
 
-  test('membership loading and failure recover to the current user on retry', async () => {
+  test('members stay loading until the host publishes its first snapshot', async () => {
     const ui = await mountAccount({
       pendingMembership: true,
       children: (
@@ -226,19 +226,13 @@ describe('workspace sharing', () => {
     await ui.settle()
     await ui.click('Users in this workspace')
     expect(ui.document.querySelector('[aria-label="Loading workspace members"]')).not.toBeNull()
-    ui.failures.membership = true
-    await act(async () => ui.membershipRequest.resolve())
+    expect(ui.calls.some(call => call.path.endsWith('/members'))).toBe(false)
+    await act(async () => setAllWorkspaceMembers([]))
     await ui.settle()
-    expect(ui.document.body.textContent).toContain('Couldn’t refresh workspace members')
     expect(ui.document.querySelector('[aria-label="Loading workspace members"]')).toBeNull()
-    ui.failures.membership = false
-    ui.setMembership({ members: [], invitations: [] })
-    await ui.click('Retry')
-    await ui.settle()
     const list = ui.document.querySelector('[aria-label="Who has access"]')!
     expect(list.textContent).toContain('Alex')
     expect(list.textContent).toContain('(You)')
-    expect(ui.document.body.textContent).not.toContain('Couldn’t refresh workspace members')
   })
 
   test('header navigation, self, overflow, and empty presence keep distinct actions', async () => {
@@ -400,10 +394,6 @@ describe('workspace sharing', () => {
                   }
                 ]
               : []
-        })
-        await ui.settle()
-        await act(async () => {
-          await ui.qc.invalidateQueries()
         })
         await ui.settle()
         await ui.click('Users in this workspace')

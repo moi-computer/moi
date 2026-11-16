@@ -23,7 +23,6 @@ export function setIdentity(value: Identity | null): void {
   const changedAccount = (current && identityKey(current)) !== (next && identityKey(next))
   if (changedAccount) {
     accountGeneration++
-    void queryClient.cancelQueries({ queryKey: memberKeys.all })
     queryClient.removeQueries({ queryKey: memberKeys.all })
   }
   identityRevision++

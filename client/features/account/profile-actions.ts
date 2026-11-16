@@ -1,8 +1,6 @@
-import { queryClient } from '@/client/api/query-client'
 import { getIdentity, setIdentity, getAccountGeneration } from '../identity/store'
-import { identityKey } from '../identity/types'
 import type { Identity } from '../identity/types'
-import { memberKeys } from '../collab/members/keys'
+import { refreshMemberProfile } from '../collab/members/store'
 
 export async function saveCloudProfile(field: 'name' | 'avatar', update: () => Promise<Identity>) {
   const before = getIdentity()
@@ -24,8 +22,8 @@ export async function saveCloudProfile(field: 'name' | 'avatar', update: () => P
     ...(field === 'name' && current.name === before.name ? { name: saved.name } : {}),
     ...(field === 'avatar' && current.avatar === before.avatar ? { avatar: saved.avatar } : {})
   })
-  // Our identity write can supersede the event bridge's in-flight snapshot.
-  // Refresh active lists now and mark inactive lists stale for their next mount.
-  if (accountGeneration === getAccountGeneration())
-    await queryClient.invalidateQueries({ queryKey: memberKeys.account(identityKey(current)) })
+  // Our identity write can supersede the event bridge's in-flight snapshot, so
+  // put the saved profile into the member lists without waiting for the next one.
+  const profile = getIdentity()
+  if (accountGeneration === getAccountGeneration() && profile) refreshMemberProfile(profile)
 }

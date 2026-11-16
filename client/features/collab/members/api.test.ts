@@ -2,12 +2,7 @@ import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-ut
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import {
-  fetchWorkspaceMembers,
-  inviteWorkspaceMember,
-  removeWorkspaceMember,
-  revokeWorkspaceInvitation
-} from './api'
+import { inviteWorkspaceMember, removeWorkspaceMember, revokeWorkspaceInvitation } from './api'
 
 let fetchSpy: ReturnType<typeof spyOn> | undefined
 afterEach(() => {
@@ -37,12 +32,10 @@ test.each([false, true])(
       apiBase: remote ? '/api/workspaces/alice:board' : '/api/workspaces/visitor-board',
       isRemote: remote
     })
-    await fetchWorkspaceMembers(id)
     await inviteWorkspaceMember(id, 'new@example.com')
     await removeWorkspaceMember(id, 'member-1')
     await revokeWorkspaceInvitation(id, 'invite-1')
     expect(calls).toEqual([
-      { url: `/cloud${target.apiBase}/members`, method: 'GET' },
       { url: `/cloud${target.apiBase}/invitations`, method: 'POST' },
       { url: `/cloud${target.apiBase}/members/member-1`, method: 'DELETE' },
       { url: `/cloud${target.apiBase}/invitations/invite-1`, method: 'DELETE' }

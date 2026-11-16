@@ -49,14 +49,6 @@ export function WorkspaceMembers({ workspaceId, users, membership }: WorkspaceMe
         membersById={membersById}
         invitations={membership.invitations ?? []}
       />
-      {membership.isError && (
-        <div className="px-2 py-1 text-xs text-muted-foreground">
-          <p>Couldn’t refresh workspace members</p>
-          <Button variant="ghost" size="sm" onClick={() => void membership.refetch()}>
-            Retry
-          </Button>
-        </div>
-      )}
       {membership.isPending && (
         <div className="flex items-center justify-center py-6">
           <Spinner className="text-muted-foreground" aria-label="Loading workspace members" />

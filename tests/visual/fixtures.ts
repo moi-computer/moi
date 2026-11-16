@@ -13,6 +13,7 @@ import {
   conversationNotices,
   conversationTurns
 } from '@/client/features/dev/chat-states-fixtures'
+import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
 import type { StreamEvent } from '@/lib/format'
 import type {
   AppSettings,
@@ -229,16 +230,26 @@ async function pinGoogleFontsStylesheet(route: Route) {
   })
 }
 
-type Options = SuiteOptions & { api: Record<string, unknown> }
-
+type Options = SuiteOptions & {
+  api: Record<string, unknown>
+  // Member lists the cloud host would publish; Moi never requests them.
+  members?: WorkspaceMembersSnapshot[]
+}
 const visualSuite = defineSuite<Options>(
   {
     viewports: { '': DEFAULT_VIEWPORT },
     now: '2026-05-12T09:30:00Z',
     api: {}
   },
-  (page, { api }) => {
+  (page, { api, members }) => {
     const answers = { ...API, ...api }
+    if (members) {
+      // Sent as source, so the data travels inside it; tests/visual/app.tsx publishes it.
+      const published = JSON.stringify({ identity: answers['/cloud/api/me'], members })
+      void page.addInitScript(
+        new Function(`window.visualCloudHost = ${published}`) as () => unknown
+      )
+    }
     page.route('**/api/**', route => {
       const { pathname } = new URL(route.request().url())
       if (route.request().method() !== 'GET') return route.fulfill({ json: {} })

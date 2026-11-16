@@ -1,7 +1,7 @@
 import { expect, takeSnapshot } from '@uiverify/bun'
 
 import type { Identity } from '@/client/features/identity/types'
-import type { WorkspaceMembers } from '@/client/features/collab/members/types'
+import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
 import type { ClientAppConfig } from '@/lib/types'
 
 import { suite, WORKSPACE } from './fixtures'
@@ -89,14 +89,17 @@ test(
         demo: false,
         demoInstallUrl: '/'
       } satisfies ClientAppConfig,
-      '/cloud/api/me': sharingUser,
-      [`/cloud/api/workspaces/${WORKSPACE}/members`]: {
+      '/cloud/api/me': sharingUser
+    },
+    members: [
+      {
+        id: WORKSPACE,
         members: [sharingUser],
         invitations: [
           { id: 'invite-tony', email: 'tony@example.com', expiresAt: '2099-01-01T00:00:00Z' }
         ]
-      } satisfies WorkspaceMembers
-    }
+      }
+    ]
   }
 )
 
@@ -179,15 +182,18 @@ test(
         demo: false,
         demoInstallUrl: '/'
       } satisfies ClientAppConfig,
-      '/cloud/api/me': sharingUser,
-      [`/cloud/api/workspaces/${WORKSPACE}/members`]: {
+      '/cloud/api/me': sharingUser
+    },
+    members: [
+      {
+        id: WORKSPACE,
         members: [
           sharingUser,
           { id: 'tony', type: 'user', name: 'Tony', email: 'tony@example.com', isAnonymous: false }
         ],
         invitations: []
-      } satisfies WorkspaceMembers
-    }
+      }
+    ]
   }
 )
 
@@ -199,7 +205,6 @@ const remotePage = `/#/workspace/${REMOTE}`
 const remoteAnswers = {
   '/api/config': { environment: 'cloud', demo: false },
   '/cloud/api/me': sharingUser,
-  '/cloud/api/workspaces/alice:owner-board/members': { members: [sharingUser], invitations: [] },
   [ownerBase]: {
     apiBase: '/api/workspaces/owner-board',
     isRemote: false,
@@ -221,6 +226,14 @@ const remoteAnswers = {
   [`${ownerBase}/applet-thumbnails`]: { thumbnails: [] }
 }
 
+// The owner's list reaches a visitor under the owner's address.
+const remoteOptions = {
+  api: remoteAnswers,
+  members: [
+    { id: 'alice:owner-board', members: [sharingUser], invitations: [] }
+  ] satisfies WorkspaceMembersSnapshot[]
+}
+
 test(
   'remote workspace without chat or setup',
   async page => {
@@ -240,7 +253,7 @@ test(
     await expect(page.getByRole('menuitem', { name: 'Theme', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Settings', exact: true })).toHaveCount(0)
   },
-  { api: remoteAnswers }
+  remoteOptions
 )
 
 for (const failure of [
@@ -301,7 +314,7 @@ for (const failure of [
       ).toBeVisible()
       expect(requests).toBe(2)
     },
-    { api: remoteAnswers }
+    remoteOptions
   )
 }
 
@@ -359,7 +372,7 @@ test(
     await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
     expect(attempts).toBe(2)
   },
-  { api: remoteAnswers }
+  remoteOptions
 )
 
 test(
@@ -388,7 +401,7 @@ test(
     await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
     expect(registrations).toBe(0)
   },
-  { api: remoteAnswers }
+  remoteOptions
 )
 
 test(
@@ -411,7 +424,7 @@ test(
     await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
     expect(registrations).toBe(1)
   },
-  { api: remoteAnswers }
+  remoteOptions
 )
 
 test(
@@ -608,5 +621,5 @@ test(
     await page.getByRole('button', { name: 'Try again', exact: true }).click()
     await expect(page.getByText('Recovered owner view', { exact: true })).toBeVisible()
   },
-  { api: remoteAnswers }
+  remoteOptions
 )

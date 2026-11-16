@@ -80,7 +80,7 @@ Test artwork: [Croodles](https://www.dicebear.com/styles/croodles/) by [Vijay Ve
 Moi keeps two separate things in the browser:
 
 - **Identity store:** who is using this tab.
-- **Workspace members cache:** members and pending invitations for each workspace, managed by React Query.
+- **Workspace members cache:** members and pending invitations for each workspace, published by the cloud and held in the React Query cache. Moi never requests a member list.
 
 Both live in memory. They are not saved to localStorage, SQLite, or workspace files. The cloud supplies fresh data after a reload.
 
@@ -94,11 +94,14 @@ Moi makes these methods available before the app appears:
 window.moi.identity.set(me)
 window.moi.identity.set(null) // Signed out
 
-window.moi.workspaceMembers.setAll([{ id: workspaceId, members, invitations }])
-window.moi.workspaceMembers.set(workspaceId, { members, invitations })
-window.moi.workspaceMembers.remove(workspaceId)
+window.moi.workspaceMembers.setAll([{ id: address, members, invitations }])
+window.moi.workspaceMembers.set(address, { members, invitations })
+window.moi.workspaceMembers.remove(address)
 window.moi.workspaceMembers.clear()
+window.moi.workspaceMembers.sharedWorkspaces // true: shared workspaces belong in setAll()
 ```
+
+A workspace is named by its address: `workspaceId` on the account's own machine, and `ownerId:workspaceId` for a workspace someone shared with the account.
 
 The page starts in this order:
 
@@ -108,7 +111,7 @@ The page starts in this order:
 
 The cloud inserts its module just before `#moi-start`. It also loads `/cloud/bridge.js` for later updates; that download does not hold up rendering. There is no temporary global payload or readiness polling. If either setter is unavailable, initialization does nothing.
 
-`setAll()` replaces the full sharing collection. Workspaces omitted from it have no invited members; the machine owner still has access. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
+`setAll()` replaces the full sharing collection, which is the only source of member lists: the account's own workspaces and every workspace shared with it. An own workspace omitted from it has no invited members; the machine owner still has access. A shared workspace omitted from it is no longer accessible, and its list becomes empty. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
 
 When sharing records are removed, existing member lists receive the owner-only replacement immediately. If ownership has not been established, the replacement is empty. This keeps mounted views and live presence in sync.
 
@@ -134,7 +137,7 @@ action.mutate({ type: 'remove', membershipId })
 action.mutate({ type: 'revoke', invitationId })
 ```
 
-These hooks call the cloud URLs above. Moi shows pending changes immediately and undoes them if the request fails. Confirmed cloud updates go into the same cache. Switching accounts clears the previous account's data. The cloud checks permission for every action.
+`useWorkspaceMembers` reads what the cloud last published and is pending until the first `setAll()`. Actions call the cloud URLs above. Moi shows pending changes immediately and undoes them if the request fails. A confirmed change is written into the cache at once, and the cloud's next snapshot replaces it. Switching accounts clears the previous account's data. The cloud checks permission for every action.
 
 ### Collaboration
 

@@ -20,8 +20,15 @@ import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { AccountProvider } from '@/client/features/account/account-provider'
 import { initConnection } from '@/client/features/chat/connection/chat-connection'
 import { setLocalUser } from '@/client/features/collab/host-state'
+import { setAllWorkspaceMembers } from '@/client/features/collab/members/store'
+import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
+import { setIdentity } from '@/client/features/identity/store'
+import type { Identity } from '@/client/features/identity/types'
 import { UI_COMPONENT_PREVIEWS } from '@/client/features/dev/ui-components/ui-component-previews'
 
+type VisualWindow = Window & {
+  visualCloudHost?: { identity: Identity; members: WorkspaceMembersSnapshot[] }
+}
 const target = decodeURIComponent(location.hash.slice(1))
 const root = document.getElementById('root')
 if (!root) throw new Error('#root is missing')
@@ -39,6 +46,12 @@ if (target.startsWith('ui/')) {
     </main>
   )
 } else {
+  // What the cloud host does before React starts, when a test supplies `members`.
+  const published = (window as VisualWindow).visualCloudHost
+  if (published) {
+    setIdentity(published.identity)
+    setAllWorkspaceMembers(published.members)
+  }
   initConnection(queryClient)
   await loadAppConfig()
   // client/index.tsx makes a random local user on first run; a fixed one keeps

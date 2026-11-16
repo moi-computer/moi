@@ -11,6 +11,7 @@ import * as config from '@/client/api/app-config'
 import { AccountProvider, useAccount } from './account-provider'
 import { queryClient } from '@/client/api/query-client'
 import type { WorkspaceMembers } from '../collab/members/types'
+import { setAllWorkspaceMembers, setWorkspaceMembers } from '../collab/members/store'
 import { setIdentity } from '../identity/store'
 import type { Identity } from '../identity/types'
 
@@ -96,9 +97,8 @@ export async function mountAccount({
   let cloudSession: Identity | null = signedOut
     ? null
     : { ...session, type: 'user', email: 'alex@example.com', isAnonymous: anonymous }
-  const failures = { signOut: false, mutation: false, session: failSession, membership: false }
+  const failures = { signOut: false, mutation: false, session: failSession }
   const mutationRequest = Promise.withResolvers<void>()
-  const membershipRequest = Promise.withResolvers<void>()
   let membership: WorkspaceMembers = {
     members: [{ ...session, membershipId: 'member-me' }],
     invitations: []
@@ -126,12 +126,6 @@ export async function mountAccount({
             : cloudSession
               ? Response.json(cloudSession)
               : Response.json({ error: 'No session' }, { status: 401 })
-        }
-        if (path.split('?')[0]!.endsWith('/members') && (!init?.method || init.method === 'GET')) {
-          if (pendingMembership) await membershipRequest.promise
-          return failures.membership
-            ? Response.json({ error: 'Members unavailable' }, { status: 503 })
-            : Response.json(membership)
         }
         if (path.endsWith('/sign-out')) {
           if (failures.signOut)
@@ -204,6 +198,16 @@ export async function mountAccount({
   setIdentity(null)
   if (!loadingSession && !failSession && environment === 'cloud') setIdentity(cloudSession)
   if (injected && environment === 'local') setIdentity(session)
+  // The cloud host publishes members before React starts; Moi never requests them.
+  const publishMembership = () => {
+    for (const id of ['one', 'two']) setWorkspaceMembers(id, membership)
+  }
+  if (environment === 'cloud' && cloudSession && !anonymous && !loadingSession && !failSession) {
+    if (!pendingMembership) {
+      setAllWorkspaceMembers([])
+      publishMembership()
+    }
+  }
   const { createRoot } = await import('react-dom/client')
   const root = createRoot(document.getElementById('root')!)
   notifyManager.setNotifyFunction(callback => {
@@ -247,10 +251,10 @@ export async function mountAccount({
     calls,
     failures,
     mutationRequest,
-    membershipRequest,
     qc,
     setMembership: (next: WorkspaceMembers) => {
       membership = next
+      publishMembership()
     },
     navigations,
     location,

@@ -47,7 +47,9 @@ export function parseWorkspaceMembers(value: unknown): WorkspaceMembers {
     throw new Error('Duplicate workspace member or invitation')
   return { members, invitations }
 }
-export function validWorkspaceId(id: string): string {
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(id)) throw new Error('Invalid workspace id')
-  return id
+// `workspaceId`, or `ownerId:workspaceId` for a workspace on someone else's machine.
+export function validWorkspaceAddress(address: string): string {
+  if (!/^(?:[A-Za-z0-9_-]{1,64}:)?[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(address))
+    throw new Error('Invalid workspace id')
+  return address
 }

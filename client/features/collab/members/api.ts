@@ -1,12 +1,7 @@
 import { getWorkspaceApiBase } from '@/client/features/workspace/remote'
 import { cloudRequest } from '../../account/api'
 import { jsonRequest } from '@/client/api/http'
-import { parseWorkspaceMembers } from './types'
 
-export async function fetchWorkspaceMembers(id: string, signal?: AbortSignal) {
-  const response = await cloudRequest(`${getWorkspaceApiBase(id)}/members`, { signal })
-  return parseWorkspaceMembers(await response.json())
-}
 export const inviteWorkspaceMember = (id: string, email: string, workspaceName?: string) =>
   cloudRequest(
     `${getWorkspaceApiBase(id)}/invitations`,

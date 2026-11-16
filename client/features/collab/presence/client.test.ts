@@ -422,7 +422,7 @@ test('remote presence connects to the owner with the same membership rules', () 
   clearWorkspaceMembers()
   const id = 'visitor-board'
   seedWorkspaceInfo(id, { user_id: 'alice', workspace_id: 'board' })
-  setWorkspaceMembers(id, {
+  setWorkspaceMembers('alice:board', {
     members: [{ id: 'visitor', type: 'user', name: 'Visitor', email: '', isAnonymous: false }],
     invitations: []
   })

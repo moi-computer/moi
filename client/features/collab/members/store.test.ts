@@ -8,7 +8,9 @@ import {
   setWorkspaceMembers,
   setAllWorkspaceMembers,
   getWorkspaceMembersRevision,
-  getWorkspaceDirectory
+  getWorkspaceDirectory,
+  updateWorkspaceMembers,
+  refreshMemberProfile
 } from './store'
 import type { WorkspaceMembers } from './types'
 import { parseWorkspaceMembers } from './types'
@@ -120,12 +122,40 @@ test('optimistic pending actions are derived over the newest snapshot without mu
   expect(applyPendingMembership(pushed, [])).toEqual(pushed)
 })
 
-test('local membership bootstrap preserves separately fetched remote members', () => {
+test('shared workspaces are listed under the owner address and lose access when omitted', () => {
   setIdentity(alex)
   const id = 'visitor-board'
   seedWorkspaceInfo(id, { user_id: 'host', workspace_id: 'board' })
   expect(getWorkspaceDirectory(id)).toBeUndefined()
-  setWorkspaceMembers(id, { members: [alex, bot], invitations: [] })
+  setAllWorkspaceMembers([
+    { id: 'board', members: [alex], invitations: [] },
+    { id: 'host:board', members: [alex, bot], invitations: [] }
+  ])
+  expect(getWorkspaceDirectory(id)).toHaveLength(2)
+  expect(getWorkspaceDirectory('board')).toHaveLength(1)
   setAllWorkspaceMembers([])
-  expect(getWorkspaceDirectory(id)?.map(user => user.id)).toHaveLength(2)
+  expect(getWorkspaceDirectory(id)).toEqual([])
+  expect(getWorkspaceDirectory('board')?.map(user => user.id)).toEqual(['alex'])
+  expect(getWorkspaceDirectory('never-opened')?.map(user => user.id)).toEqual(['alex'])
+})
+
+test('confirmed changes and saved profiles update published lists in place', () => {
+  setIdentity(alex)
+  setAllWorkspaceMembers([
+    { id: 'one', members: [alex, { ...bot, membershipId: 'bot' }], invitations: [] }
+  ])
+  const key = (id: string) => memberKeys.workspace('user:alex', id)
+  updateWorkspaceMembers('one', current => ({ ...current, members: [alex] }))
+  expect(queryClient.getQueryData<WorkspaceMembers>(key('one'))?.members).toEqual([alex])
+  // An owner-only workspace has no stored list until its first change.
+  const invitation = { id: 'invite', email: 'tony@example.com', expiresAt: '2099-01-01' }
+  updateWorkspaceMembers('two', current => ({ ...current, invitations: [invitation] }))
+  expect(queryClient.getQueryData<WorkspaceMembers>(key('two'))).toEqual({
+    members: [alex],
+    invitations: [invitation]
+  })
+  refreshMemberProfile({ ...alex, name: 'Renamed' })
+  expect(queryClient.getQueryData<WorkspaceMembers>(key('one'))?.members).toEqual([
+    { ...alex, name: 'Renamed' }
+  ])
 })
