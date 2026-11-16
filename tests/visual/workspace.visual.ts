@@ -547,14 +547,16 @@ test(
     await page.goto('/#/')
     await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Invitations', exact: true })).toBeVisible()
-    await takeSnapshot('pending invitation')
+    await expect(page.getByText('Import other workspaces', { exact: true })).toBeVisible()
+    await takeSnapshot('invitation below workspaces and above imports')
     await page.getByRole('button', { name: 'Accept', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
     expect(registrations).toBe(1)
   },
   {
     api: {
-      ...remoteAnswers
+      ...remoteAnswers,
+      '/api/workspaces/discover': [{ path: '/projects/notes', harnesses: ['claude-code'] }]
     }
   }
 )

@@ -94,7 +94,6 @@ export function HomePage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
       <HomeLogo className="mb-10" />
-      <WorkspaceInvitations />
 
       {count > 0 ? (
         <section className="mb-12">
@@ -141,6 +140,8 @@ export function HomePage() {
           </Button>
         </div>
       )}
+
+      <WorkspaceInvitations />
 
       {discovered.length > 0 && (
         <section>

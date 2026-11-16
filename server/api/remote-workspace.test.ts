@@ -6,7 +6,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { stringify, parse } from 'devalue'
 import { api } from './index'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
+import {
+  DEFAULT_REGISTRY_PATH,
+  getWorkspace,
+  registerWorkspace,
+  setRegistryPath
+} from '../workspaces/registry'
+import { completeRemoteViewBuilds } from '../sessions/pending-views'
 import { loadLayout, saveLayout } from '../workspaces/layout'
 import { buildAllViews } from '../applets/views'
 import { killAllWorkers } from '../applets/functions'
@@ -164,7 +170,7 @@ test('remote reference serves no shared content and keeps personal state local',
   expect(previews[visitorId]).toEqual({ thumbnails: [] })
 })
 
-test('a view being built stays with the visitor until the browser reports the owner’s build', async () => {
+test('a view being built stays with the visitor until the owner lists it as compiled', async () => {
   const pendingIds = async () =>
     Object.keys((await (await api.request(`${local}/state`)).json()).pendingViews)
   const created = await api.request(`${local}/views`, { method: 'POST' })
@@ -179,8 +185,14 @@ test('a view being built stays with the visitor until the browser reports the ow
   // Compiled views are the owner's: the reference neither renames nor deletes them.
   expect((await api.request(`${local}/views/compiled`, patch({ title: 'Mine' }))).status).toBe(404)
   expect((await api.request(`${local}/views/compiled`, { method: 'DELETE' })).status).toBe(404)
-  expect((await api.request(`${base}/views/${id}/complete`, { method: 'POST' })).status).toBe(409)
-  expect((await api.request(`${local}/views/${id}/complete`, { method: 'POST' })).status).toBe(204)
+  const reference = (await getWorkspace(visitorId))!
+  const ownerLists =
+    (...ids: string[]) =>
+    async () =>
+      Response.json({ views: ids.map(id => ({ id })) })
+  await completeRemoteViewBuilds(reference, ownerLists('compiled'))
+  expect(await pendingIds()).toEqual([id])
+  await completeRemoteViewBuilds(reference, ownerLists('compiled', id))
   expect(await pendingIds()).toEqual([])
 })
 

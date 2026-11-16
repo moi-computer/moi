@@ -28,8 +28,8 @@ The agent runs in the reference folder, which holds no workspace files, and reac
 files through the CLI ([Remote operations](remote-cli.md#remote-operations)).
 
 A view under construction is kept in the visitor's state; its source and build live on the owner.
-When the owner lists a view that is still pending locally, the visitor's browser clears it with
-`POST /api/workspaces/{localId}/views/{viewId}/complete`.
+After a successful `moi bundle`, the visitor's CLI asks the local server to clear the views the
+owner now lists as compiled.
 
 Owner build events do not reach visitors; `moi refresh` re-reads the owner's widget and view lists.
 

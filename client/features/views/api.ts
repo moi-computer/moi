@@ -90,39 +90,51 @@ function useViewMutation<T, Input>(workspaceId: string, mutationFn: (input: Inpu
     onSuccess: () => queryClient.invalidateQueries({ queryKey: workspaceKeys.views(workspaceId) })
   })
 }
-export function useRenameView(workspaceId: string) {
+// A view still being built lives in this Moi's state, next to the chat building
+// it. A compiled view lives with the workspace's owner.
+function useViewBase(workspaceId: string) {
   const { apiBase } = useWorkspaceLayoutCtx()
+  const queryClient = useQueryClient()
+  const local = `/api/workspaces/${workspaceId}`
+  return {
+    local,
+    forView: (viewId: string) =>
+      getCachedWorkspaceState(queryClient, workspaceId)?.pendingViews[viewId] ? local : apiBase
+  }
+}
+export function useRenameView(workspaceId: string) {
+  const base = useViewBase(workspaceId)
   return useViewMutation(workspaceId, ({ viewId, title }: { viewId: string; title: string }) =>
     requestJson<ViewInfo>(
-      `${apiBase}/views/${encodeURIComponent(viewId)}`,
+      `${base.forView(viewId)}/views/${encodeURIComponent(viewId)}`,
       jsonRequest('PATCH', { title }),
       'Couldn’t rename view'
     )
   )
 }
 export function useDeleteView(workspaceId: string) {
-  const { apiBase } = useWorkspaceLayoutCtx()
+  const base = useViewBase(workspaceId)
   return useViewMutation(workspaceId, (viewId: string) =>
     requestVoid(
-      `${apiBase}/views/${encodeURIComponent(viewId)}`,
+      `${base.forView(viewId)}/views/${encodeURIComponent(viewId)}`,
       { method: 'DELETE' },
       'Couldn’t delete view'
     )
   )
 }
 export function useCreateView(workspaceId: string) {
-  const { apiBase } = useWorkspaceLayoutCtx()
+  const { local } = useViewBase(workspaceId)
   return useViewMutation(workspaceId, () =>
-    requestJson<PendingView>(`${apiBase}/views`, jsonRequest('POST'), 'Couldn’t create view')
+    requestJson<PendingView>(`${local}/views`, jsonRequest('POST'), 'Couldn’t create view')
   )
 }
 export function useSaveViewDraft(workspaceId: string) {
-  const { apiBase } = useWorkspaceLayoutCtx()
+  const { local } = useViewBase(workspaceId)
   return useViewMutation(
     workspaceId,
     ({ viewId, requirements }: { viewId: string; requirements: string }) =>
       requestJson<PendingView>(
-        `${apiBase}/views/${viewId}`,
+        `${local}/views/${viewId}`,
         jsonRequest('PATCH', { requirements }),
         'Couldn’t save view requirements'
       )
@@ -140,10 +152,10 @@ export type SubmitViewInput = {
   stream?: boolean
 }
 export function useSubmitView(workspaceId: string) {
-  const { apiBase } = useWorkspaceLayoutCtx()
+  const { local } = useViewBase(workspaceId)
   return useViewMutation(workspaceId, ({ viewId, ...input }: SubmitViewInput) =>
     requestJson<{ viewId: string; sessionId: string }>(
-      `${apiBase}/views/${viewId}/submit`,
+      `${local}/views/${viewId}/submit`,
       jsonRequest('POST', input),
       'Couldn’t start view chat'
     )

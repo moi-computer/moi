@@ -2,6 +2,9 @@ import { isRemoteWorkspace } from '@/client/features/workspace/remote'
 import type { ComponentType } from 'react'
 import { useRouter } from 'wouter'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+
+import { workspaceKeys } from '@/client/api/workspace-keys'
 
 import {
   type AppletSegment,
@@ -179,7 +182,23 @@ export function useView(name: string, revision?: string): AppletState {
 // fires while that applet is on screen; this covers the (common) rest.
 export function useAppletCacheInvalidation(): void {
   const workspaceId = useWorkspaceId()
+  const queryClient = useQueryClient()
   useWorkspaceScopedEvent(workspaceId, event => {
+    // Owner build events don't reach visitors. `moi refresh` from the visitor's
+    // agent does, so it also re-reads the owner's lists for new or removed applets.
+    if (
+      isRemoteWorkspace(workspaceId, queryClient) &&
+      (event.type === 'applets:refresh' ||
+        event.type === 'view:updated' ||
+        event.type === 'widget:updated')
+    ) {
+      void queryClient.invalidateQueries({
+        queryKey: workspaceKeys.views(workspaceId)
+      })
+      void queryClient.invalidateQueries({
+        queryKey: workspaceKeys.widgets(workspaceId)
+      })
+    }
     if (event.type === 'view:updated') invalidateApplet('views', workspaceId, event.name)
     else if (event.type === 'widget:updated') invalidateApplet('widgets', workspaceId, event.name)
     else if (event.type === 'applets:refresh') {

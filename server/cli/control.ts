@@ -47,6 +47,23 @@ export async function registerViaControl(absPath: string): Promise<string> {
   })
 }
 
+// Tell the local server something it may act on. Never fails the command: the
+// server may be stopped, and the caller's own work is already done.
+export function notifyLocalServer(payload: Record<string, unknown>, timeoutMs = 3000) {
+  return new Promise<void>(done => {
+    const ws = new WebSocket(CONTROL_URL)
+    const finish = () => {
+      clearTimeout(timer)
+      ws.close()
+      done()
+    }
+    const timer = setTimeout(finish, timeoutMs)
+    ws.onopen = () => ws.send(JSON.stringify(payload))
+    ws.onmessage = finish
+    ws.onerror = finish
+  })
+}
+
 // Shared data in a linked folder uses the owner API. Browser actions and local
 // workspaces use visitor control. Both paths keep output/file IO on the caller.
 export async function sendControl(

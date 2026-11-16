@@ -2,7 +2,12 @@
 import { lstat, mkdir, readdir, readlink, rename, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
-import { createServer, request as httpRequest, type IncomingMessage } from 'node:http'
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingMessage,
+  type ServerResponse
+} from 'node:http'
 import { connect } from 'node:net'
 import { Readable } from 'node:stream'
 import envPaths from 'env-paths'
@@ -59,6 +64,12 @@ export function createMockRemoteInvitations() {
         membershipId: `member-${viewer.id}`
       })
     }
+    if (path === '/mock/snapshot' && request.method === 'GET')
+      return Response.json({
+        workspaces: members.some(member => member.id === viewer.id)
+          ? [{ id: 'alice:owner-board', members, invitations }]
+          : []
+      })
     if (path === '/mock/cloud/api/workspaces/shared' && request.method === 'GET')
       return Response.json({
         workspaces: members.some(member => member.id === viewer.id)
@@ -121,6 +132,7 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
       throw new Error('Mock upstreams must be local HTTP origins')
   }
   const cloud = createMockRemoteInvitations()
+  const memberStreams = new Set<ServerResponse>()
   const remote = /^\/api\/workspaces\/alice:owner-board(?=\/|\?|$)/
   const target = (path: string) => {
     return new URL(
@@ -129,7 +141,8 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
     )
   }
   const forwardHeaders = (req: IncomingMessage, url: URL) => {
-    const headers = { ...req.headers, host: url.host }
+    // HTML is rewritten below, so request an uncompressed upstream body.
+    const headers = { ...req.headers, host: url.host, 'accept-encoding': 'identity' }
     const browserOrigin = `http://${req.headers.host}`
     // Translate only this proxy's origin. Foreign origins must still fail upstream checks.
     if (headers.origin === browserOrigin) headers.origin = new URL(batiok).origin
@@ -175,6 +188,65 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
       '/cloud/api/invitations/mock-owner-invite/accept'
     ].includes(path)
     try {
+      if (path === '/mock/member-events' || path === '/mock/snapshot') {
+        const auth = await authorize(req)
+        if (auth.response) {
+          res.writeHead(auth.response.status)
+          res.end()
+          return
+        }
+        if (path === '/mock/snapshot') {
+          const response = await cloud(
+            new Request('http://localhost/mock/snapshot', { headers: auth.headers })
+          )
+          res.writeHead(response.status, {
+            'content-type': 'application/json',
+            'cache-control': 'no-store'
+          })
+          res.end(await response.text())
+          return
+        }
+        res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store' })
+        res.write('data: ready\n\n')
+        memberStreams.add(res)
+        res.on('close', () => memberStreams.delete(res))
+        return
+      }
+      if (path === '/cloud/api/bootstrap' && req.method === 'GET') {
+        const auth = await authorize(req)
+        const upstream =
+          auth.response ??
+          (await fetch(new URL(path, batiok), {
+            headers: { cookie: req.headers.cookie ?? '' },
+            redirect: 'manual'
+          }))
+        let body = await upstream.text()
+        if (upstream.ok && auth.headers) {
+          const snapshot = JSON.parse(body) as { workspaces: { id: string }[] }
+          const mock = (await (
+            await cloud(
+              new Request('http://localhost/mock/snapshot', {
+                headers: auth.headers
+              })
+            )
+          ).json()) as { workspaces: { id: string }[] }
+          snapshot.workspaces = [
+            ...snapshot.workspaces.filter(workspace => workspace.id !== 'alice:owner-board'),
+            ...mock.workspaces
+          ]
+          body = JSON.stringify(snapshot)
+        }
+        res.writeHead(upstream.status, {
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+          'set-cookie': [
+            ...upstream.headers.getSetCookie(),
+            ...(auth.session?.headers.getSetCookie() ?? [])
+          ]
+        })
+        res.end(body)
+        return
+      }
       if (discovery || sharing) {
         const auth = await authorize(req)
         if (auth.response) {
@@ -201,6 +273,8 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
           'set-cookie': session.headers.getSetCookie()
         })
         res.end(await response.text())
+        if (response.ok && req.method !== 'GET')
+          for (const stream of memberStreams) stream.write('data: updated\n\n')
         return
       }
       if (remote.test(req.url!)) {
@@ -215,12 +289,68 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
       const upstream = httpRequest(
         url,
         { method: req.method, headers: forwardHeaders(req, url) },
-        reply => {
+        async reply => {
           const headers = { ...reply.headers }
           if (headers.location) {
             const redirect = new URL(headers.location, url)
             if (redirect.origin === new URL(batiok).origin)
               headers.location = redirect.pathname + redirect.search + redirect.hash
+          }
+          if (headers['content-type']?.includes('text/html')) {
+            try {
+              const auth = await authorize(req)
+              if (auth.headers) {
+                const snapshot = (await (
+                  await cloud(
+                    new Request('http://localhost/mock/snapshot', {
+                      headers: auth.headers
+                    })
+                  )
+                ).json()) as { workspaces: { id: string }[] }
+                // Batiok publishes its own members first. Add the mock before Moi mounts.
+                const data = JSON.stringify(snapshot.workspaces).replaceAll('<', '\\u003c')
+                const body = await new HTMLRewriter()
+                  .on('script#moi-start', {
+                    element(element) {
+                      element.before(
+                        `<script type="module">const api = window.moi;
+for (const workspace of ${data}) api.workspaceMembers.set(workspace.id, workspace);
+const events = new EventSource('/mock/member-events');
+let revision = 0;
+events.onmessage = async () => {
+  const current = ++revision;
+  const identity = api.identity.getRevision();
+  try {
+    const response = await fetch('/mock/snapshot', { cache: 'no-store' });
+    if (!response.ok) return;
+    const snapshot = await response.json();
+    if (current !== revision || identity !== api.identity.getRevision()) return;
+    const workspace = snapshot.workspaces[0];
+    if (workspace) api.workspaceMembers.set(workspace.id, workspace);
+    else api.workspaceMembers.remove('alice:owner-board');
+  } catch { /* Reconnection and cloud bootstrap refresh repair missed updates. */ }
+};
+window.addEventListener('pagehide', () => events.close());</script>`,
+                        { html: true }
+                      )
+                    }
+                  })
+                  .transform(
+                    new Response(Readable.toWeb(reply) as unknown as ReadableStream<Uint8Array>)
+                  )
+                  .text()
+                delete headers['content-length']
+                delete headers['content-encoding']
+                headers['cache-control'] = 'no-store'
+                res.writeHead(reply.statusCode!, headers)
+                res.end(body)
+                return
+              }
+            } catch {
+              res.writeHead(502)
+              res.end('Could not load mock membership snapshot')
+              return
+            }
           }
           res.writeHead(reply.statusCode!, headers)
           reply.pipe(res)
