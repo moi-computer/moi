@@ -10,7 +10,7 @@ import {
   login as signIn,
   logout as signOut,
   CloudSignInRequired,
-  remoteConfig,
+  cloudUrl,
   remoteStatus,
   invitations as listInvitations,
   accept as acceptInvitation,
@@ -210,7 +210,7 @@ export const remote = defineCommand({
         return
       }
       console.log(
-        `\n${text(status.me.name || ('email' in status.me ? status.me.email : status.me.client))} <${text('email' in status.me ? status.me.email : status.me.client)}>\nAccount: ${text(status.me.id)}\nCloud: ${(await remoteConfig()).url}\n`
+        `\n${text(status.me.name || ('email' in status.me ? status.me.email : status.me.client))} <${text('email' in status.me ? status.me.email : status.me.client)}>\nAccount: ${text(status.me.id)}\nCloud: ${await cloudUrl()}\n`
       )
       if (status.currentWorkspace)
         console.log(

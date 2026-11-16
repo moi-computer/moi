@@ -35,6 +35,7 @@ import {
   type WorkspaceConfigPatch
 } from './workspaces/config'
 import { VERSION } from './version'
+import { createRemoteBroker } from './remote/broker'
 import {
   getWorkspaceEnvView,
   parseEnvUpdate,
@@ -44,6 +45,8 @@ import {
 } from './workspaces/env'
 
 type ControlSocket = { send(data: string): void }
+
+const remoteBroker = createRemoteBroker()
 
 // Resolve a control request's `path` to the registered workspace that contains
 // it — the entry itself or its nearest registered ancestor — so every
@@ -76,7 +79,12 @@ async function resolveWorkspace(
 export const control = Bun.serve({
   port: CONTROL_PORT,
   hostname: CONTROL_HOST,
-  fetch(req, server) {
+  async fetch(req, server) {
+    // Cloud requests from callers with no login of their own (remote/broker.ts).
+    // An exec stream can stay quiet for longer than the default idle timeout.
+    if (new URL(req.url).pathname.startsWith('/remote/')) server.timeout(req, 0)
+    const brokered = await remoteBroker(req)
+    if (brokered) return brokered
     return server.upgrade(req)
       ? new Response(null, { status: 101 })
       : new Response('Control WebSocket only', { status: 426 })

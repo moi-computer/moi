@@ -52,7 +52,7 @@ All three must be absolute paths.
 **`agentLauncher`**: an executable that every agent process starts through: `agentLauncher <command> <args…>`. That covers Claude Code, Codex, function workers, applet builds, installs and chat titles. It must switch to the agent's user, drop anything that user may not have, set `HOME` to the agent's home, and `exec` the command, keeping stdin, stdout and the rest of the environment. Use it to keep the agent out of moi's data folder. When set:
 
 - moi must be able to read and write the agent's files (chat histories, workspaces). The machine grants this; moi doesn't check.
-- The agent can't open moi's data folder, so its `moi` CLI works through the running server. `init`, `start`, `service`, `update` and the provider `init`s refuse to run for it; `version` and `status` still work.
+- The agent can't open moi's data folder, so its `moi` CLI works through the running server. That includes `moi remote` and commands in a linked workspace: the server sends their Cloud requests with its own login (see [Which login a command uses](remote-cli.md#which-login-a-command-uses)). `init`, `start`, `service`, `update` and the provider `init`s refuse to run for it; `version` and `status` still work.
 - New code that starts agent processes must use `agentCommand()` or `claudeCodeSpawn()` from `server/agent-launcher.ts`, or it runs as moi's user.
 
 **`unixSocket`**: a socket file the web side listens on instead of port 13337. Put it in a folder only the machine's gateway can open, so nothing else on the machine, the agent included, reaches the API meant for people.

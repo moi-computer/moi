@@ -7,10 +7,13 @@ import { decodeJwt } from 'jose'
 import { Mutex } from 'async-mutex'
 import { lock } from 'proper-lockfile'
 import { z } from 'zod'
-import { chmod, mkdir, rename, rm } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { access as fileAccess, chmod, mkdir, rename, rm } from 'node:fs/promises'
+import { accessSync, constants, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { DATA_DIR } from '../data-dir'
+import { canUseDataDir, DATA_DIR } from '../data-dir'
+import { allowedCloudRequest } from './allowed'
+import { controlBroker } from './broker-client'
+import { CloudSignInRequired } from './errors'
 import { PACKAGE_ROOT } from '../version'
 import {
   agentCredentialsSchema,
@@ -21,14 +24,23 @@ import {
   AGENT_CLIENTS
 } from './agent'
 
-type RemoteRequestOptions = {
+export type RemoteRequestOptions = {
   method?: string
   body?: string | Blob | Uint8Array<ArrayBuffer>
   signal?: AbortSignal
   contentType?: string
 }
+export type RemoteLogin = 'human' | 'agent'
+/** A Cloud answer, and which kind of login sent the request. */
+export type RemoteReply = { response: Response; agent: boolean }
+/** A running Moi server that sends listed Cloud requests with its own login.
+ * Both calls answer undefined when no such server is running. */
+export type RemoteBroker = {
+  info(): Promise<{ url: string; login?: RemoteLogin } | undefined>
+  fetch(path: string, options: RemoteRequestOptions): Promise<RemoteReply | undefined>
+}
 
-export class CloudSignInRequired extends Error {}
+export { CloudSignInRequired }
 
 const humanCredentialsSchema = z.object({
   accessToken: z.string().min(1),
@@ -101,11 +113,31 @@ export function resolveRemoteConfig(
   }
 }
 
-/** Each client owns one data directory. Tests use an isolated directory. */
-export function createRemoteClient(directory: string) {
+/** Each client owns one data directory. Tests use an isolated directory.
+ *
+ * A request uses the login saved in that directory. Given a broker, a caller
+ * with no readable login of its own asks the running Moi server to send the
+ * request instead, so the agent's OS user on a managed machine never holds a
+ * credential. With no login and no server, the caller is signed out.
+ */
+export function createRemoteClient(directory: string, broker?: RemoteBroker) {
   const authFile = join(directory, 'remote-auth.json')
   const mutex = new Mutex()
   const pendingFile = join(directory, 'remote-agent-pending.json')
+  const ownLogin = () =>
+    fileAccess(authFile, constants.R_OK).then(
+      () => true,
+      () => false
+    )
+  // A directory that does not exist yet can still be created and used.
+  function usable(): boolean {
+    try {
+      accessSync(directory, constants.R_OK | constants.W_OK | constants.X_OK)
+      return true
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === 'ENOENT'
+    }
+  }
 
   async function json<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
     // A parser error can quote the response body, which may contain tokens.
@@ -290,7 +322,13 @@ export function createRemoteClient(directory: string) {
           throw new Error(
             'Logging out permanently revokes this agent login and deletes its local keys. It cannot be restored. Run moi remote logout --yes to confirm'
           )
-        await cloudJson(config, pair, '/agents/logout', {}, z.object({ success: z.boolean() }))
+        await answer(
+          {
+            response: await localSend(config, pair, 'api/agents/logout', jsonRequest({})),
+            agent: true
+          },
+          z.object({ success: z.boolean() })
+        )
         assertLock()
         await rm(authFile, { force: true })
         await rm(pendingFile, { force: true })
@@ -332,33 +370,79 @@ export function createRemoteClient(directory: string) {
     })
   }
 
-  async function cloudJson<T>(
+  const jsonRequest = (body: unknown | undefined, method?: string): RemoteRequestOptions => ({
+    method: method ?? (body === undefined ? 'GET' : 'POST'),
+    body: body === undefined ? undefined : JSON.stringify(body),
+    contentType: 'application/json',
+    signal: AbortSignal.timeout(30_000)
+  })
+
+  // The one place a credential meets a request. Answers with whatever Cloud
+  // returned; callers decide what a failure status means.
+  async function localSend(
     config: RemoteConfig,
     pair: Credentials,
     path: string,
-    body: unknown | undefined,
-    schema: z.ZodType<T>,
-    method = body === undefined ? 'GET' : 'POST'
-  ): Promise<T> {
-    if (!path.startsWith('/') || path.startsWith('//') || path.includes('..'))
-      throw new Error('Invalid cloud API path')
-    const url = `${config.url}/api${path}`,
-      raw = body === undefined ? '' : JSON.stringify(body)
+    options: RemoteRequestOptions
+  ): Promise<Response> {
+    const url = new URL(path, config.url.replace(/\/+$/, '') + '/').href
+    const method = options.method ?? 'GET'
+    let body = options.body
+    if (isAgent(pair) && body instanceof Blob) {
+      if (body.size > 16 * 1024 * 1024) throw new Error('Agent uploads are limited to 16 MiB')
+      body = new Uint8Array(await body.arrayBuffer())
+    }
+    if (
+      isAgent(pair) &&
+      body &&
+      (typeof body === 'string'
+        ? Buffer.byteLength(body)
+        : body instanceof Blob
+          ? body.size
+          : body.byteLength) >
+        16 * 1024 * 1024
+    )
+      throw new Error('Agent uploads are limited to 16 MiB')
     const authorization = isAgent(pair)
-      ? await agentAuthorization(pair, url, method, raw)
+      ? await agentAuthorization(pair, url, method, body instanceof Blob ? '' : (body ?? ''))
       : `Bearer ${pair.accessToken}`
-    const response = await fetch(url, {
+    return fetch(url, {
       method,
-      headers: { authorization, 'content-type': 'application/json' },
-      body: body === undefined ? undefined : raw,
+      body,
       redirect: 'error',
-      signal: AbortSignal.timeout(30_000)
+      signal: options.signal,
+      headers: {
+        authorization,
+        ...(options.contentType ? { 'content-type': options.contentType } : {})
+      }
     })
-    if (response.status === 401)
+  }
+
+  /** Send a listed Cloud request with this directory's login, or through the
+   * running Moi server when the caller has no login of its own. */
+  async function send(path: string, options: RemoteRequestOptions = {}): Promise<RemoteReply> {
+    allowedCloudRequest(options.method ?? 'GET', path)
+    if (broker && !(await ownLogin())) {
+      const brokered = await broker.fetch(path, options)
+      if (brokered) return brokered
+      if (!usable()) throw new Error('Moi is not running, so this user cannot reach Moi Cloud')
+    }
+    const config = await remoteConfig()
+    const pair = await access(config)
+    return { response: await localSend(config, pair, path, options), agent: isAgent(pair) }
+  }
+
+  async function answer<T>({ response, agent }: RemoteReply, schema: z.ZodType<T>): Promise<T> {
+    if (response.status === 401) {
+      await response.body?.cancel()
       throw new Error(
-        isAgent(pair) ? 'Agent login is no longer valid' : 'Sign-in expired — run moi remote login'
+        agent ? 'Agent login is no longer valid' : 'Sign-in expired — run moi remote login'
       )
-    if (!response.ok) throw new Error(`Cloud request failed (${response.status})`)
+    }
+    if (!response.ok) {
+      await response.body?.cancel()
+      throw new Error(`Cloud request failed (${response.status})`)
+    }
     return json(response, schema)
   }
   async function request<T>(
@@ -367,16 +451,29 @@ export function createRemoteClient(directory: string) {
     schema: z.ZodType<T>,
     method?: string
   ) {
-    const config = await remoteConfig()
-    return cloudJson(config, await access(config), path, body, schema, method)
+    return answer(await send('api' + path, jsonRequest(body, method)), schema)
   }
-  async function authenticatedGet<T>(
-    config: RemoteConfig,
-    pair: Credentials,
-    path: string,
-    schema: z.ZodType<T>
-  ) {
-    return cloudJson(config, pair, path, undefined, schema)
+
+  /** The saved login's kind and Cloud URL, for a server lending it to callers. */
+  async function loginInfo(): Promise<{ url: string; login?: RemoteLogin }> {
+    const config = await remoteConfig()
+    try {
+      return { url: config.url, login: isAgent(await read(config)) ? 'agent' : 'human' }
+    } catch (error) {
+      if (error instanceof CloudSignInRequired) return { url: config.url }
+      throw error
+    }
+  }
+  // The login requests go out with: this directory's, else the running server's.
+  async function activeLogin(): Promise<{ url: string; login?: RemoteLogin }> {
+    if (broker && !(await ownLogin())) {
+      const info = await broker.info()
+      if (info) return info
+    }
+    return loginInfo()
+  }
+  async function cloudUrl(): Promise<string> {
+    return (await activeLogin()).url
   }
   const invitationSchema = z.object({
     id: z.string(),
@@ -394,7 +491,7 @@ export function createRemoteClient(directory: string) {
       )
     ).invitations
   }
-  function invitation(value: string, config: RemoteConfig) {
+  function invitation(value: string, config: { url: string }) {
     if (!value.includes('://')) {
       if (!/^[A-Za-z0-9_-]{1,240}$/.test(value)) throw new Error('Invalid invitation ID')
       return { id: value, token: undefined, agent: false }
@@ -424,24 +521,54 @@ export function createRemoteClient(directory: string) {
       .transform(parseRemoteWorkspaceTarget),
     membershipId: z.string()
   })
+  const acceptPath = (id: string) => `/invitations/${encodeURIComponent(id)}/accept`
   async function accept(value: string, name?: string, client?: string) {
     if (client !== undefined && !agentClientSchema.safeParse(client).success)
       throw new Error(`Invalid client — choose ${AGENT_CLIENTS.join(', ')}`)
+    // No login of its own: the running server accepts with its login, unless
+    // this is a new agent identity that this directory can hold itself.
+    const server = broker && !(await ownLogin()) ? await broker.info() : undefined
+    if (server) {
+      const target = invitation(value, server)
+      const creating =
+        target.agent &&
+        usable() &&
+        ((await Bun.file(pendingFile).exists()) || (name !== undefined && client !== undefined))
+      if (!creating && (server.login || !usable())) {
+        if (!server.login)
+          throw new CloudSignInRequired('Moi is signed out of Moi Cloud on this machine')
+        if (
+          server.login !== 'agent' &&
+          (target.agent || name !== undefined || client !== undefined)
+        )
+          throw new Error(
+            'Already signed in as a human — use a separate Moi data directory for this agent'
+          )
+        return request(acceptPath(target.id), target.token ? { token: target.token } : {}, accepted)
+      }
+    }
     const config = await remoteConfig(),
       target = invitation(value, config)
+    const acceptWith = async (pair: Credentials) =>
+      answer(
+        {
+          response: await localSend(
+            config,
+            pair,
+            'api' + acceptPath(target.id),
+            jsonRequest(target.token ? { token: target.token } : {})
+          ),
+          agent: isAgent(pair)
+        },
+        accepted
+      )
     if (await Bun.file(authFile).exists()) {
       const saved = await read(config)
       if (!isAgent(saved) && (target.agent || name !== undefined || client !== undefined))
         throw new Error(
           'Already signed in as a human — use a separate Moi data directory for this agent'
         )
-      return cloudJson(
-        config,
-        await access(config),
-        `/invitations/${encodeURIComponent(target.id)}/accept`,
-        target.token ? { token: target.token } : {},
-        accepted
-      )
+      return acceptWith(await access(config))
     }
     if (!target.agent)
       throw new CloudSignInRequired(
@@ -455,13 +582,7 @@ export function createRemoteClient(directory: string) {
           throw new Error(
             'Already signed in as a human — use a separate Moi data directory for this agent'
           )
-        return cloudJson(
-          config,
-          pair,
-          `/invitations/${encodeURIComponent(target.id)}/accept`,
-          target.token ? { token: target.token } : {},
-          accepted
-        )
+        return acceptWith(pair)
       }
       if (!target.token) throw new Error('First agent acceptance requires an invitation URL')
       const fingerprint = new Bun.CryptoHasher('sha256').update(target.token).digest('hex')
@@ -524,10 +645,9 @@ export function createRemoteClient(directory: string) {
     })
   }
   async function renameAgent(name: string) {
-    const config = await remoteConfig(),
-      pair = await access(config)
-    if (!isAgent(pair)) throw new Error('This command is for agents')
-    return cloudJson(config, pair, '/me', { name }, agentProfileSchema, 'PATCH')
+    const { login } = await activeLogin()
+    if (login === 'human') throw new Error('This command is for agents')
+    return request('/me', { name }, agentProfileSchema, 'PATCH')
   }
   async function leave(ownerId: string, workspaceId: string) {
     parseRemoteWorkspaceTarget({ user_id: ownerId, workspace_id: workspaceId })
@@ -542,10 +662,7 @@ export function createRemoteClient(directory: string) {
    * Refreshes credentials automatically; requires no browser or running Moi server.
    */
   async function fetchSharedWorkspaces(): Promise<SharedWorkspace[]> {
-    const config = await remoteConfig()
-    const pair = await access(config)
-    const result = await authenticatedGet(config, pair, '/workspaces/shared', workspacesSchema)
-    return result.workspaces
+    return (await request('/workspaces/shared', undefined, workspacesSchema)).workspaces
   }
 
   /** Byte-preserving operations transport; writes are never automatically replayed. */
@@ -557,7 +674,7 @@ export function createRemoteClient(directory: string) {
   ): Promise<Response> {
     parseRemoteWorkspaceTarget({ user_id: ownerId, workspace_id: workspaceId })
     if (!/^\/(?:files\/|exec$|commands$)/.test(suffix)) throw new Error('Invalid remote operation')
-    return authenticatedTransport(
+    return transport(
       `api/workspaces/${workspaceAddress(workspaceId, ownerId)}/ops${suffix}`,
       options
     )
@@ -577,43 +694,11 @@ export function createRemoteClient(directory: string) {
       (url.pathname !== base.pathname && !url.pathname.startsWith(base.pathname + '/'))
     )
       throw new Error('Invalid workspace path')
-    return authenticatedTransport(url.pathname + url.search, options)
+    return transport(url.pathname + url.search, options)
   }
 
-  async function authenticatedTransport(path: string, options: RemoteRequestOptions) {
-    const config = await remoteConfig()
-    const pair = await access(config)
-    const url = new URL(path, config.url.replace(/\/+$/, '') + '/').href
-    const method = options.method ?? 'GET'
-    let body = options.body
-    if (isAgent(pair) && body instanceof Blob) {
-      if (body.size > 16 * 1024 * 1024) throw new Error('Agent uploads are limited to 16 MiB')
-      body = new Uint8Array(await body.arrayBuffer())
-    }
-    if (
-      isAgent(pair) &&
-      body &&
-      (typeof body === 'string'
-        ? Buffer.byteLength(body)
-        : body instanceof Blob
-          ? body.size
-          : body.byteLength) >
-        16 * 1024 * 1024
-    )
-      throw new Error('Agent uploads are limited to 16 MiB')
-    const authorization = isAgent(pair)
-      ? await agentAuthorization(pair, url, method, body instanceof Blob ? '' : (body ?? ''))
-      : `Bearer ${pair.accessToken}`
-    const response = await fetch(url, {
-      method,
-      body,
-      redirect: 'error',
-      signal: options.signal,
-      headers: {
-        authorization,
-        ...(options.contentType ? { 'content-type': options.contentType } : {})
-      }
-    })
+  async function transport(path: string, options: RemoteRequestOptions) {
+    const { response } = await send(path, options)
     if (!response.ok) {
       await response.body?.cancel()
       throw new Error(
@@ -626,17 +711,18 @@ export function createRemoteClient(directory: string) {
   }
 
   async function remoteStatus(): Promise<RemoteStatus> {
-    const config = await remoteConfig()
-    const pair = await access(config)
     const [me, shared] = await Promise.all([
-      authenticatedGet(config, pair, '/me', profileSchema),
-      authenticatedGet(config, pair, '/workspaces/shared', workspacesSchema)
+      request('/me', undefined, profileSchema),
+      request('/workspaces/shared', undefined, workspacesSchema)
     ])
     return { me, workspaces: shared.workspaces }
   }
 
   return {
     remoteConfig,
+    cloudUrl,
+    loginInfo,
+    send,
     login,
     logout,
     fetchSharedWorkspaces,
@@ -650,8 +736,13 @@ export function createRemoteClient(directory: string) {
   }
 }
 
+// A data directory the caller named and can open is its own: it never borrows
+// the running server's login. Standalone bots and tests rely on this.
+const ownsDataDir = !!process.env.MOI_DATA_DIR && canUseDataDir()
+
 export const {
   remoteConfig,
+  cloudUrl,
   login,
   logout,
   fetchSharedWorkspaces,
@@ -662,4 +753,4 @@ export const {
   accept,
   renameAgent,
   leave
-} = createRemoteClient(DATA_DIR)
+} = createRemoteClient(DATA_DIR, ownsDataDir ? undefined : controlBroker)

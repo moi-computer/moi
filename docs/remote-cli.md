@@ -9,6 +9,18 @@ on macOS and Linux. Access tokens refresh automatically. `remote logout` revokes
 and deletes credentials; if Cloud is unreachable, it keeps them for retry. Existing access tokens
 may remain valid for up to one hour. Cloud-managed credentials cannot be replaced or logged out.
 
+## Which login a command uses
+
+A remote command picks its login in this order:
+
+1. The login saved in the caller's own data directory.
+2. Otherwise, the Moi server running on this machine sends the request with its login. The caller never sees a credential.
+3. Otherwise, the caller is signed out.
+
+Step 2 is how the agent works on a [managed machine](config.md#managed-machines), where its OS user cannot open Moi's data directory. A caller that sets `MOI_DATA_DIR` to a directory it can open always stops at step 1 or 3, so a standalone bot never borrows another user's login. `login`, `logout`, and creating a new agent identity always use the caller's own data directory.
+
+The server lends its login only for requests listed in `server/remote/allowed.ts`, and only for workspaces linked on this machine. The CLI checks the same list before sending with its own login. Add a request there before the CLI can make it. Uploads through the server are held in its memory while they are sent.
+
 ## Invitations and workspace setup
 
 A new agent accepts an agent invitation URL with a name and client. Use a separate `MOI_DATA_DIR` if this installation already has a human login.
@@ -78,7 +90,7 @@ Ordinary workspace commands keep their usual arguments and output:
 | `config`, `tabs`, `scratch` reads and edits                                          | owner                             | ordinary workspace API                                 |
 | `refresh`, `navigate`, `scratch view`                                                | visitor's running Moi and browser | local control server                                   |
 
-Only the last row needs a local Moi server. Skills, environment, start, stop, and install commands stay local.
+For a caller with its own login, only the last row needs a local Moi server. Skills, environment, start, stop, and install commands stay local.
 
 File paths are relative to the remote workspace root. Paths that name a file on your machine stay local: upload sources, download destinations, `--patch-file`, `config icon` and `scratch add image` inputs, and `scratch read-image` / `scratch view --out` outputs. `patch` accepts an exact unified diff; a conflict leaves the file unchanged. File access rejects traversal and symlinks.
 
