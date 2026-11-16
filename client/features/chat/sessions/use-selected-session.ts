@@ -1,15 +1,8 @@
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useParams } from 'wouter'
 
-import { appUiKeys } from '@/client/api/app-ui-keys'
 import { jsonRequest, requestJson } from '@/client/api/http'
-import {
-  readSelectedSession,
-  writeSelectedSession,
-  type BrowserTabSelection
-} from '@/client/features/chat/sessions/browser-tab-state'
-import { useAppConfig } from '@/client/api/app-config'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import {
   changeWorkspaceStateCache,
@@ -20,7 +13,7 @@ import {
 } from '@/client/features/workspace/workspace-state'
 import { useUiStore } from '@/client/store/ui'
 import { composerDraftKey } from '@/lib/session-drafts'
-import type { SelectedSessionScope, WorkspaceState, WorkspaceTabId } from '@/lib/types'
+import type { WorkspaceState, WorkspaceTabId } from '@/lib/types'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 
 type SetSelectedSession = (sessionId: string | null) => void
@@ -40,69 +33,22 @@ type SelectionWrite = {
   ifMatch?: string | null
 }
 
-export function browserTabSelectionKey(workspaceId: string) {
-  return appUiKeys.browserTabSelection(workspaceId)
-}
-
-// sessionStorage is the source; the query only lets React observe it. Dropped
-// on unmount so the next visit reads storage again.
-export function browserTabSelectionOptions(workspaceId: string) {
-  return {
-    queryKey: browserTabSelectionKey(workspaceId),
-    queryFn: () => Promise.resolve(readSelectedSession(workspaceId)),
-    staleTime: Infinity,
-    gcTime: 0,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false
-  }
-}
-
-// The chat a tab shows: the pin, then this browser tab's own choice (collab),
-// then the workspace's. Undefined until the state has loaded.
+// The personal pin takes precedence over the chat selected in this workspace tab.
 export function selectedSessionForTab(
   state: WorkspaceState | undefined,
-  tabId: WorkspaceTabId,
-  local?: BrowserTabSelection
+  tabId: WorkspaceTabId
 ): string | null | undefined {
   if (!state) return undefined
   if (state.pinnedSessionId) return state.pinnedSessionId
-  if (local && tabId in local.selected) return local.selected[tabId] ?? null
   return state.selected[tabId] ?? null
 }
 
-function cachedBrowserTabSelection(
-  queryClient: QueryClient,
-  workspaceId: string
-): BrowserTabSelection {
-  return (
-    queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey(workspaceId)) ??
-    readSelectedSession(workspaceId)
-  )
-}
-
-// For handlers outside render, which must see a change before React does.
 export function cachedSelectedSession(
   queryClient: QueryClient,
   workspaceId: string,
-  tabId: WorkspaceTabId,
-  scope: SelectedSessionScope
-): string | null | undefined {
-  return selectedSessionForTab(
-    getCachedWorkspaceState(queryClient, workspaceId),
-    tabId,
-    scope === 'browser-tab' ? cachedBrowserTabSelection(queryClient, workspaceId) : undefined
-  )
-}
-
-function setBrowserTabSelection(
-  queryClient: QueryClient,
-  workspaceId: string,
-  change: (selected: BrowserTabSelection['selected']) => void
-): void {
-  const selected = { ...cachedBrowserTabSelection(queryClient, workspaceId).selected }
-  change(selected)
-  queryClient.setQueryData<BrowserTabSelection>(browserTabSelectionKey(workspaceId), { selected })
-  writeSelectedSession(workspaceId, { selected })
+  tabId: WorkspaceTabId
+) {
+  return selectedSessionForTab(getCachedWorkspaceState(queryClient, workspaceId), tabId)
 }
 
 function applySelectionWrite(draft: WorkspaceState, input: SelectionWrite): void {
@@ -111,22 +57,13 @@ function applySelectionWrite(draft: WorkspaceState, input: SelectionWrite): void
 }
 
 // The request that points `tabId` at `sessionId` (null: a new chat), or
-// undefined when nothing needs saving. Collab saves locally right here.
+// undefined when nothing needs saving.
 function selectionChange(
   queryClient: QueryClient,
   workspaceId: string,
   sessionId: string | null,
-  tabId: WorkspaceTabId,
-  scope: SelectedSessionScope
+  tabId: WorkspaceTabId
 ): SelectionWrite | undefined {
-  if (scope === 'browser-tab') {
-    const local = cachedBrowserTabSelection(queryClient, workspaceId)
-    if (tabId in local.selected && (local.selected[tabId] ?? null) === sessionId) return
-    setBrowserTabSelection(queryClient, workspaceId, selected => {
-      selected[tabId] = sessionId
-    })
-    return
-  }
   const current = getCachedWorkspaceState(queryClient, workspaceId)?.selected[tabId] ?? null
   if (current === sessionId) return
   if (sessionId === null) return current ? { sessionId: current, tabId, show: false } : undefined
@@ -139,17 +76,11 @@ export function setSelectedSessionInCache(
   queryClient: QueryClient,
   workspaceId: string,
   sessionId: string,
-  tabId: WorkspaceTabId,
-  scope: SelectedSessionScope
+  tabId: WorkspaceTabId
 ): void {
-  if (scope === 'browser-tab')
-    setBrowserTabSelection(queryClient, workspaceId, selected => {
-      selected[tabId] = sessionId
-    })
-  else
-    changeWorkspaceStateCache(queryClient, workspaceId, draft => {
-      draft.selected[tabId] = sessionId
-    })
+  changeWorkspaceStateCache(queryClient, workspaceId, draft => {
+    draft.selected[tabId] = sessionId
+  })
 }
 
 // A harness replaced a temporary chat id with its real one.
@@ -165,10 +96,6 @@ export function renameSelectedSessionInCache(
   changeWorkspaceStateCache(queryClient, workspaceId, draft =>
     renameSessionInState(draft, from, to)
   )
-  setBrowserTabSelection(queryClient, workspaceId, selected => {
-    for (const [tabId, sessionId] of Object.entries(selected) as [WorkspaceTabId, string | null][])
-      if (sessionId === from) selected[tabId] = to
-  })
 }
 
 export function useCurrentTabId(): WorkspaceTabId {
@@ -193,40 +120,31 @@ export function useSelectedSession(explicitTabId?: WorkspaceTabId): SelectedSess
   const routeTabId = useCurrentTabId()
   const tabId = explicitTabId ?? routeTabId
   const workspaceId = useWorkspaceId()
-  const cloud = useAppConfig().environment === 'cloud'
-  const scope: SelectedSessionScope = cloud ? 'browser-tab' : 'shared'
   const queryClient = useQueryClient()
   const state = useWorkspaceState(workspaceId).data
-  const local = useQuery({
-    ...browserTabSelectionOptions(workspaceId),
-    enabled: scope === 'browser-tab'
-  }).data
   const { mutate: save, mutateAsync: saveAsync } = useSelectionWrite(workspaceId)
 
   const setSelectedSessionId = useCallback<SetSelectedSession>(
     sessionId => {
       // A pinned chat shows in every tab until it is unpinned.
       if (getCachedWorkspaceState(queryClient, workspaceId)?.pinnedSessionId) return
-      const input = selectionChange(queryClient, workspaceId, sessionId, tabId, scope)
+      const input = selectionChange(queryClient, workspaceId, sessionId, tabId)
       if (input) save(input)
     },
-    [queryClient, save, workspaceId, tabId, scope]
+    [queryClient, save, workspaceId, tabId]
   )
 
   const selectSessionForTab = useCallback(
     async (sessionId: string, destination: WorkspaceTabId) => {
-      const input = selectionChange(queryClient, workspaceId, sessionId, destination, scope)
+      const input = selectionChange(queryClient, workspaceId, sessionId, destination)
       if (!input) return
       const saved = await saveAsync(input)
       if (saved.selected[destination] !== sessionId) throw new Error('Couldn’t save selected chat')
     },
-    [queryClient, saveAsync, scope, workspaceId]
+    [queryClient, saveAsync, workspaceId]
   )
 
-  const selectedSessionId =
-    scope === 'browser-tab' && local === undefined
-      ? undefined
-      : selectedSessionForTab(state, tabId, scope === 'browser-tab' ? local : undefined)
+  const selectedSessionId = selectedSessionForTab(state, tabId)
   return [selectedSessionId, setSelectedSessionId, selectSessionForTab]
 }
 

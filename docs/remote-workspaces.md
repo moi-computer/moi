@@ -11,9 +11,13 @@ A remote workspace is a registered local folder whose `.moi/.workspace.json` poi
 }
 ```
 
-A remote config contains only `version` and `remote`; any other field is ignored. Local configs keep their existing format at version 1; opening or saving them does not migrate them.
+New local and remote configs use version 2. Remote configs contain only `version` and `remote`.
 
-Name, icon, layout, harness, theme, and content come from the owner. The folder holds only the config and the workspace skill. Open tabs and the active tab live in browser-tab storage. Remote workspaces open in fullscreen mode; chat and settings are unavailable.
+The owner stores shared content, widgets, theme, name, and icon. Your Moi stores personal tabs,
+active tab, chat placement, panel widths, model defaults, and per-chat settings in
+`DATA_DIR/workspaces/{localId}/state.json`. All browsers connected to that Moi share this state.
+Existing preferences reset to defaults; no migration is needed. Remote chat and settings UI
+remain unavailable.
 
 ## Routing
 
@@ -26,7 +30,7 @@ Registered workspaces use their local ID. Their info response provides `apiBase`
 - local: `/api/workspaces/{localId}`
 - remote: `/api/workspaces/{user_id}:{workspace_id}`
 
-The browser calls the remote prefix directly with its Batiok session. Batiok checks access and forwards to the owner's ordinary API; the visitor's Moi is not in the path. Applet RPC and file URLs follow the address the module was loaded from. For a remote reference, the visitor's own API serves only the reference and personal chat state. It answers 404 for shared content and rejects layout writes.
+The browser calls the remote prefix directly with its Batiok session. Batiok checks access and forwards to the owner's ordinary API; the visitor's Moi is not in the path. Applet RPC and file URLs follow the address the module was loaded from. For a remote reference, the visitor's own API serves only the reference and personal state. It answers 404 for shared content and rejects shared layout writes. Personal layout uses `/api/workspaces/{localId}/state/layout`.
 
 The standalone Moi UI supports local workspaces only: it hides remote registrations and makes no Cloud discovery, sharing, or collaboration calls.
 
@@ -34,15 +38,17 @@ The standalone Moi UI supports local workspaces only: it hides remote registrati
 
 ## Discovery and collaboration
 
-In Cloud mode the home page lists accepted shares from `/cloud/api/workspaces/shared` in the same grid as registered workspaces.
+In Cloud mode, home and the sidebar combine registered workspaces with accepted shares.
+They reuse the workspace info query for names, icons, and themes. Each owner loads independently
+and wakes when needed; failed requests fall back to the registered name or workspace ID.
+A registered reference remains listed after Cloud access is removed.
 
-- Discovery lists are merged and deduplicated before requesting current names, icons, and themes from each owner. These requests wake machines when needed, run independently, and use the same workspace info queries as the workspace loader, home, and sidebar, so slow owners do not delay other cards. Cards select their display fields from the full info response; there is no separate metadata cache. If an owner request fails, the card keeps its registered metadata or falls back to the workspace ID.
-- Accepting an invitation in the UI immediately opens the shared workspace. Opening a share creates the reference under the workspace root (normally `~/moi`), installs the skill, and registers it. Later opens leave an existing reference and skill untouched.
-- A registered reference stays in the grid and sidebar after the share disappears from Cloud.
+Presence uses `${apiBase}/collab`; membership uses `/cloud${apiBase}/members` and
+`/cloud${apiBase}/invitations`. The host and accepted human members can manage membership.
+The UI does not offer leaving yet.
 
-Presence uses `{prefix}/collab`. Membership controls use `/cloud${apiBase}/members` and `/cloud${apiBase}/invitations`. Non-React consumers read the same workspace query; there is no separate routing cache. These fields are response metadata and are never saved in the workspace config. The host and accepted human members can invite and remove members. Leaving a workspace from the UI is not available yet.
-
-Scratchpad documents and assets stay on the owner. Browser saves replace the full document, and there is no live sync: reopen the canvas to load edits made elsewhere.
+Scratchpad documents and assets stay on the owner. Saves replace the full document;
+reopen the canvas to see edits made elsewhere.
 
 ## Local mock workspace
 
@@ -54,7 +60,11 @@ bun scripts/mock-remote-workspace.ts
 
 Open [localhost:9898](http://localhost:9898). No Batiok environment changes or restart needed.
 
-Each start removes the mock from the local Moi registry and removes its generated visitor folder if it contains only the original reference and skill. Extra or modified files and manually linked folders are preserved, as is owner data. Invitations start pending again. Moi must be running on `13337` (override with `MOCK_VISITOR_ORIGIN`). If Moi uses a custom `MOI_DATA_DIR`, pass the same value to the script. Reload any open mock page after restarting.
+Each start resets invitations and unregisters the mock. It deletes the generated visitor folder
+only if the reference and skill are unchanged and no extra files exist. Owner data and manually
+linked folders are preserved. Reload the mock page after restarting.
+
+Moi defaults to `13337` (override with `MOCK_VISITOR_ORIGIN`). Pass its `MOI_DATA_DIR` if customized.
 
 Coverage: [mock workspace flow](../scripts/mock-remote-workspace.test.ts), [owner API boundaries](../server/api/remote-workspace.test.ts), [CLI requests](../server/cli/remote-control.test.ts), and [visual states](../tests/visual/workspace.visual.ts).
 

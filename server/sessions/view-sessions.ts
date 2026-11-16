@@ -2,7 +2,7 @@ import { HarnessTransitionError, reserveWorkspaceOperation } from '../workspaces
 import { IDENTITY_ICON_IDS } from '@/lib/identity-icons'
 import { viewBuildDirectives } from '@/lib/view-build-directives'
 import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
-import type { PendingView, SelectedSessionScope, WorkspaceEntry, WorkspaceTabId } from '@/lib/types'
+import type { PendingView, WorkspaceEntry, WorkspaceTabId } from '@/lib/types'
 import { getCollabReferencePath } from '../collab/config'
 import { harnessFor } from '../harness/registry'
 import type { SendMessageInput } from '../harness/types'
@@ -37,13 +37,13 @@ export class ViewStartupError extends Error {
 type BuildSendOptions = Pick<
   SendMessageInput,
   'attachments' | 'optimisticId' | 'model' | 'effort' | 'speedMode' | 'stream'
-> & { selectedSessionScope?: SelectedSessionScope }
+>
 export type SubmitViewInput = BuildSendOptions & { requirements: string; sessionId?: string }
 
 // Both ordinary chat and initial build requests use this boundary.
 export async function sendWorkspaceMessage(
   ws: WorkspaceEntry,
-  input: SendMessageInput & { selectedSessionScope?: SelectedSessionScope; viewBuildId?: string }
+  input: SendMessageInput & { viewBuildId?: string }
 ) {
   const release = reserveWorkspaceOperation(ws.id)
   try {
@@ -53,7 +53,7 @@ export async function sendWorkspaceMessage(
       throw new HarnessTransitionError('Agent changed. Start a new chat')
     const { prepareWorkspaceHarness } = await import('../workspaces/change-harness')
     await prepareWorkspaceHarness(ws)
-    const { selectedSessionScope, viewBuildId, ...message } = input
+    const { viewBuildId, ...message } = input
     const sessionId = resolveRenamedSession(ws.id, input.sessionId)
     const record = await getSessionEntry(ws, sessionId)
     const tabId = input.context?.activeTab?.id ?? record.tabId ?? 'overview'
@@ -79,7 +79,7 @@ export async function sendWorkspaceMessage(
       throw new PendingViewError('This view is already being built in another chat', 409)
     if (input.isNew && record.tabId !== tabId) {
       record.tabId = tabId === 'overview' ? undefined : tabId
-      await attachSession(ws, tabId, sessionId, null, selectedSessionScope)
+      await attachSession(ws, tabId, sessionId, null)
     }
     if (isBuildRequest)
       await patchPendingView(ws, pending.id, {
@@ -126,11 +126,10 @@ async function attachSession(
   ws: WorkspaceEntry,
   tabId: WorkspaceTabId,
   sessionId: string,
-  ifMatch?: string | null,
-  selectedSessionScope: SelectedSessionScope = 'shared'
+  ifMatch?: string | null
 ) {
   await updateSessionEntry(ws, sessionId, { tabId: tabId === 'overview' ? undefined : tabId })
-  if (selectedSessionScope === 'shared') await saveSelectedSession(ws, sessionId, tabId, ifMatch)
+  await saveSelectedSession(ws, sessionId, tabId, ifMatch)
 }
 async function sendBuild(
   ws: WorkspaceEntry,
@@ -176,7 +175,6 @@ async function failStartup(
 
 export async function submitView(ws: WorkspaceEntry, viewId: string, input: SubmitViewInput) {
   const tabId = viewTabId(viewId)
-  const shared = (input.selectedSessionScope ?? 'shared') === 'shared'
   // The build, the chat's tab and the tab's selection start in one write. A
   // pinned chat takes the build and keeps its own tab.
   const { view, sessionId, pinned } = await updateWorkspaceState(ws, state => {
@@ -191,7 +189,7 @@ export async function submitView(ws: WorkspaceEntry, viewId: string, input: Subm
     )
     if (!pinned) {
       setSessionTab(state, sessionId, tabId)
-      if (shared) selectSessionForTab(state, ws.id, sessionId, tabId)
+      selectSessionForTab(state, ws.id, sessionId, tabId)
     }
     return { view, sessionId, pinned }
   })

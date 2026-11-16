@@ -1,3 +1,4 @@
+import { DEFAULT_WORKSPACE_STATE_ROOT, setWorkspaceStateRoot } from '../workspace-state'
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -7,7 +8,7 @@ import type { WorkspaceEntry } from '@/lib/types'
 
 import { api } from './index'
 import { setEventServer } from '../events'
-import { loadLayout, saveLayout } from '../workspaces/layout'
+import { loadLayout } from '../workspaces/layout'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 
 const PNG = Buffer.from(
@@ -22,6 +23,7 @@ let published: string[]
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-workspace-presentation-'))
+  setWorkspaceStateRoot(join(tempDir, 'state'))
   workspaceDir = join(tempDir, 'workspace')
   await mkdir(join(workspaceDir, '.moi'), { recursive: true })
   setRegistryPath(join(tempDir, 'workspaces.json'))
@@ -35,6 +37,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   await rm(tempDir, { recursive: true, force: true })
 })
@@ -130,34 +133,22 @@ test('theme saves broadcast changes and expose the theme in workspace lists', as
   expect(list[0]?.theme).toEqual(theme)
 })
 
-test('a delayed layout save preserves the current harness defaults and unrelated edits', async () => {
+test('layout saves leave personal chat defaults unchanged', async () => {
   const initial = await loadLayout(workspaceDir)
-  await saveLayout({ ...initial, selectedModel: 'new-model' }, workspaceDir)
+  const settings = await api.request(`/api/workspaces/${workspaceId}/state/chat-defaults`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'chosen-model' })
+  })
+  expect(settings.status).toBe(200)
   const response = await api.request(`/api/workspaces/${workspaceId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...initial,
-      harness: 'claude-code',
-      layoutMode: 'fullscreen',
-      selectedModel: 'old-model',
-      selectedEffort: 'high',
-      selectedSpeedMode: 'fast'
-    })
+    body: JSON.stringify({ ...initial, widgetGrid: [] })
   })
   expect(response.status).toBe(204)
-  const saved = await loadLayout(workspaceDir)
-  expect(saved.layoutMode).toBe('fullscreen')
-  expect(saved.selectedModel).toBe('new-model')
-  expect(saved.selectedEffort).toBeUndefined()
-  expect(saved.selectedSpeedMode).toBeUndefined()
-  expect('harness' in saved).toBe(false)
-
-  const current = await api.request(`/api/workspaces/${workspaceId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...saved, harness: 'codex', selectedModel: 'chosen-model' })
-  })
-  expect(current.status).toBe(204)
-  expect((await loadLayout(workspaceDir)).selectedModel).toBe('chosen-model')
+  expect(await loadLayout(workspaceDir)).toEqual({ ...initial, widgetGrid: [] })
+  expect(
+    (await (await api.request(`/api/workspaces/${workspaceId}/state`)).json()).chatDefaults
+  ).toEqual({ model: 'chosen-model' })
 })

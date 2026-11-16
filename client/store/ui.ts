@@ -9,15 +9,11 @@ type UiStore = {
   hasSentMessageFromMoi: boolean
   workspaceIdsPendingAnalysis: string[]
   composerDrafts: Record<string, string>
-  dockedChatWidth: number
-  popupChatWidth: number
   setDiscoveredWorkspacesOpen: (open: boolean) => void
   markWorkspacePendingAnalysis: (workspaceId: string) => void
   markMessageSentFromMoi: (workspaceId: string) => void
   setComposerDraft: (key: string, value: string | null) => void
   moveComposerDraft: (from: string, to: string) => void
-  setDockedChatWidth: (width: number) => void
-  setPopupChatWidth: (width: number) => void
 }
 
 export const createUiStore = (storage?: StateStorage) =>
@@ -28,8 +24,6 @@ export const createUiStore = (storage?: StateStorage) =>
         hasSentMessageFromMoi: false,
         workspaceIdsPendingAnalysis: [],
         composerDrafts: {},
-        dockedChatWidth: 360,
-        popupChatWidth: 440,
         setDiscoveredWorkspacesOpen: open => set({ discoveredWorkspacesOpen: open }),
         markWorkspacePendingAnalysis: workspaceId =>
           set(state => {
@@ -65,9 +59,7 @@ export const createUiStore = (storage?: StateStorage) =>
             composerDrafts[to] ??= composerDrafts[from]
             delete composerDrafts[from]
             return { composerDrafts }
-          }),
-        setDockedChatWidth: width => set({ dockedChatWidth: width }),
-        setPopupChatWidth: width => set({ popupChatWidth: width })
+          })
       }),
       {
         name: 'moi:ui',

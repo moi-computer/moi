@@ -8,7 +8,7 @@ import { toast } from '@/client/components/ui/toast'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
-import { useWorkspaceTabs } from '@/client/features/workspace/browser-tab-state'
+import { useWorkspaceTabs } from '@/client/features/workspace/personal-layout'
 import { resolveActiveTab, tabAvailable } from './tab-resolution'
 import { useWorkspaceLayoutCtx } from './workspace-layout-context'
 import { useNavigationClient } from '@/client/runtime/use-workspace-events'
@@ -76,6 +76,9 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
   const isUnavailable =
     Boolean(path) && !isChatLink && (!requestedTab || !tabAvailable(requestedTab, views))
   const isAvailableTab = requestedTab !== undefined && !isUnavailable
+  const previousAddress = useRef<string | undefined>(undefined)
+  const previousActive = useRef(tabsState.active)
+  const previousAvailable = useRef(false)
 
   const setTabs = useCallback(
     (tabs: WorkspaceTabsState) => {
@@ -216,12 +219,44 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
   }, [activeTab, isChatLink, navigate, path, remembered, reportError, search])
 
   useEffect(() => {
-    if (!isAvailableTab) return
+    const address = path + search
+    const addressChanged = previousAddress.current !== address
+    const selectionChanged = previousActive.current !== tabsState.active
+    const becameAvailable = !previousAvailable.current && isAvailableTab
+    previousAvailable.current = isAvailableTab
+    previousAddress.current = address
+    previousActive.current = tabsState.active
+    if (!addressChanged && selectionChanged && tabAvailable(tabsState.active, views)) {
+      // Another browser changed the personal active tab. Replace, don't add history.
+      if (requestedTab !== tabsState.active) {
+        const url = resolveUrl(tabUrl(remembered, tabsState.active), { workspaceId, base, apiBase })
+        previousAddress.current = url.slice(prefix.length)
+        setLocation(`~${url}`, { replace: true })
+      }
+      return
+    }
+    if ((!addressChanged && !becameAvailable) || !isAvailableTab) return
     remembered.set(activeTab, `moi:/${activeTab}${search}`)
     const current = latest.current.tabsState
     const open = current.open.includes(activeTab) ? current.open : [...current.open, activeTab]
     if (open !== current.open || current.active !== activeTab) setTabs({ open, active: activeTab })
-  }, [activeTab, isAvailableTab, latest, remembered, search, setTabs])
+  }, [
+    path,
+    search,
+    tabsState.active,
+    views,
+    requestedTab,
+    activeTab,
+    isAvailableTab,
+    latest,
+    remembered,
+    setTabs,
+    workspaceId,
+    base,
+    apiBase,
+    prefix,
+    setLocation
+  ])
 
   // React bubbling includes applet/chat portals. Native modified clicks and
   // downloads keep a real href, so the browser can handle them normally.

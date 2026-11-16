@@ -22,9 +22,7 @@ async function fetchProxyUser(): Promise<ProxyUserState | undefined> {
   } catch {}
 }
 
-// Loaded once before the app mounts, like startup config, so workspaces
-// choose between shared and browser-tab navigation with the inherited user
-// already in place.
+// Load the inherited identity before the app mounts.
 export async function loadProxyUser(): Promise<ProxyUserState | undefined> {
   return fetchProxyUser()
 }

@@ -16,9 +16,7 @@ beforeEach(() => {
   useUiStore.setState({
     hasSentMessageFromMoi: false,
     workspaceIdsPendingAnalysis: [],
-    composerDrafts: {},
-    dockedChatWidth: 360,
-    popupChatWidth: 440
+    composerDrafts: {}
   })
 })
 
@@ -59,8 +57,6 @@ describe('composer drafts', () => {
     const restoredStore = createUiStore(localStorage)
 
     expect(restoredStore.getState().composerDrafts).toEqual({})
-    expect(restoredStore.getState().dockedChatWidth).toBe(360)
-    expect(restoredStore.getState().popupChatWidth).toBe(440)
   })
 
   test('persists drafts per workspace and restores them in a new store', () => {
@@ -108,28 +104,6 @@ describe('pending view drafts', () => {
 
     expect(useUiStore.getState()).toBe(before)
   })
-})
-
-describe('docked chat width', () => {
-  test('persists one width across stores', () => {
-    useUiStore.getState().setDockedChatWidth(412)
-
-    const restoredStore = createUiStore(localStorage)
-
-    expect(restoredStore.getState().dockedChatWidth).toBe(412)
-    expect(JSON.parse(storedValues.get('moi:ui') ?? '{}')).toMatchObject({
-      state: { dockedChatWidth: 412 }
-    })
-  })
-})
-
-test('popup width survives reloads independently of the sidebar width', () => {
-  useUiStore.getState().setPopupChatWidth(1000)
-  useUiStore.getState().setDockedChatWidth(412)
-
-  const restoredStore = createUiStore(localStorage)
-  expect(restoredStore.getState().popupChatWidth).toBe(1000)
-  expect(restoredStore.getState().dockedChatWidth).toBe(412)
 })
 
 test('a pending view draft follows chat creation and native renames, including empty text', () => {

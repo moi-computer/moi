@@ -1,4 +1,3 @@
-import { loadLayout, saveLayout } from './layout'
 import type { WorkspaceEntry, WorkspaceType } from '@/lib/types'
 import { harnessFor } from '../harness/registry'
 import { harnessStore } from '../harness/auth'
@@ -43,9 +42,9 @@ export async function changeWorkspaceHarness(ws: WorkspaceEntry, type: Workspace
     if (type === previousType) return current
     if (harness.activeSessions().some(session => session.workspaceId === ws.id))
       throw new HarnessTransitionError('Wait for the agent to finish before changing it')
-    const layoutBefore = await loadLayout(current.path)
     const before = await updateWorkspaceState(current, state => {
       const before = structuredClone(state)
+      state.chatDefaults = {}
       state.selected = {}
       delete state.pinnedSessionId
       for (const view of Object.values(state.pendingViews)) {
@@ -57,21 +56,11 @@ export async function changeWorkspaceHarness(ws: WorkspaceEntry, type: Workspace
     })
     let updated: WorkspaceEntry
     try {
-      const layout = { ...layoutBefore }
-      delete layout.selectedModel
-      delete layout.selectedEffort
-      delete layout.selectedSpeedMode
-      await saveLayout(layout, current.path)
       updated = await updateWorkspaceHarness(ws.id, type)
     } catch (error) {
-      const recovery = await Promise.allSettled([
-        saveLayout(layoutBefore, current.path),
-        updateWorkspaceState(current, state => Object.assign(state, before))
-      ])
-      for (const result of recovery) {
-        if (result.status === 'rejected')
-          console.error('Could not restore workspace state', result.reason)
-      }
+      await updateWorkspaceState(current, state => Object.assign(state, before)).catch(error => {
+        console.error('Could not restore workspace state', error)
+      })
       throw error
     }
     // Capture and dispose the old runtime before allowing another transition.

@@ -3,7 +3,7 @@ import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
 import { viewTabId } from '@/lib/workspace-tabs'
 
 // One row of `moi tabs`. `isDefault` marks the workspace's saved default tab
-// (`layout.tabs.active`) — where a bare `/workspace/:id` lands.
+// (`state.layout.tabs.active`) — where a bare `/workspace/:id` lands.
 export type TabRow = {
   id: WorkspaceTabId
   title: string

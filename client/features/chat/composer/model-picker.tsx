@@ -1,3 +1,4 @@
+import { useWorkspaceState } from '@/client/features/workspace/workspace-state'
 import { type ComponentProps, type ReactNode, memo, useState } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
@@ -329,7 +330,8 @@ type ModelPickerProps = {
 // A session id targets that chat's stored config. Null targets the workspace
 // defaults that seed new chats such as the pending view.
 export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerProps) {
-  const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
+  const { workspaceId } = useWorkspaceLayoutCtx()
+  const defaults = useWorkspaceState(workspaceId).data?.chatDefaults
   const { data } = useWorkspaceHarness(workspaceId)
 
   // The SDK prepends a synthetic "default" entry ("Use the default model
@@ -346,24 +348,24 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
   const sessionConfig = useSessionState(workspaceId, sessionId).data?.config
   const saveSessionConfig = useSaveSessionConfig(workspaceId)
 
-  const selectedModel = (sessionId ? sessionConfig?.model : undefined) ?? layout.selectedModel
-  const selectedEffort = (sessionId ? sessionConfig?.effort : undefined) ?? layout.selectedEffort
+  const selectedModel = (sessionId ? sessionConfig?.model : undefined) ?? defaults?.model
+  const selectedEffort = (sessionId ? sessionConfig?.effort : undefined) ?? defaults?.effort
   const selectedSpeedMode =
-    (sessionId ? sessionConfig?.speedMode : undefined) ?? layout.selectedSpeedMode
+    (sessionId ? sessionConfig?.speedMode : undefined) ?? defaults?.speedMode
 
   const setSelectedModel = (value: string) => {
     if (sessionId) saveSessionConfig.mutate({ sessionId, patch: { model: value } })
-    else setLayout({ selectedModel: value })
+    else saveSessionConfig.mutate({ patch: { model: value } })
   }
 
   const setSelectedEffort = (value: string) => {
     if (sessionId) saveSessionConfig.mutate({ sessionId, patch: { effort: value } })
-    else setLayout({ selectedEffort: value })
+    else saveSessionConfig.mutate({ patch: { effort: value } })
   }
 
   const setSelectedSpeedMode = (value: SpeedMode) => {
     if (sessionId) saveSessionConfig.mutate({ sessionId, patch: { speedMode: value } })
-    else setLayout({ selectedSpeedMode: value })
+    else saveSessionConfig.mutate({ patch: { speedMode: value } })
   }
 
   const model = resolveSelectedModel(models, selectedModel, defaultEntry?.resolvedModel)

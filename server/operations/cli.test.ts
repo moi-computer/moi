@@ -131,11 +131,3 @@ test.each(
   expect(result.code).toBe(0)
   expect(bundleCalls.slice(before)).toEqual([{ command: args[0], args: args.slice(1) }])
 })
-
-test.each(['bundle', 'theme', 'views', 'check'])('removed remote alias %s fails', async command => {
-  const before = bundleCalls.length
-  const result = await cli([command])
-  expect(result.code).toBe(1)
-  expect(result.stderr).toContain('Unknown command')
-  expect(bundleCalls.length).toBe(before)
-})

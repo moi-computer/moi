@@ -412,8 +412,7 @@ if (import.meta.main) {
           ...createDefaultWorkspaceLayout().widgetGrid,
           { i: 'launch-brief', x: 0, y: 1 },
           { i: 'launch-progress', x: 2, y: 1 }
-        ],
-        tabs: { open: ['overview', 'views/launch-plan'], active: 'overview' }
+        ]
       },
       owner
     )

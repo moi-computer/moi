@@ -38,6 +38,7 @@ afterEach(async () => {
 test('switches in place and preserves metadata while resetting selections and pending builds', async () => {
   const ws = await registerWorkspace(root, { type: 'claude-code', name: 'My workspace' })
   await updateWorkspaceState(ws, state => {
+    state.chatDefaults = { model: 'old-default', effort: 'high', speedMode: 'fast' }
     state.selected.overview = 'old'
     state.pinnedSessionId = 'old'
     state.sessions.old = { config: { model: 'old-model' } }
@@ -50,6 +51,7 @@ test('switches in place and preserves metadata while resetting selections and pe
   const next = await changeWorkspaceHarness(ws, 'codex')
   expect(next).toMatchObject({ id: ws.id, path: root, name: ws.name, type: 'codex' })
   const state = await readWorkspaceState(ws)
+  expect(state.chatDefaults).toEqual({})
   expect(state.selected).toEqual({})
   expect(state.pinnedSessionId).toBeUndefined()
   expect(state.sessions.old?.config?.model).toBe('old-model')
@@ -101,6 +103,7 @@ test('restores selection when registration persistence fails', async () => {
   const registry = await import('./registry')
   const ws = await registerWorkspace(root, { type: 'claude-code' })
   await updateWorkspaceState(ws, state => {
+    state.chatDefaults = { model: 'kept-model' }
     state.selected.overview = 'kept'
     state.pinnedSessionId = 'kept'
   })
@@ -111,31 +114,11 @@ test('restores selection when registration persistence fails', async () => {
     await expect(changeWorkspaceHarness(ws, 'codex')).rejects.toThrow('Disk failure')
     expect((await getWorkspace(ws.id))?.type).toBe('claude-code')
     const state = await readWorkspaceState(ws)
+    expect(state.chatDefaults).toEqual({ model: 'kept-model' })
     expect(state.selected.overview).toBe('kept')
     expect(state.pinnedSessionId).toBe('kept')
   } finally {
     save.mockRestore()
-  }
-})
-
-test('restores session selections even when layout rollback also fails', async () => {
-  const layout = await import('./layout')
-  const ws = await registerWorkspace(root, { type: 'claude-code' })
-  await updateWorkspaceState(ws, state => {
-    state.selected.overview = 'kept'
-    state.pinnedSessionId = 'kept'
-  })
-  const save = spyOn(layout, 'saveLayout').mockRejectedValue(new Error('Layout unavailable'))
-  const log = spyOn(console, 'error').mockImplementation(() => {})
-  try {
-    await expect(changeWorkspaceHarness(ws, 'codex')).rejects.toThrow('Layout unavailable')
-    const state = await readWorkspaceState(ws)
-    expect(state.selected.overview).toBe('kept')
-    expect(state.pinnedSessionId).toBe('kept')
-    expect((await getWorkspace(ws.id))?.type).toBe('claude-code')
-  } finally {
-    save.mockRestore()
-    log.mockRestore()
   }
 })
 

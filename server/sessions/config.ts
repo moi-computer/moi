@@ -21,22 +21,25 @@ export async function hasSessionConfig(ws: WorkspaceRef, sessionId: string): Pro
   return Object.keys(await getSessionConfig(ws, sessionId)).length > 0
 }
 
+// Without a session id, update the personal defaults used by new chats.
 export async function saveSessionConfig(
   ws: WorkspaceRef,
-  sessionId: string,
+  sessionId: string | undefined,
   patch: SessionConfigPatch
 ): Promise<SessionConfig> {
   return updateWorkspaceState(ws, state => {
-    const session = (state.sessions[sessionId] ??= {})
-    const config: SessionConfig = { ...session.config }
+    const session = sessionId ? (state.sessions[sessionId] ??= {}) : undefined
+    const config: SessionConfig = { ...(session ? session.config : state.chatDefaults) }
     for (const key of ['model', 'effort', 'speedMode'] as const) {
       if (patch[key] === null) delete config[key]
     }
     if (typeof patch.model === 'string') config.model = patch.model
     if (typeof patch.effort === 'string') config.effort = patch.effort
     if (isSpeedMode(patch.speedMode)) config.speedMode = patch.speedMode
-    if (Object.keys(config).length) session.config = config
-    else delete session.config
+    if (session) {
+      if (Object.keys(config).length) session.config = config
+      else delete session.config
+    } else state.chatDefaults = config
     return config
   })
 }

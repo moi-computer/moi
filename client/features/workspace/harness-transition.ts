@@ -4,8 +4,6 @@ import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type { WorkspaceLayoutResponse, WorkspaceType } from '@/lib/types'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { liveStore } from '@/client/features/chat/chat-store'
-import { writeSelectedSession } from '@/client/features/chat/sessions/browser-tab-state'
-import { browserTabSelectionKey } from '@/client/features/chat/sessions/use-selected-session'
 import { changeWorkspaceStateCache } from './workspace-state'
 
 export async function receiveWorkspaceHarness(
@@ -44,16 +42,12 @@ export async function receiveWorkspaceHarness(
     previous
       ? {
           ...previous,
-          provider: harness,
-          selectedModel: undefined,
-          selectedEffort: undefined,
-          selectedSpeedMode: undefined
+          provider: harness
         }
       : previous
   )
-  writeSelectedSession(id, { selected: {} })
-  queryClient.setQueryData(browserTabSelectionKey(id), { selected: {} })
   changeWorkspaceStateCache(queryClient, id, state => {
+    state.chatDefaults = {}
     state.selected = {}
     delete state.pinnedSessionId
   })

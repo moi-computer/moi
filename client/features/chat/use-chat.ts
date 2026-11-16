@@ -1,3 +1,4 @@
+import { useWorkspaceState } from '@/client/features/workspace/workspace-state'
 import { useCallback, useMemo } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -6,7 +7,6 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useSessionState, useSessionView } from '@/client/features/chat/sessions/api'
 import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useSelectedSession } from '@/client/features/chat/sessions/use-selected-session'
-import { useAppConfig } from '@/client/api/app-config'
 import {
   type WorkspaceTabAddress,
   useMoiUserMessageContext
@@ -51,9 +51,8 @@ const EMPTY: ViewState = emptyViewState()
 export function useChat(address: WorkspaceTabAddress) {
   const workspaceId = useWorkspaceId()
   const qc = useQueryClient()
-  const { layout, chatAvailable } = useWorkspaceLayoutCtx()
+  const { chatAvailable } = useWorkspaceLayoutCtx()
   const [selectedSession, selectSession] = useSelectedSession(address.activeTab)
-  const cloud = useAppConfig().environment === 'cloud'
   const modelsData = useWorkspaceHarness(workspaceId).data
   // A newly forked/native session can precede the provider's session listing.
   // Archive explicitly clears selection; a stale catalog must not do so.
@@ -75,6 +74,7 @@ export function useChat(address: WorkspaceTabAddress) {
   const viewQuery = useSessionView(workspaceId, selectedSessionId)
   const { refetch } = viewQuery
   // Tab, settings and fork history, from the workspace state.
+  const defaults = useWorkspaceState(workspaceId).data?.chatDefaults
   const session = useSessionState(workspaceId, selectedSessionId)
   const { refetch: refetchSession } = session
   const retryLoad = useCallback(async () => {
@@ -157,9 +157,9 @@ export function useChat(address: WorkspaceTabAddress) {
       // the picker's concrete model even for an implicit or stale selection;
       // otherwise its config or resumed thread can choose a different model.
       // Validate effort and Fast mode against that same resolved row.
-      const pickedModel = sessionConfig?.model ?? layout.selectedModel
-      const pickedEffort = sessionConfig?.effort ?? layout.selectedEffort
-      const pickedSpeedMode = sessionConfig?.speedMode ?? layout.selectedSpeedMode
+      const pickedModel = sessionConfig?.model ?? defaults?.model
+      const pickedEffort = sessionConfig?.effort ?? defaults?.effort
+      const pickedSpeedMode = sessionConfig?.speedMode ?? defaults?.speedMode
       const { model, effort, speedMode, stream } = resolveChatRunOptions(
         modelsData,
         pickedModel,
@@ -172,7 +172,6 @@ export function useChat(address: WorkspaceTabAddress) {
         content: text,
         sessionId: sid,
         isNew,
-        selectedSessionScope: cloud ? 'browser-tab' : 'shared',
         optimisticId,
         model,
         effort,
@@ -193,15 +192,14 @@ export function useChat(address: WorkspaceTabAddress) {
       selectedSessionId,
       workspaceId,
       qc,
-      layout.selectedModel,
-      layout.selectedEffort,
-      layout.selectedSpeedMode,
+      defaults?.model,
+      defaults?.effort,
+      defaults?.speedMode,
       buildMoiContext,
       sessionConfig?.model,
       sessionConfig?.effort,
       sessionConfig?.speedMode,
       selectSession,
-      cloud,
       modelsData
     ]
   )

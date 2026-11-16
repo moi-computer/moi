@@ -202,10 +202,7 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
     expect(await configFile.text()).toBe(originalConfig)
     const localFolder = join(dir, 'local-workspace')
     const localConfig = Bun.file(join(localFolder, '.moi/.workspace.json'))
-    await Bun.write(
-      localConfig,
-      JSON.stringify({ version: 1, widgetGrid: [], layoutMode: 'split' })
-    )
+    await Bun.write(localConfig, JSON.stringify({ version: 1, widgetGrid: [] }))
     const localBefore = await localConfig.text()
     expect(
       (await cli(['init', localFolder, '--remote', 'owner:two', '--json'], 1)).stderr
@@ -221,8 +218,6 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
     expect(await configFile.text()).toBe(originalConfig)
     await cli(['leave', 'owner:two', '--json'])
     expect(await client.fetchSharedWorkspaces()).toEqual([])
-    for (const removed of ['join', 'link', 'unlink'])
-      expect((await cli([removed], 1)).stderr).toContain(`Unknown command ${removed}`)
     expect((await cli(['logout'], 1)).stderr).toContain('--yes')
     expect(active).toBe(true)
     await cli(['logout', '--yes'])

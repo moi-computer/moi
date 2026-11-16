@@ -104,10 +104,6 @@ export async function updateWorkspaceState<T>(
   })
 }
 
-export function hasWorkspaceState(workspaceId: string): boolean {
-  return existsSync(statePath(workspaceId))
-}
-
 async function listStateIds(): Promise<string[]> {
   try {
     const entries = await readdir(root, { withFileTypes: true })

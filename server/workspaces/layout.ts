@@ -6,44 +6,23 @@ import {
   type WorkspaceFileConfig
 } from '@/lib/workspace-config'
 import { join } from 'path'
-import { isSpeedMode } from '@/lib/speed-mode'
 
-import type {
-  AppletKind,
-  WorkspaceLayout,
-  WorkspaceLayoutSave,
-  WorkspacePreview
-} from '@/lib/types'
-import { createDefaultWorkspaceLayout, normalizeWorkspaceTabs } from '@/lib/workspace-layout'
+import type { AppletKind, WorkspaceLayout, WorkspacePreview } from '@/lib/types'
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { isWorkspaceIcon } from '@/lib/workspace-icon'
 
 import { getCapturedThumbnails } from '../applets/thumbnails'
 
 function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
-  const defaults = createDefaultWorkspaceLayout()
-  const layout = { ...defaults, ...parsed } as Record<string, unknown>
-  if (layout.layoutMode !== 'split' && layout.layoutMode !== 'fullscreen') {
-    layout.layoutMode = defaults.layoutMode
+  return {
+    version: 2,
+    widgetGrid: (parsed.widgetGrid ??
+      createDefaultWorkspaceLayout().widgetGrid) as WorkspaceLayout['widgetGrid'],
+    ...(typeof parsed.name === 'string' && { name: parsed.name }),
+    ...(isWorkspaceIcon(parsed.icon) && { icon: parsed.icon }),
+    ...(typeof parsed.theme === 'object' &&
+      parsed.theme !== null && { theme: parsed.theme as WorkspaceLayout['theme'] })
   }
-  layout.tabs = normalizeWorkspaceTabs(layout.tabs)
-  if (typeof layout.selectedModel !== 'string') delete layout.selectedModel
-  if (typeof layout.selectedEffort !== 'string') delete layout.selectedEffort
-  if (!isSpeedMode(layout.selectedSpeedMode)) delete layout.selectedSpeedMode
-  delete layout.selectedFastMode
-  if (typeof layout.icon === 'string') {
-    layout.icon = { type: 'upload', value: layout.icon }
-  } else if (layout.icon !== undefined && !isWorkspaceIcon(layout.icon)) {
-    delete layout.icon
-  }
-  // Legacy thumbnail caches are intentionally dropped, not migrated — images
-  // now live as files under `.moi/.cache/thumbnails` (server/applets/thumbnails.ts)
-  // and applets are simply captured again there.
-  delete layout.widgetThumbnails
-  delete layout.viewThumbnails
-  delete layout.appletThumbnails
-  delete layout.sectionMode
-  delete layout.chatMode
-  return layout as unknown as WorkspaceLayout
 }
 
 export function getLayoutPath(workspacePath: string): string {
@@ -59,7 +38,8 @@ export async function loadWorkspaceFileConfig(workspacePath: string): Promise<Wo
     throw new Error('Invalid workspace config')
   const value = parsed as Record<string, unknown>
   if ('remote' in value) return parseRemoteWorkspaceConfig(value)
-  if (value.version !== 1) throw new Error('Unsupported workspace config version')
+  if (value.version !== 1 && value.version !== 2)
+    throw new Error('Unsupported workspace config version')
   return normalizeLayout(value)
 }
 
@@ -76,35 +56,16 @@ export async function saveLayout(layout: WorkspaceLayout, workspacePath: string)
   await Bun.write(getLayoutPath(workspacePath), JSON.stringify(layout, null, 2))
 }
 
-// Merge a client-submitted layout over the stored one for persistence.
-//
-// Everything (grid, layout mode, theme, AND identity) shares one
-// `.workspace.json`, but the grid editor and `moi config` own different fields.
-// The client's layout PUT is authoritative for the editor fields (widgetGrid,
-// layoutMode, theme, selectedModel) — but it strips `name` and round-trips a
-// possibly-stale `icon`.
-// A blind overwrite therefore erases a `moi config`-set name (and could revert an
-// icon). So drop whatever identity the body carries and re-apply the server-owned
-// fields from `existing` — conditionally, so an absent field never serializes
-// as `name: undefined`.
+// The editor owns widgets and theme; identity changes use the config API.
 export function mergeLayoutForSave(
   existing: WorkspaceLayout,
-  body: WorkspaceLayoutSave
+  body: WorkspaceLayout
 ): WorkspaceLayout {
-  const { name: _name, icon: _icon, ...editor } = body
-  // Stale clients may still round-trip the pre-`.cache` thumbnail records;
-  // never let a layout PUT resurrect them in `.workspace.json`.
-  delete (editor as Record<string, unknown>).appletThumbnails
-  return {
-    // Shared edits omit personal preferences; preserve them unless explicitly supplied.
+  return normalizeLayout({
     ...existing,
-    ...editor,
-    // Personal navigation never writes tabs. Other layout edits must not
-    // round-trip a stale copy of the workspace's authored defaults.
-    tabs: editor.tabs === undefined ? existing.tabs : normalizeWorkspaceTabs(editor.tabs),
-    ...(existing.name !== undefined && { name: existing.name }),
-    ...(existing.icon !== undefined && { icon: existing.icon })
-  }
+    widgetGrid: body.widgetGrid ?? existing.widgetGrid,
+    theme: body.theme ?? existing.theme
+  })
 }
 
 // Thumbnails for the home screen's workspace card. Widgets take the front

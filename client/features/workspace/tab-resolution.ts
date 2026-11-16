@@ -1,6 +1,6 @@
 // Pure tab-state derivation for the workspace screen. The URL is the live
-// truth for the active tab (`/workspace/:id/views/<id>`, etc.); the persisted layout
-// keeps the open set and the saved DEFAULT tab (`tabs.active`). These helpers
+// address for the active tab (`/workspace/:id/views/<id>`, etc.); personal state
+// keeps the open set and active tab in sync across windows. These helpers
 // turn (URL segment + layout + what actually exists) into the rendered state.
 import type { ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
 import { viewIdFromTab } from '@/lib/workspace-tabs'

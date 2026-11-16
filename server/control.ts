@@ -1,3 +1,4 @@
+import { getWorkspaceState } from './workspace-state'
 import { stringify as devalueStringify } from 'devalue'
 import { resolve } from 'path'
 
@@ -325,11 +326,16 @@ export const control = Bun.serve({
         if (data.type === 'tabs') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          const [layout, views] = await Promise.all([
-            loadLayout(match.path),
+          const [state, views] = await Promise.all([
+            getWorkspaceState(match),
             getWorkspaceViews(match)
           ])
-          ws.send(JSON.stringify({ ok: true, tabs: assembleTabRows(views, layout.tabs.active) }))
+          ws.send(
+            JSON.stringify({
+              ok: true,
+              tabs: assembleTabRows(views, state.layout?.tabs.active ?? 'overview')
+            })
+          )
           return
         }
 

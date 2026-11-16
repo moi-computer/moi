@@ -27,7 +27,6 @@ import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace, listWorkspaces } from './workspaces/registry'
 import { failInterruptedViewStarts, sendWorkspaceMessage } from './sessions/view-sessions'
 import { prepareWorkspaceStates } from './workspace-state'
-import { migrateLegacyWorkspaceState } from './workspace-state/legacy-migration'
 import {
   addClient,
   broadcast,
@@ -57,7 +56,6 @@ function isClientMessage(value: unknown): value is ClientMessage {
     sessionId?: unknown
     content?: unknown
     isNew?: unknown
-    selectedSessionScope?: unknown
     optimisticId?: unknown
     model?: unknown
     effort?: unknown
@@ -73,9 +71,6 @@ function isClientMessage(value: unknown): value is ClientMessage {
       typeof v.content === 'string' &&
       typeof v.sessionId === 'string' &&
       typeof v.isNew === 'boolean' &&
-      (v.selectedSessionScope === undefined ||
-        v.selectedSessionScope === 'shared' ||
-        v.selectedSessionScope === 'browser-tab') &&
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string') &&
       (v.effort === undefined || typeof v.effort === 'string') &&
@@ -113,7 +108,6 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
 // WebSocket channels (which need Bun's native `server.upgrade` + pub/sub). Every
 // HTTP API route is delegated to the Hono app (`./api`) via `fetch`.
 const registeredWorkspaces = await listWorkspaces()
-await migrateLegacyWorkspaceState(registeredWorkspaces)
 await prepareWorkspaceStates(registeredWorkspaces)
 await Promise.all(registeredWorkspaces.map(failInterruptedViewStarts))
 
@@ -252,7 +246,6 @@ export const app = Bun.serve<WsData>({
             workspacePath: workspace.path,
             sessionId: data.sessionId,
             isNew: data.isNew,
-            selectedSessionScope: data.selectedSessionScope,
             content: data.content.trim(),
             attachments: data.attachments,
             optimisticId: data.optimisticId,

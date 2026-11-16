@@ -6,7 +6,6 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import {
   type WorkspaceLayoutResponse,
-  type WorkspaceLayoutMutation,
   useSaveLayout,
   useWorkspaceLayout
 } from '@/client/features/workspace/api'
@@ -15,10 +14,10 @@ import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { WorkspaceLayout, WorkspaceType } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
-import { accumulateLayoutSave } from './layout-save'
+import { useWorkspaceState } from './workspace-state'
 
 export type WorkspaceLayoutContextValue = {
-  // The persisted layout (widget grid, layout mode, theme). Falls back to an
+  // Shared widget layout and theme. Falls back to an
   // empty default while the query is still loading.
   layout: WorkspaceLayout
   // Merge a partial update into the layout: updates the query cache immediately
@@ -84,12 +83,13 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
   const qc = useQueryClient()
   const query = useWorkspaceLayout(id)
   const save = useSaveLayout(id)
+  const personal = useWorkspaceState(id)
 
   // `setLayout` must be referentially stable (it feeds effect deps in the grid
   // reconcile), so reach the latest mutate via a ref instead of closing over it.
   const saveRef = useLatestRef(save.mutate)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingSave = useRef<WorkspaceLayoutMutation | null>(null)
+  const pendingSave = useRef<WorkspaceLayout | null>(null)
 
   const setLayout = useCallback(
     (update: Partial<WorkspaceLayout>) => {
@@ -101,11 +101,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       // Optimistic: the grid/theme reflects the change before the PUT lands.
       const next = { ...prev, ...update }
       qc.setQueryData<WorkspaceLayoutResponse>(key, next)
-      pendingSave.current = {
-        ...accumulateLayoutSave(stripMeta(next), update, pendingSave.current),
-        harness: next.provider ?? 'claude-code',
-        saveShared: Boolean(pendingSave.current?.saveShared || update.widgetGrid || update.theme)
-      }
+      pendingSave.current = stripMeta(next)
 
       if (timer.current) clearTimeout(timer.current)
       // Persist the value captured at call time, NOT the cache at fire time: a
@@ -147,16 +143,19 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
 
   return (
     <WorkspaceLayoutContext value={value}>
-      {query.isPending ? (
+      {query.isPending || personal.isPending ? (
         <WorkspacePendingScreen>
           <WorkspaceLoadingState />
         </WorkspacePendingScreen>
-      ) : query.isError && !query.data ? (
+      ) : (query.isError && !query.data) || (personal.isError && !personal.data) ? (
         <WorkspacePendingScreen setupRequired>
           <WorkspaceOpenError
-            error={query.error}
-            retrying={query.isFetching}
-            onRetry={() => void query.refetch()}
+            error={query.error ?? personal.error!}
+            retrying={query.isFetching || personal.isFetching}
+            onRetry={() => {
+              void query.refetch()
+              void personal.refetch()
+            }}
           />
         </WorkspacePendingScreen>
       ) : (

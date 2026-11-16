@@ -4,7 +4,6 @@ import type {
   CompiledView,
   MessageAttachment,
   PendingView,
-  SelectedSessionScope,
   ViewInfo,
   WorkspaceState
 } from '@/lib/types'
@@ -134,7 +133,6 @@ export type SubmitViewInput = {
   requirements: string
   sessionId: string
   optimisticId: string
-  selectedSessionScope?: SelectedSessionScope
   attachments?: MessageAttachment[]
   model?: string
   effort?: string

@@ -17,13 +17,13 @@ async function fixture(config: unknown) {
   return path
 }
 
-test('reads and saves local layouts at version 1', async () => {
-  const path = await fixture({ version: 1, widgetGrid: [], layoutMode: 'fullscreen' })
+test.each([1, 2])('reads local version %s and saves version 2', async version => {
+  const path = await fixture({ version, widgetGrid: [] })
   const layout = await loadLayout(path)
-  expect(layout.layoutMode).toBe('fullscreen')
-  expect((await Bun.file(join(path, '.moi/.workspace.json')).json()).version).toBe(1)
+  expect(layout.widgetGrid).toEqual([])
+  expect((await Bun.file(join(path, '.moi/.workspace.json')).json()).version).toBe(version)
   await saveLayout(layout, path)
-  expect((await Bun.file(join(path, '.moi/.workspace.json')).json()).version).toBe(1)
+  expect((await Bun.file(join(path, '.moi/.workspace.json')).json()).version).toBe(2)
 })
 
 test('remote references have no local layout to load or replace', async () => {
@@ -32,10 +32,8 @@ test('remote references have no local layout to load or replace', async () => {
   await expect(
     saveLayout(
       {
-        version: 1,
-        widgetGrid: [],
-        layoutMode: 'split',
-        tabs: { open: ['overview'], active: 'overview' }
+        version: 2,
+        widgetGrid: []
       },
       path
     )
@@ -55,14 +53,14 @@ test('remote provisioning reports skipped and preserves its config', async () =>
 })
 
 test('existing local scaffolding omits the install log path', async () => {
-  const path = await fixture({ version: 1, widgetGrid: [] })
+  const path = await fixture({ version: 2, widgetGrid: [] })
   await Bun.write(join(path, '.moi/package.json'), '{}')
   const result = await provisionWorkspace(path, 'codex')
   expect(result.scaffold).toBe('exists')
   expect(result).not.toHaveProperty('installLogPath')
 })
 
-test('version 2 is reserved for remote references', async () => {
-  const path = await fixture({ version: 2, widgetGrid: [] })
+test('rejects unsupported config versions', async () => {
+  const path = await fixture({ version: 3, widgetGrid: [] })
   await expect(loadLayout(path)).rejects.toThrow('Unsupported workspace config version')
 })

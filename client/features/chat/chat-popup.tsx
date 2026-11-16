@@ -7,7 +7,7 @@ import { Resizable } from 'react-resizable'
 import { AgentBlobatar } from '@/client/components/shared/agent-blobatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
 import { cn } from '@/client/lib/cn'
-import { useUiStore } from '@/client/store/ui'
+import { usePersonalLayout } from '@/client/features/workspace/personal-layout'
 import type { AgentTheme } from '@/lib/types'
 
 type ChatPopupProps = {
@@ -28,8 +28,9 @@ export function ChatPopup({
   children
 }: ChatPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null)
-  const popupChatWidth = useUiStore(state => state.popupChatWidth)
-  const setPopupChatWidth = useUiStore(state => state.setPopupChatWidth)
+  const [layout, setLayout] = usePersonalLayout()
+  const popupChatWidth = layout.popupChatWidth
+  const setPopupChatWidth = (popupChatWidth: number) => setLayout({ popupChatWidth })
   const [size, setSize] = useState({ width: popupChatWidth, min: 0, max: popupChatWidth })
 
   const setPopupRef = useCallback(
@@ -130,7 +131,10 @@ export function ChatPopup({
         resizeHandles={['w']}
         minConstraints={[size.min, 0]}
         maxConstraints={[size.max, 0]}
-        onResize={(_event, { size }) => setPopupChatWidth(Math.round(size.width))}
+        onResize={(_event, { size }) =>
+          popupRef.current?.style.setProperty('--chat-popup-width', `${Math.round(size.width)}px`)
+        }
+        onResizeStop={(_event, { size }) => setPopupChatWidth(Math.round(size.width))}
         handle={
           <div
             role="separator"

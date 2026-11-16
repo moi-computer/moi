@@ -1,12 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { requestJson } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import {
-  readSelectedSession,
-  writeSelectedSession,
-  type BrowserTabSelection
-} from '@/client/features/chat/sessions/browser-tab-state'
-import { browserTabSelectionKey } from '@/client/features/chat/sessions/use-selected-session'
 import { moveChatDraft } from '@/client/features/chat/chat-send'
 import { liveStore } from '@/client/features/chat/chat-store'
 import {
@@ -16,7 +10,7 @@ import {
 import { useUiStore } from '@/client/store/ui'
 import { composerDraftKey, draftSessionId } from '@/lib/session-drafts'
 import { viewTabId } from '@/lib/workspace-tabs'
-import type { SelectedSessionScope, SessionSummary, WorkspaceState } from '@/lib/types'
+import type { SessionSummary, WorkspaceState } from '@/lib/types'
 
 // A failed HTTP response does not prove startup failed. Refresh the server's
 // state before restoring the fresh composer; never replay the request.
@@ -26,8 +20,7 @@ export async function recoverViewSubmission(
   viewId: string,
   sessionId: string,
   text: string,
-  pinned: boolean,
-  selectionScope: SelectedSessionScope = 'shared'
+  pinned: boolean
 ) {
   const tabId = viewTabId(viewId)
   let target =
@@ -52,18 +45,6 @@ export async function recoverViewSubmission(
     if (view?.status === 'draft' || view?.status === 'failed')
       liveStore.getState().setActivity(workspaceId, target, 'idle')
     receiveWorkspaceState(queryClient, workspaceId, state)
-    if (selectionScope === 'browser-tab' && !pinned) {
-      const local =
-        queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey(workspaceId)) ??
-        readSelectedSession(workspaceId)
-      const selected = { ...local.selected }
-      if (view?.status === 'draft') delete selected[tabId]
-      else selected[tabId] = target
-      queryClient.setQueryData<BrowserTabSelection>(browserTabSelectionKey(workspaceId), {
-        selected
-      })
-      writeSelectedSession(workspaceId, { selected })
-    }
   } catch {
     moveChatDraft(workspaceId, sessionId, target)
     // Offline: retain the draft at its current identity until state can refresh.

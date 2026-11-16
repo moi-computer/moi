@@ -1,3 +1,4 @@
+import { usePersonalLayout } from './personal-layout'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { AnimatePresence } from 'motion/react'
@@ -126,7 +127,12 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   const frame = useWorkspaceFrame()
   const { mode, canUseSplit, setMode } = frame
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
-  const [floatingChatOpen, setFloatingChatOpen] = useState(false)
+  const [personalLayout, savePersonalLayout] = usePersonalLayout()
+  const floatingChatOpen = personalLayout.chatOpen
+  const setFloatingChatOpen = useCallback(
+    (chatOpen: boolean) => savePersonalLayout({ chatOpen }),
+    [savePersonalLayout]
+  )
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
   const pendingViewRefs = useRef(new Map<string, PendingViewHandle>())
   const sessionActivity = useLive(state => state.activity)
@@ -145,7 +151,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   const revealChat = useCallback(() => {
     setFloatingChatOpen(true)
     setChatFocusRequest(request => request + 1)
-  }, [])
+  }, [setFloatingChatOpen])
 
   // The tab address: URL in, active tab + applet params out, plus the persisted
   // tab state it keeps in sync. See useWorkspaceNavigation for the invariants.
@@ -250,16 +256,10 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   }, [allViews, setTabs, tabsState])
 
   useEffect(() => {
-    if (mode !== 'fullscreen') {
-      setFloatingChatOpen(false)
-    }
-  }, [mode])
-
-  useEffect(() => {
     if (!activeDraftViewId) return
     if (mode === 'fullscreen') setFloatingChatOpen(true)
     setChatFocusRequest(request => request + 1)
-  }, [activeDraftViewId, mode])
+  }, [activeDraftViewId, mode, setFloatingChatOpen])
 
   const openTab = navigateToTab
 

@@ -1,17 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, mock, spyOn } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import {
-  browserTabSelectionKey,
-  cachedSelectedSession
-} from '@/client/features/chat/sessions/use-selected-session'
+import { cachedSelectedSession } from '@/client/features/chat/sessions/use-selected-session'
 import { toast } from '@/client/components/ui/toast'
 import * as appletLog from '@/client/features/applets/applet-log'
 import type { AppletChatMessage } from '@/client/features/applets/applet-runtime'
 import { type ChatSendOptions, ownsComposerAttachments, attachmentsForSend } from './chat-send'
 import { liveStore } from './chat-store'
 import { stageTextAttachment } from './composer/attachments/draft-attachments'
-import type { SelectedSessionScope, UploadInfo, WorkspaceState } from '@/lib/types'
+import type { UploadInfo, WorkspaceState } from '@/lib/types'
 import { drainChatDirectives, pushChatDirective } from '@/client/features/workspace/moi-context'
 
 import { canSubmitComposerAction } from '@/client/components/shared/composer'
@@ -70,7 +67,7 @@ describe('appletSendBlockedReason', () => {
 
 // Exercise the actual async handler with deferred uploads and the real selection
 // cache, including changes that happen without an intervening React render.
-describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope=%p', scope => {
+describe('applet sends', () => {
   const workspaceId = 'immediate-send-test'
   const originalFetch = globalThis.fetch
   let handler: ReturnType<typeof createAppletMessageHandler>
@@ -82,20 +79,13 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
   let close: ReturnType<typeof spyOn<typeof toast, 'close'>>
   let log: ReturnType<typeof spyOn<typeof appletLog, 'reportAppletError'>>
 
-  function selectIn(target: SelectedSessionScope, sessionId: string | null) {
-    const selected = sessionId ? { overview: sessionId } : {}
-    if (target === 'browser-tab')
-      queryClient.setQueryData(browserTabSelectionKey(workspaceId), { selected })
-    else
-      queryClient.setQueryData<WorkspaceState>(workspaceKeys.state(workspaceId), {
-        revision: 1,
-        selected,
-        sessions: {},
-        pendingViews: {}
-      })
-  }
   function select(sessionId: string | null) {
-    selectIn(scope, sessionId)
+    queryClient.setQueryData<WorkspaceState>(workspaceKeys.state(workspaceId), {
+      revision: 1,
+      selected: sessionId ? { overview: sessionId } : {},
+      sessions: {},
+      pendingViews: {}
+    })
   }
   function deferredUpload() {
     const deferred = Promise.withResolvers<Response>()
@@ -117,7 +107,6 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
 
   beforeEach(() => {
     queryClient = new QueryClient()
-    if (scope === 'browser-tab') selectIn('shared', null)
     select('session-1')
     availability = { status: 'available' }
     send = mock(() => {})
@@ -125,18 +114,13 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
     notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
     close = spyOn(toast, 'close').mockImplementation(() => {})
     log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
-    handler = createAppletMessageHandler(
-      workspaceId,
-      queryClient,
-      () => ({
-        tabId: 'overview',
-        sessionId: cachedSelectedSession(queryClient, workspaceId, 'overview', scope) ?? null,
-        send,
-        revealChat: reveal,
-        agentAvailability: availability
-      }),
-      scope
-    )
+    handler = createAppletMessageHandler(workspaceId, queryClient, () => ({
+      tabId: 'overview',
+      sessionId: cachedSelectedSession(queryClient, workspaceId, 'overview') ?? null,
+      send,
+      revealChat: reveal,
+      agentAvailability: availability
+    }))
   })
   afterEach(() => {
     handler.dispose()
@@ -156,16 +140,6 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
       preparedAttachments: { attachments: [], parts: [] }
     })
     expect(notices).not.toHaveBeenCalled()
-  })
-
-  test('ignores selection changes in the other scope while attachments are prepared', async () => {
-    const deferred = deferredUpload()
-    const pending = handler.handle(event)
-    selectIn(scope === 'shared' ? 'browser-tab' : 'shared', 'another-chat')
-    deferred.resolve(Response.json(upload))
-    await pending
-    expect(send).toHaveBeenCalledTimes(1)
-    expect(notices.mock.calls.some(([notice]) => notice.title === 'Message canceled')).toBe(false)
   })
 
   test('prepares all three inputs in order without deduplication or draft mutations', async () => {
@@ -322,18 +296,13 @@ describe.each(['shared', 'browser-tab'] as const)('applet sends, selection scope
 
   test('a stale rendered send callback cannot target a previously selected chat', async () => {
     handler.dispose()
-    handler = createAppletMessageHandler(
-      workspaceId,
-      queryClient,
-      () => ({
-        tabId: 'overview',
-        sessionId: 'old-session',
-        send,
-        revealChat: reveal,
-        agentAvailability: availability
-      }),
-      scope
-    )
+    handler = createAppletMessageHandler(workspaceId, queryClient, () => ({
+      tabId: 'overview',
+      sessionId: 'old-session',
+      send,
+      revealChat: reveal,
+      agentAvailability: availability
+    }))
     const fetch = mock(() => Promise.reject(new Error('unexpected upload')))
     globalThis.fetch = fetch as unknown as typeof globalThis.fetch
     await handler.handle(event)

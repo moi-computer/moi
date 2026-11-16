@@ -1,3 +1,4 @@
+import { createDefaultPersonalLayout, parsePersonalLayoutPatch } from '@/lib/workspace-layout'
 import { isSpeedMode } from '@/lib/speed-mode'
 import { mkdir, rename, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
@@ -97,6 +98,10 @@ export function normalizeWorkspaceState(
   const state = emptyWorkspaceState(optionalString(value.workspacePath) ?? workspacePath)
   if (typeof value.revision === 'number' && Number.isSafeInteger(value.revision))
     state.revision = value.revision
+  if (isRecord(value.chatDefaults))
+    state.chatDefaults = normalizeSession({ config: value.chatDefaults }).config ?? {}
+  const layout = parsePersonalLayoutPatch(value.layout)
+  if (layout) state.layout = { ...createDefaultPersonalLayout(), ...layout }
   const pinned = optionalString(value.pinnedSessionId)
   if (pinned) state.pinnedSessionId = pinned
   if (isRecord(value.selected)) {

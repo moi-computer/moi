@@ -101,7 +101,7 @@ test(
                 new MessageEvent('message', {
                   data: JSON.stringify({
                     type: 'welcome',
-                    version: 1,
+                    version: 2,
                     connectionId: 'self',
                     users: [
                       message.profile,
@@ -184,11 +184,9 @@ const remoteAnswers = {
   [ownerBase]: {
     apiBase: '/api/workspaces/owner-board',
     isRemote: false,
-    version: 1,
+    version: 2,
     name: 'Shared board',
-    widgetGrid: [],
-    layoutMode: 'fullscreen',
-    tabs: { open: ['overview'], active: 'overview' }
+    widgetGrid: []
   },
   [`${remoteBase}/skills`]: { skills: [], updateAvailable: false },
   [remoteBase]: {
@@ -547,12 +545,23 @@ test(
   'failed owner view discovery can be retried',
   async page => {
     let unavailable = true
-    await page.addInitScript(() => {
-      sessionStorage.setItem(
-        'moi:collab:shared-board:tabs',
-        JSON.stringify({ open: ['overview', 'views/counter'], active: 'views/counter' })
-      )
-    })
+    await page.route(`**${remoteBase}/state`, route =>
+      route.fulfill({
+        json: {
+          revision: 1,
+          selected: {},
+          sessions: {},
+          pendingViews: {},
+          layout: {
+            tabs: { open: ['overview', 'views/counter'], active: 'views/counter' },
+            layoutMode: 'fullscreen',
+            chatOpen: false,
+            dockedChatWidth: 360,
+            popupChatWidth: 440
+          }
+        }
+      })
+    )
     await page.route(`**${ownerBase}/views`, route =>
       route.fulfill(
         unavailable

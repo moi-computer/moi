@@ -5,14 +5,7 @@ import { useCallback, useMemo } from 'react'
 import { jsonRequest, requestJson } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { sessionViewOptions } from '@/client/features/chat/sessions/session-view'
-import { readSelectedSession, writeSelectedSession } from './browser-tab-state'
-import {
-  browserTabSelectionKey,
-  browserTabSelectionOptions,
-  usePinnedSession,
-  useSelectedSession
-} from './use-selected-session'
-import { useAppConfig } from '@/client/api/app-config'
+import { usePinnedSession, useSelectedSession } from './use-selected-session'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import {
@@ -30,7 +23,6 @@ import type {
   WorkspaceState,
   WorkspaceTabId
 } from '@/lib/types'
-import type { BrowserTabSelection } from './browser-tab-state'
 
 // The agent's chat list. Reading it makes the harness scan transcripts, so
 // mounts within 30 s reuse it; harness `sessions_changed` frames refetch it,
@@ -70,10 +62,9 @@ export function useWorkspaceSessions(workspaceId: string): { data: SessionInfo[]
 export function useSelectLinkedChat() {
   const workspaceId = useWorkspaceId()
   const queryClient = useQueryClient()
-  const cloud = useAppConfig().environment === 'cloud'
   const [, , selectSessionForTab] = useSelectedSession()
   const { unpinAsync } = usePinnedSession()
-  const stateRef = useLatestRef({ cloud, selectSessionForTab, unpinAsync })
+  const stateRef = useLatestRef({ selectSessionForTab, unpinAsync })
   // Stable so selection updates do not restart a pending chat link.
   return useCallback(
     async (
@@ -81,7 +72,7 @@ export function useSelectLinkedChat() {
       tab: WorkspaceTabId,
       signal: AbortSignal
     ): Promise<WorkspaceTabId | undefined> => {
-      const { cloud, selectSessionForTab, unpinAsync } = stateRef.current
+      const { selectSessionForTab, unpinAsync } = stateRef.current
       signal.throwIfAborted()
       let sessions =
         queryClient.getQueryData<SessionSummary[]>(workspaceKeys.sessions(workspaceId)) ?? []
@@ -96,7 +87,6 @@ export function useSelectLinkedChat() {
       const state = await queryClient.ensureQueryData(
         workspaceStateOptions(queryClient, workspaceId)
       )
-      if (cloud) await queryClient.ensureQueryData(browserTabSelectionOptions(workspaceId))
       signal.throwIfAborted()
       const pinned = state.pinnedSessionId
       const destination =
@@ -138,16 +128,6 @@ export function applyArchivedSession(
   changeWorkspaceStateCache(queryClient, workspaceId, draft =>
     clearSessionInState(draft, sessionId)
   )
-  const localKey = browserTabSelectionKey(workspaceId)
-  const local =
-    queryClient.getQueryData<BrowserTabSelection>(localKey) ?? readSelectedSession(workspaceId)
-  if (!Object.values(local.selected).includes(sessionId)) return
-  // An explicit empty local choice prevents falling back to the server's chat.
-  const selected = Object.fromEntries(
-    Object.entries(local.selected).map(([tabId, id]) => [tabId, id === sessionId ? null : id])
-  )
-  queryClient.setQueryData<BrowserTabSelection>(localKey, { selected })
-  writeSelectedSession(workspaceId, { selected })
 }
 
 export function useArchiveWorkspaceSession(workspaceId: string) {
@@ -188,22 +168,25 @@ export function useSessionState(workspaceId: string, sessionId: string | null) {
 export type SessionConfigPatch = { [Key in keyof SessionConfig]?: SessionConfig[Key] | null }
 
 export function useSaveSessionConfig(workspaceId: string) {
-  return useWorkspaceStateWrite<{ sessionId: string; patch: SessionConfigPatch }>(workspaceId, {
+  return useWorkspaceStateWrite<{ sessionId?: string; patch: SessionConfigPatch }>(workspaceId, {
     request: ({ sessionId, patch }) =>
       requestJson<WorkspaceState>(
-        `/api/workspaces/${workspaceId}/sessions/${encodeURIComponent(sessionId)}/config`,
+        sessionId
+          ? `/api/workspaces/${workspaceId}/sessions/${encodeURIComponent(sessionId)}/config`
+          : `/api/workspaces/${workspaceId}/state/chat-defaults`,
         jsonRequest('PATCH', patch),
         'Failed to save chat settings'
       ),
     optimistic: (draft, { sessionId, patch }) => {
-      const session = (draft.sessions[sessionId] ??= {})
-      const config: SessionConfig = { ...session.config }
+      const session = sessionId ? (draft.sessions[sessionId] ??= {}) : undefined
+      const config: SessionConfig = { ...(session ? session.config : draft.chatDefaults) }
       for (const key of ['model', 'effort', 'speedMode'] as const) {
         const value = patch[key]
         if (value === null) delete config[key]
         else if (value !== undefined) Object.assign(config, { [key]: value })
       }
-      session.config = config
+      if (session) session.config = config
+      else draft.chatDefaults = config
     },
     errorTitle: 'Couldn’t save chat settings'
   })

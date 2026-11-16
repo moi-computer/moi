@@ -231,8 +231,6 @@ export type MessageAttachment =
   | ({ type: 'upload'; uploadId: string; purpose?: DrawingPurpose } & Partial<AttachmentOrigin>)
 
 // Client → server messages, routed by workspaceId over the shared WebSocket.
-export type SelectedSessionScope = 'shared' | 'browser-tab'
-
 export type ClientMessage =
   | {
       type: 'chat'
@@ -240,9 +238,6 @@ export type ClientMessage =
       content: string
       sessionId: string
       isNew: boolean
-      // Where this tab keeps its selected session. Browser-tab selection must
-      // not update the workspace's shared selection or switch other tabs.
-      selectedSessionScope?: SelectedSessionScope
       // Text and upload references for this turn. The server resolves uploads
       // and describes all attachments together, preserving their order.
       attachments?: MessageAttachment[]
@@ -317,10 +312,20 @@ export type WorkspaceSessionState = {
   fork?: SessionFork
 }
 
-// Per-user chat state for one workspace, kept in Moi's data dir and served by
-// GET /api/workspaces/:id/state. Every write returns it and publishes it as
-// `state:changed`.
+export type PersonalWorkspaceLayout = {
+  tabs: WorkspaceTabsState
+  layoutMode: LayoutMode
+  chatOpen: boolean
+  dockedChatWidth: number
+  popupChatWidth: number
+}
+
+// Personal state on this Moi installation, shared across its browser windows.
+// GET /api/workspaces/:id/state; writes publish `state:changed`.
 export type WorkspaceState = {
+  layout?: PersonalWorkspaceLayout
+  // Personal defaults for new chats on this Moi installation.
+  chatDefaults?: SessionConfig
   // Goes up by one with every saved change. Lets clients drop an older copy
   // that arrives after a newer one.
   revision: number
@@ -629,39 +634,14 @@ export type WorkspaceTabsState = {
 
 export type { AgentTheme, ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from './themes'
 
-export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & {
-  tabs?: WorkspaceTabsState
-  // Captured when the edit is made, so delayed saves cannot restore another harness's defaults.
-  harness?: WorkspaceType
-}
-
 export type WorkspaceLayout = {
-  version: 1
+  version: 2
   widgetGrid: LayoutGridItem[]
-  layoutMode: LayoutMode
-  // Open tabs and active tab for the fullscreen/split workspace chrome. The
-  // `open` order is persisted so future drag-reordering has one source of truth.
-  tabs: WorkspaceTabsState
   // User-set display-name override. When empty/undefined the API falls back to
   // the workspace folder name, so the resolved name always comes from the API.
   name?: string
   // Workspace icon override. Emoji and glyphs may use a themed background.
   icon?: WorkspaceIcon
-  // Model id chosen in the composer picker (`supportedModels()` `value`, an
-  // alias like `sonnet`). Persisted so the choice survives a reload. Sent with
-  // each chat frame; undefined means the agent runs on the SDK default. Note
-  // the transcript records the *resolved* id (e.g. `claude-sonnet-4-6`), which
-  // doesn't map back to these aliases — hence we persist the pick here.
-  //
-  // This (with `selectedEffort` and `selectedSpeedMode`) is the *workspace
-  // default*: the value the picker edits when no session is open, and the seed a
-  // brand-new session copies. Once a session exists it carries its own per-session
-  // override (see `SessionConfig`).
-  selectedModel?: string
-  // Reasoning-effort default for new sessions (a `supportedEffortLevels` value).
-  selectedEffort?: string
-  // Speed default for new sessions. Undefined behaves as normal.
-  selectedSpeedMode?: SpeedMode
   theme?: WorkspaceTheme
 }
 

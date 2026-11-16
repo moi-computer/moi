@@ -190,65 +190,43 @@ describe('pending view availability', () => {
 })
 
 describe('pending view chat selection', () => {
-  test.each([
-    { selectedSessionScope: 'browser-tab', previous: null },
-    { selectedSessionScope: 'browser-tab', previous: 'other-chat' },
-    { selectedSessionScope: 'shared', previous: 'other-chat' },
-    { selectedSessionScope: undefined, previous: 'other-chat' }
-  ] as const)('respects selection ownership %j', async ({ selectedSessionScope, previous }) => {
-    const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'codex' })
-    const createResponse = await api.request(`/api/workspaces/${workspace.id}/views`, {
-      method: 'POST'
-    })
-    const draft = (await createResponse.json()) as PendingView
-    if (previous) await saveSelectedSession(workspace, previous, viewTabId(draft.id))
-    const sent: SendMessageInput[] = []
-    codexHarness.sendMessage = async input => {
-      sent.push(input)
+  test.each([undefined, 'other-chat'])(
+    'publishes the new chat selection (previous: %s)',
+    async previous => {
+      const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'codex' })
+      const createResponse = await api.request(`/api/workspaces/${workspace.id}/views`, {
+        method: 'POST'
+      })
+      const draft = (await createResponse.json()) as PendingView
+      if (previous) await saveSelectedSession(workspace, previous, viewTabId(draft.id))
+      const sent: SendMessageInput[] = []
+      codexHarness.sendMessage = async input => {
+        sent.push(input)
+      }
+
+      const response = await api.request(
+        `/api/workspaces/${workspace.id}/views/${draft.id}/submit`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requirements: 'Build a dashboard'
+          })
+        }
+      )
+
+      expect(response.status).toBe(200)
+      const result = (await response.json()) as { sessionId: string }
+      expect(sent).toHaveLength(1)
+      expect(sent[0]).toMatchObject({ sessionId: result.sessionId, isNew: true })
+      expect((await workspaceState(workspace.id)).selected[viewTabId(draft.id)]).toBe(
+        result.sessionId
+      )
+      // Other browser tabs hear the selection through the published state.
+      const published = events.filter(event => event.type === 'state:changed').at(-1) as
+        | { state: WorkspaceState }
+        | undefined
+      expect(published?.state.selected[viewTabId(draft.id)]).toBe(result.sessionId)
     }
-
-    const response = await api.request(`/api/workspaces/${workspace.id}/views/${draft.id}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requirements: 'Build a dashboard',
-        selectedSessionScope
-      })
-    })
-
-    expect(response.status).toBe(200)
-    const result = (await response.json()) as { sessionId: string }
-    expect(sent).toHaveLength(1)
-    expect(sent[0]).toMatchObject({ sessionId: result.sessionId, isNew: true })
-    const expected =
-      selectedSessionScope === 'browser-tab' ? (previous ?? undefined) : result.sessionId
-    expect((await workspaceState(workspace.id)).selected[viewTabId(draft.id)]).toBe(expected)
-    // Other browser tabs hear the selection through the published state.
-    const published = events.filter(event => event.type === 'state:changed').at(-1) as
-      | { state: WorkspaceState }
-      | undefined
-    expect(published?.state.selected[viewTabId(draft.id)]).toBe(expected)
-  })
-
-  test('rejects a malformed selection scope before starting a view', async () => {
-    const workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'codex' })
-    const createResponse = await api.request(`/api/workspaces/${workspace.id}/views`, {
-      method: 'POST'
-    })
-    const draft = (await createResponse.json()) as PendingView
-    const response = await api.request(`/api/workspaces/${workspace.id}/views/${draft.id}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requirements: 'Build a dashboard',
-        selectedSessionScope: 'tab'
-      })
-    })
-
-    expect(response.status).toBe(400)
-    expect(await response.text()).toBe('Invalid selectedSessionScope')
-    expect((await workspaceState(workspace.id)).pendingViews[draft.id].status).toBe('draft')
-    // Only creating the draft changed the state.
-    expect(events.filter(event => event.type === 'state:changed')).toHaveLength(1)
-  })
+  )
 })

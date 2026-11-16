@@ -63,10 +63,8 @@ const workspaces: WorkspaceEntry[] = [
 const layout: WorkspaceLayoutResponse = {
   apiBase: `/api/workspaces/${WORKSPACE}`,
   isRemote: false,
-  version: 1,
+  version: 2,
   widgetGrid: [{ i: '_moi_views', x: 0, y: 0 }],
-  layoutMode: 'split',
-  tabs: { open: ['overview', 'scratchpad'], active: 'overview' },
   name: WORKSPACE,
   cwd: DEV_CWD,
   provider: 'claude-code'

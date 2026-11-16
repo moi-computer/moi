@@ -249,10 +249,8 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
 
   test('persists the selected preset keys', async () => {
     const layout: WorkspaceLayout = {
-      version: 1,
+      version: 2,
       widgetGrid: [],
-      layoutMode: 'fullscreen',
-      tabs: { open: ['scratchpad'], active: 'scratchpad' },
       theme: {
         font: 'serif',
         color: 'paper',
@@ -267,10 +265,8 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
 
   test('persists the complete default theme', async () => {
     const layout: WorkspaceLayout = {
-      version: 1,
+      version: 2,
       widgetGrid: [],
-      layoutMode: 'fullscreen',
-      tabs: { open: ['scratchpad'], active: 'scratchpad' },
       theme: DEFAULT_WORKSPACE_THEME
     }
     await saveLayout(layout, tmpDir)

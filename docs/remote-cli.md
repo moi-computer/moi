@@ -11,8 +11,7 @@ may remain valid for up to one hour. Cloud-managed credentials cannot be replace
 
 ## Invitations and workspace setup
 
-Humans sign in with `moi remote login`. A new agent accepts an agent invitation URL with a name
-and client. Use a separate `MOI_DATA_DIR` if this installation already has a human login.
+A new agent accepts an agent invitation URL with a name and client. Use a separate `MOI_DATA_DIR` if this installation already has a human login.
 
 ```sh
 moi remote accept "<agent-invite-url>" --name "Lawyer" --client grok-bot
@@ -36,7 +35,7 @@ moi remote leave <ownerId>:<workspaceId> # Explicit workspace
 moi remote leave --path ./project       # Another folder's remote workspace
 ```
 
-`moi init [directory]` creates a local workspace at version 1. With `--remote`, it writes the
+`moi init [directory]` creates a local workspace at version 2. With `--remote`, it writes the
 version 2 remote reference, installs the skill, and registers the folder without downloading
 files. The directory defaults to the current folder. Repeat initialization is safe for the same
 target; conflicting configs and duplicate registrations at other paths are rejected.
@@ -112,8 +111,6 @@ const workspaces = await fetchSharedWorkspaces()
 // [{ id, owner: { id, name, email, ... } }]
 ```
 
-The function uses the configured Cloud URL and saved credentials. It refreshes a human access token when it has less than 30 seconds left, or signs an agent request. It returns accepted shared workspaces and throws on authentication or network failure. It does not require the CLI or open a browser.
+Returns accepted workspaces using the configured Cloud URL and saved credentials. Authentication and network failures throw. No CLI or browser is required.
 
 Credentials use the same data-directory layout in every environment. Set `MOI_DATA_DIR` to a different directory to keep local testing and production logins separate. Saved credentials are bound to their Cloud URL (including its mount path) and client ID: changing either requires a new login, and never sends the previous login's tokens to the new target.
-
-Normal reads do not take a file lock. Refresh, login, and logout coordinate across processes, and credential replacements are atomic. An abandoned lock is recoverable after one minute.

@@ -6,7 +6,7 @@ import { toast } from '@/client/components/ui/toast'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type { WorkspaceState } from '@/lib/types'
 
-// Per-user chat state for one workspace: pin, the chat each tab shows, chat
+// Personal state for one workspace: layout, tabs, pin, selected chats, chat
 // settings and fork history, and views being built. One cache, kept current by
 // write replies and `state:changed` events instead of refetches.
 
@@ -46,6 +46,7 @@ export function workspaceStateOptions(queryClient: QueryClient, workspaceId: str
     // Events keep the cache current, so new observers never refetch. A focus
     // refetch heals anything missed while the socket was down.
     staleTime: 0,
+    retry: false,
     gcTime: 5 * 60_000,
     refetchOnMount: false,
     refetchOnWindowFocus: true

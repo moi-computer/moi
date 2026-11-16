@@ -5,12 +5,8 @@ import { act, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import {
-  useSaveLayout,
-  useWorkspaceLayout,
-  workspaceInfoOptions,
-  type WorkspaceLayoutMutation
-} from './api'
+import { useSaveLayout, useWorkspaceLayout, workspaceInfoOptions } from './api'
+import type { WorkspaceLayout } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
 test.each([false, true])(
@@ -37,16 +33,13 @@ test.each([false, true])(
       ...createDefaultWorkspaceLayout(),
       name: 'Owner board',
       apiBase: '/api/workspaces/board',
-      isRemote: false,
-      selectedModel: 'owner-model'
+      isRemote: false
     }
     const visitor = {
       version: 2,
       remote,
       apiBase: '/api/workspaces/alice:board',
       isRemote: true,
-      layoutMode: 'fullscreen',
-      tabs: { open: ['scratchpad'], active: 'scratchpad' },
       cwd: '/visitor'
     }
     const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
@@ -66,7 +59,7 @@ test.each([false, true])(
       )
     )
     let loaded: ReturnType<typeof useWorkspaceLayout>['data']
-    let save: (value: WorkspaceLayoutMutation) => Promise<void> = async () => {}
+    let save: (value: WorkspaceLayout) => Promise<void> = async () => {}
     function Probe() {
       const cards = useWorkspaceMetadata([{ remote, name: 'Fallback' }])
       const layout = useWorkspaceLayout('visitor')
@@ -95,38 +88,15 @@ test.each([false, true])(
         name: 'Owner board',
         apiBase: '/api/workspaces/alice:board',
         isRemote: true,
-        cwd: '/visitor',
-        layoutMode: 'fullscreen',
-        tabs: createDefaultWorkspaceLayout().tabs
+        cwd: '/visitor'
       })
-      expect(loaded?.selectedModel).toBeUndefined()
-      expect(
-        client
-          .getQueryCache()
-          .getAll()
-          .map(query => query.queryKey)
-      ).toEqual(
-        expect.arrayContaining([
-          ['workspaces', 'layout', 'visitor'],
-          ['workspaces', 'layout', 'alice:board']
-        ])
-      )
-      expect(client.getQueryCache().getAll()).toHaveLength(2)
       expect(reads.filter(url => url === visitor.apiBase)).toHaveLength(1)
       expect(document.body.textContent).toContain('Owner board')
-      await act(async () => {
-        await save({
-          ...owner,
-          tabs: visitor.tabs as WorkspaceLayoutMutation['tabs'],
-          saveShared: false
-        })
-      })
-      expect(writes).toEqual([])
       writes.length = 0
       reads.length = 0
       owner.name = 'Updated board'
       await act(async () => {
-        await save({ ...owner, saveShared: true })
+        await save(owner)
       })
       expect(writes.map(write => write.url)).toEqual(['/api/workspaces/alice:board'])
       for (let i = 0; i < 20 && !document.body.textContent?.includes('Updated board'); i++)
@@ -138,15 +108,13 @@ test.each([false, true])(
       failSave = true
       owner.name = 'Changed by owner'
       await act(async () => {
-        await expect(save({ ...owner, saveShared: true })).rejects.toThrow('Save failed')
+        await expect(save(owner)).rejects.toThrow('Save failed')
       })
       for (let i = 0; i < 20 && loaded?.name !== 'Changed by owner'; i++)
         await act(async () => {
           await Bun.sleep(10)
         })
       expect(loaded?.name).toBe('Changed by owner')
-      for (const field of ['tabs', 'layoutMode', 'selectedModel', 'saveShared', 'remote'])
-        expect(writes[0]!.body).not.toHaveProperty(field)
     } finally {
       await act(async () => root.unmount())
       client.clear()
@@ -181,12 +149,6 @@ test('non-React consumers use the workspace info cache and follow its updates', 
     seedWorkspaceInfo('visitor', { user_id: 'alice', workspace_id: 'board' }, client)
     expect(getWorkspaceApiBase('visitor', client)).toBe('/api/workspaces/alice:board')
     expect(isRemoteWorkspace('visitor', client)).toBe(true)
-    expect(
-      client
-        .getQueryCache()
-        .getAll()
-        .map(query => query.queryKey)
-    ).toEqual([workspaceKeys.layout('visitor')])
     seedWorkspaceInfo('visitor', { user_id: 'bob', workspace_id: 'board' }, client)
     expect(getWorkspaceApiBase('visitor', client)).toBe('/api/workspaces/bob:board')
     seedWorkspaceInfo('visitor', undefined, client)

@@ -1,6 +1,5 @@
 import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { queryClient as appQueryClient } from '@/client/api/query-client'
-import * as appConfig from '@/client/api/app-config'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -8,11 +7,7 @@ import { Route, Router } from 'wouter'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { Workspace } from './workspace-context'
-import {
-  browserTabSelectionKey,
-  useCurrentTabId
-} from '@/client/features/chat/sessions/use-selected-session'
-import type { BrowserTabSelection } from '@/client/features/chat/sessions/browser-tab-state'
+import { useCurrentTabId } from '@/client/features/chat/sessions/use-selected-session'
 import type {
   SessionSummary,
   ViewInfo,
@@ -20,7 +15,7 @@ import type {
   WorkspaceTabId,
   WorkspaceTabsState
 } from '@/lib/types'
-import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
+import { createDefaultWorkspaceLayout, createDefaultPersonalLayout } from '@/lib/workspace-layout'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
 import { useWorkspaceNavigation } from './use-workspace-navigation'
@@ -33,7 +28,6 @@ type ReadNavigationOptions = {
   navigate?: (path: string, options?: { replace?: boolean }) => void
   queryClient?: QueryClient
   onOpenChat?: () => void
-  cloud?: boolean
   tabs?: WorkspaceTabsState
 }
 
@@ -46,10 +40,18 @@ function readNavigation(
     navigate,
     queryClient = new QueryClient(),
     onOpenChat = () => {},
-    cloud = false,
-    tabs = createDefaultWorkspaceLayout().tabs
+    tabs = createDefaultPersonalLayout().tabs
   }: ReadNavigationOptions = {}
 ) {
+  const previous = queryClient.getQueryData<WorkspaceState>(workspaceKeys.state('abc'))
+  queryClient.setQueryData(workspaceKeys.state('abc'), {
+    revision: 0,
+    selected: {},
+    sessions: {},
+    pendingViews: {},
+    ...previous,
+    layout: { ...createDefaultPersonalLayout(), tabs }
+  })
   const queryKey = workspaceKeys.views('abc')
   if (!queryClient.getQueryDefaults(queryKey).queryFn)
     queryClient.setQueryDefaults(queryKey, { queryFn: async () => views, retry: false })
@@ -66,11 +68,6 @@ function readNavigation(
       </script>
     )
   }
-  const configSpy = spyOn(appConfig, 'useAppConfig').mockReturnValue({
-    environment: cloud ? 'cloud' : 'local',
-    demo: false,
-    demoInstallUrl: '/'
-  })
   const html = renderToStaticMarkup(
     <Workspace id="abc">
       <QueryClientProvider client={queryClient}>
@@ -83,7 +80,7 @@ function readNavigation(
           <Route path="/workspace/:id/*?">
             <WorkspaceLayoutContext
               value={{
-                layout: { ...createDefaultWorkspaceLayout(), tabs },
+                layout: createDefaultWorkspaceLayout(),
                 setLayout: () => {},
                 name: null,
                 cwd: null,
@@ -102,7 +99,6 @@ function readNavigation(
       </QueryClientProvider>
     </Workspace>
   )
-  configSpy.mockRestore()
   if (!html) throw new Error('The workspace route did not match')
   return JSON.parse(html.slice(html.indexOf('>') + 1, html.lastIndexOf('<'))) as Pick<
     ReturnType<typeof useWorkspaceNavigation>,
@@ -288,7 +284,7 @@ test.each(['', '/', '/prefix'])(
 
 type Write = { method: string; url: string; body: unknown }
 
-function createChatNavigationFixture(cloud: boolean) {
+function createChatNavigationFixture() {
   const views: ViewInfo[] = [
     { id: 'orders', status: 'compiled', title: 'Orders' },
     { id: 'draft', status: 'draft', requirements: '' }
@@ -333,8 +329,6 @@ function createChatNavigationFixture(cloud: boolean) {
   } = { sessions: Promise.resolve(sessions) }
   let navigate: (href: string) => void | Promise<void> = () => {}
   const savedWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
-  const savedStorage = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
-  const storage = new Map<string, string>()
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
@@ -344,13 +338,6 @@ function createChatNavigationFixture(cloud: boolean) {
         search: '',
         hash: ''
       }
-    }
-  })
-  Object.defineProperty(globalThis, 'sessionStorage', {
-    configurable: true,
-    value: {
-      getItem: (key: string) => storage.get(key) ?? null,
-      setItem: (key: string, value: string) => storage.set(key, value)
     }
   })
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
@@ -401,7 +388,6 @@ function createChatNavigationFixture(cloud: boolean) {
     navigate: (path, options) => routed.push({ path, ...options }),
     queryClient,
     onOpenChat: () => revealed.push(true),
-    cloud,
     tabs: { open: ['overview', 'scratchpad'], active: 'scratchpad' }
   })
   return {
@@ -413,15 +399,9 @@ function createChatNavigationFixture(cloud: boolean) {
     routed,
     revealed,
     writes,
-    storage,
     cachedState: () => queryClient.getQueryData<WorkspaceState>(workspaceKeys.state('abc')),
-    // The chat this browser tab's selection shows on a workspace tab.
     selectedIn: (tab: WorkspaceTabId) =>
-      cloud
-        ? queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey('abc'))?.selected[
-            tab
-          ]
-        : queryClient.getQueryData<WorkspaceState>(workspaceKeys.state('abc'))?.selected[tab],
+      queryClient.getQueryData<WorkspaceState>(workspaceKeys.state('abc'))?.selected[tab],
     navigate: (href: string) => Promise.resolve(navigate(href)),
     cleanup() {
       fetchSpy.mockRestore()
@@ -429,8 +409,6 @@ function createChatNavigationFixture(cloud: boolean) {
       queryClient.clear()
       if (savedWindow) Object.defineProperty(globalThis, 'window', savedWindow)
       else Reflect.deleteProperty(globalThis, 'window')
-      if (savedStorage) Object.defineProperty(globalThis, 'sessionStorage', savedStorage)
-      else Reflect.deleteProperty(globalThis, 'sessionStorage')
     }
   }
 }
@@ -438,207 +416,186 @@ function createChatNavigationFixture(cloud: boolean) {
 const selectionUrl = (id: string) => `/api/workspaces/abc/sessions/${id}/selection`
 const pinUrl = (id: string) => `/api/workspaces/abc/sessions/${id}/pin`
 
-for (const cloud of [false, true]) {
-  describe(`chat links with ${cloud ? 'cloud' : 'local'} environment`, () => {
-    let fixture: ReturnType<typeof createChatNavigationFixture>
-    beforeEach(() => {
-      fixture = createChatNavigationFixture(cloud)
-    })
-    afterEach(() => fixture.cleanup())
+describe('chat links', () => {
+  let fixture: ReturnType<typeof createChatNavigationFixture>
+  beforeEach(() => {
+    fixture = createChatNavigationFixture()
+  })
+  afterEach(() => fixture.cleanup())
 
-    test.each([
-      { selected: { overview: 'previous' } },
-      { selected: { overview: 'previous' }, pinnedSessionId: 'other' },
-      { selected: {} }
-    ] satisfies Partial<WorkspaceState>[])(
-      'opens the current chat without changing selection %j',
-      async patch => {
-        const { queryClient, setState, cachedState, navigate, routed, revealed, writes, storage } =
-          fixture
-        setState(patch)
-        const before = cachedState()
-        const local: BrowserTabSelection = { selected: { overview: 'local' } }
-        if (cloud) queryClient.setQueryData(browserTabSelectionKey('abc'), local)
-        await navigate('moi:/chat')
-        expect(routed).toEqual([])
-        expect(revealed).toEqual([true])
-        expect(cachedState()).toEqual(before)
-        if (cloud)
-          expect(
-            queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey('abc'))
-          ).toEqual(local)
-        expect(writes).toEqual([])
-        expect(storage.size).toBe(0)
-      }
-    )
-
-    test.each([
-      ['a general chat', 'general', undefined, 'overview'],
-      ['a Scratchpad chat', 'notes', undefined, 'scratchpad'],
-      ['a view chat and unpins another chat', 'orders', 'other', 'views/orders'],
-      ['a pending view chat and preserves its pin', 'draft', 'draft', 'scratchpad'],
-      ['a chat whose original view was removed', 'gone', undefined, 'views/gone']
-    ] as const)(
-      'opens %s on its owning tab unless pinned',
-      async (_name, id, pinned, destination) => {
-        const { setState, cachedState, selectedIn, navigate, routed, revealed, writes, storage } =
-          fixture
-        setState({ pinnedSessionId: pinned })
-        await navigate(`moi:/chats/${id}`)
-        expect(routed.map(route => ({ ...route, path: route.path.split('?')[0] }))).toEqual(
-          destination === 'scratchpad'
-            ? []
-            : [{ path: `/prefix/workspace/abc/${destination}`, replace: false }]
-        )
-        expect(revealed).toEqual([true])
-        expect(cachedState()?.pinnedSessionId).toBe(pinned === id ? id : undefined)
-        if (pinned === id) {
-          expect(writes).toEqual([])
-          return
-        }
-        expect(selectedIn(destination)).toBe(id)
-        expect(writes).toEqual([
-          ...(pinned ? [{ method: 'DELETE', url: pinUrl(pinned), body: undefined }] : []),
-          ...(cloud
-            ? []
-            : [
-                {
-                  method: 'PUT',
-                  url: selectionUrl(id),
-                  body: {
-                    tabId: destination,
-                    ifMatch: destination === 'overview' ? 'previous' : null
-                  }
-                }
-              ])
-        ])
-        if (cloud)
-          expect(JSON.parse(storage.get('moi:collab:abc:session')!).selected[destination]).toBe(id)
-      }
-    )
-
-    test('waits for pin state on a direct load before selecting', async () => {
-      const { queryClient, responses, initial, navigate, writes, routed, revealed } = fixture
-      queryClient.removeQueries({ queryKey: workspaceKeys.state('abc'), exact: true })
-      const loading = Promise.withResolvers<WorkspaceState>()
-      responses.state = loading.promise
-      const opening = navigate('moi:/chats/general')
+  test.each([
+    { selected: { overview: 'previous' } },
+    { selected: { overview: 'previous' }, pinnedSessionId: 'other' },
+    { selected: {} }
+  ] satisfies Partial<WorkspaceState>[])(
+    'opens the current chat without changing selection %j',
+    async patch => {
+      const { setState, cachedState, navigate, routed, revealed, writes } = fixture
+      setState(patch)
+      const before = cachedState()
+      await navigate('moi:/chat')
+      expect(routed).toEqual([])
+      expect(revealed).toEqual([true])
+      expect(cachedState()).toEqual(before)
       expect(writes).toEqual([])
-      expect(routed).toEqual([])
-      loading.resolve({ ...initial, pinnedSessionId: 'other' })
-      await opening
-      expect(writes.map(write => write.url)).toEqual([
-        pinUrl('other'),
-        ...(cloud ? [] : [selectionUrl('general')])
-      ])
-      expect(revealed).toEqual([true])
-    })
-
-    test('opens a chat the agent lists before Moi has a record of it', async () => {
-      const { queryClient, sessions, selectedIn, navigate, routed, revealed } = fixture
-      queryClient.setQueryData(workspaceKeys.sessions('abc'), [
-        ...sessions,
-        { sessionId: 'outside', summary: 'Started in a terminal', lastModified: 1 }
-      ])
-      await navigate('moi:/chats/outside')
-      expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
-      expect(revealed).toEqual([true])
-      expect(selectedIn('overview')).toBe('outside')
-    })
-
-    test('failed unpinning stops before selection or redirect', async () => {
-      const { queryClient, setState, cachedState, responses, navigate, writes, routed, revealed } =
-        fixture
-      setState({ pinnedSessionId: 'other' })
-      responses.pin = Response.json({ error: 'Unpin failed' }, { status: 500 })
-      await expect(navigate('moi:/chats/general')).rejects.toThrow()
-      expect(routed).toEqual([])
-      expect(revealed).toEqual([])
-      expect(writes.map(write => write.url)).toEqual([pinUrl('other')])
-      // The failure refetches the server's copy, which still has the pin.
-      await queryClient.refetchQueries({ queryKey: workspaceKeys.state('abc'), exact: true })
-      expect(cachedState()?.pinnedSessionId).toBe('other')
-    })
-
-    if (!cloud) {
-      test('waits for selection persistence before redirecting or acknowledging', async () => {
-        const { initial, responses, navigate, routed, revealed } = fixture
-        const saving = Promise.withResolvers<Response>()
-        const requested = Promise.withResolvers<void>()
-        responses.save = saving.promise
-        responses.onSave = () => requested.resolve()
-        const opening = navigate('moi:/chats/general')
-        await requested.promise
-        expect(routed).toEqual([])
-        expect(revealed).toEqual([])
-        saving.resolve(
-          Response.json({
-            ...initial,
-            revision: 2,
-            selected: { ...initial.selected, overview: 'general' }
-          })
-        )
-        await opening
-        expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
-        expect(revealed).toEqual([true])
-      })
-
-      test('a refused conditional selection save does not open the chat', async () => {
-        const { initial, responses, navigate, routed, revealed } = fixture
-        responses.save = Promise.resolve(
-          Response.json({
-            ...initial,
-            revision: 2,
-            selected: { ...initial.selected, scratchpad: 'someone-else' }
-          })
-        )
-        await expect(navigate('moi:/chats/general')).rejects.toThrow('Couldn’t save selected chat')
-        expect(routed).toEqual([])
-        expect(revealed).toEqual([])
-      })
     }
+  )
 
-    test('a missing chat keeps the current tab, selection, and pin', async () => {
-      const { setState, cachedState, navigate, writes, routed, revealed } = fixture
+  test.each([
+    ['a general chat', 'general', undefined, 'overview'],
+    ['a Scratchpad chat', 'notes', undefined, 'scratchpad'],
+    ['a view chat and unpins another chat', 'orders', 'other', 'views/orders'],
+    ['a pending view chat and preserves its pin', 'draft', 'draft', 'scratchpad'],
+    ['a chat whose original view was removed', 'gone', undefined, 'views/gone']
+  ] as const)(
+    'opens %s on its owning tab unless pinned',
+    async (_name, id, pinned, destination) => {
+      const { setState, cachedState, selectedIn, navigate, routed, revealed, writes } = fixture
+      setState({ pinnedSessionId: pinned })
+      await navigate(`moi:/chats/${id}`)
+      expect(routed.map(route => ({ ...route, path: route.path.split('?')[0] }))).toEqual(
+        destination === 'scratchpad'
+          ? []
+          : [{ path: `/prefix/workspace/abc/${destination}`, replace: false }]
+      )
+      expect(revealed).toEqual([true])
+      expect(cachedState()?.pinnedSessionId).toBe(pinned === id ? id : undefined)
+      if (pinned === id) {
+        expect(writes).toEqual([])
+        return
+      }
+      expect(selectedIn(destination)).toBe(id)
+      expect(writes).toEqual([
+        ...(pinned ? [{ method: 'DELETE', url: pinUrl(pinned), body: undefined }] : []),
+        ...[
+          {
+            method: 'PUT',
+            url: selectionUrl(id),
+            body: {
+              tabId: destination,
+              ifMatch: destination === 'overview' ? 'previous' : null
+            }
+          }
+        ]
+      ])
+    }
+  )
+
+  test('waits for pin state on a direct load before selecting', async () => {
+    const { queryClient, responses, initial, navigate, writes, routed, revealed } = fixture
+    queryClient.removeQueries({ queryKey: workspaceKeys.state('abc'), exact: true })
+    const loading = Promise.withResolvers<WorkspaceState>()
+    responses.state = loading.promise
+    const opening = navigate('moi:/chats/general')
+    expect(writes).toEqual([])
+    expect(routed).toEqual([])
+    loading.resolve({ ...initial, pinnedSessionId: 'other' })
+    await opening
+    expect(writes.map(write => write.url)).toEqual([pinUrl('other'), selectionUrl('general')])
+    expect(revealed).toEqual([true])
+  })
+
+  test('opens a chat the agent lists before Moi has a record of it', async () => {
+    const { queryClient, sessions, selectedIn, navigate, routed, revealed } = fixture
+    queryClient.setQueryData(workspaceKeys.sessions('abc'), [
+      ...sessions,
+      { sessionId: 'outside', summary: 'Started in a terminal', lastModified: 1 }
+    ])
+    await navigate('moi:/chats/outside')
+    expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
+    expect(revealed).toEqual([true])
+    expect(selectedIn('overview')).toBe('outside')
+  })
+
+  test('failed unpinning stops before selection or redirect', async () => {
+    const { queryClient, setState, cachedState, responses, navigate, writes, routed, revealed } =
+      fixture
+    setState({ pinnedSessionId: 'other' })
+    responses.pin = Response.json({ error: 'Unpin failed' }, { status: 500 })
+    await expect(navigate('moi:/chats/general')).rejects.toThrow()
+    expect(routed).toEqual([])
+    expect(revealed).toEqual([])
+    expect(writes.map(write => write.url)).toEqual([pinUrl('other')])
+    // The failure refetches the server's copy, which still has the pin.
+    await queryClient.refetchQueries({ queryKey: workspaceKeys.state('abc'), exact: true })
+    expect(cachedState()?.pinnedSessionId).toBe('other')
+  })
+
+  test('waits for selection persistence before redirecting or acknowledging', async () => {
+    const { initial, responses, navigate, routed, revealed } = fixture
+    const saving = Promise.withResolvers<Response>()
+    const requested = Promise.withResolvers<void>()
+    responses.save = saving.promise
+    responses.onSave = () => requested.resolve()
+    const opening = navigate('moi:/chats/general')
+    await requested.promise
+    expect(routed).toEqual([])
+    expect(revealed).toEqual([])
+    saving.resolve(
+      Response.json({
+        ...initial,
+        revision: 2,
+        selected: { ...initial.selected, overview: 'general' }
+      })
+    )
+    await opening
+    expect(routed).toEqual([{ path: '/prefix/workspace/abc/overview', replace: false }])
+    expect(revealed).toEqual([true])
+  })
+
+  test('a refused conditional selection save does not open the chat', async () => {
+    const { initial, responses, navigate, routed, revealed } = fixture
+    responses.save = Promise.resolve(
+      Response.json({
+        ...initial,
+        revision: 2,
+        selected: { ...initial.selected, scratchpad: 'someone-else' }
+      })
+    )
+    await expect(navigate('moi:/chats/general')).rejects.toThrow('Couldn’t save selected chat')
+    expect(routed).toEqual([])
+    expect(revealed).toEqual([])
+  })
+  test('a missing chat keeps the current tab, selection, and pin', async () => {
+    const { setState, cachedState, navigate, writes, routed, revealed } = fixture
+    setState({ pinnedSessionId: 'pin' })
+    const original = cachedState()
+    await navigate('moi:/chats/missing')
+    expect(routed).toEqual([])
+    expect(cachedState()).toEqual(original)
+    expect(writes).toEqual([])
+    expect(revealed).toEqual([])
+  })
+
+  test.each(['moi:/overview', 'moi:/chat'])(
+    'navigation to %s cancels a pending lookup without changing selection or pin',
+    async href => {
+      const { setState, cachedState, responses, sessions, navigate, writes, routed, revealed } =
+        fixture
       setState({ pinnedSessionId: 'pin' })
       const original = cachedState()
-      await navigate('moi:/chats/missing')
-      expect(routed).toEqual([])
+      const refresh = Promise.withResolvers<SessionSummary[]>()
+      responses.sessions = refresh.promise
+      const opening = navigate('moi:/chats/new')
+      await navigate(href)
+      refresh.resolve([...sessions, { sessionId: 'new', summary: 'New', lastModified: 2 }])
+      await expect(opening).rejects.toMatchObject({ name: 'AbortError' })
       expect(cachedState()).toEqual(original)
       expect(writes).toEqual([])
-      expect(revealed).toEqual([])
-    })
+      expect(revealed).toEqual(href === 'moi:/chat' ? [true] : [])
+      expect(routed).toEqual(
+        href === 'moi:/chat' ? [] : [{ path: '/prefix/workspace/abc/overview', replace: false }]
+      )
+    }
+  )
 
-    test.each(['moi:/overview', 'moi:/chat'])(
-      'navigation to %s cancels a pending lookup without changing selection or pin',
-      async href => {
-        const { setState, cachedState, responses, sessions, navigate, writes, routed, revealed } =
-          fixture
-        setState({ pinnedSessionId: 'pin' })
-        const original = cachedState()
-        const refresh = Promise.withResolvers<SessionSummary[]>()
-        responses.sessions = refresh.promise
-        const opening = navigate('moi:/chats/new')
-        await navigate(href)
-        refresh.resolve([...sessions, { sessionId: 'new', summary: 'New', lastModified: 2 }])
-        await expect(opening).rejects.toMatchObject({ name: 'AbortError' })
-        expect(cachedState()).toEqual(original)
-        expect(writes).toEqual([])
-        expect(revealed).toEqual(href === 'moi:/chat' ? [true] : [])
-        expect(routed).toEqual(
-          href === 'moi:/chat' ? [] : [{ path: '/prefix/workspace/abc/overview', replace: false }]
-        )
-      }
-    )
-
-    test('refreshes a missing cached chat before falling back', async () => {
-      const { responses, sessions, navigate, revealed } = fixture
-      responses.sessions = Promise.resolve([
-        ...sessions,
-        { sessionId: 'new', summary: 'New', lastModified: 2 }
-      ])
-      await navigate('moi:/chats/new')
-      expect(revealed).toEqual([true])
-    })
+  test('refreshes a missing cached chat before falling back', async () => {
+    const { responses, sessions, navigate, revealed } = fixture
+    responses.sessions = Promise.resolve([
+      ...sessions,
+      { sessionId: 'new', summary: 'New', lastModified: 2 }
+    ])
+    await navigate('moi:/chats/new')
+    expect(revealed).toEqual([true])
   })
-}
+})

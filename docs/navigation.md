@@ -67,7 +67,7 @@ Modified clicks, downloads, and explicit link targets retain browser behavior.
 
 A tab click restores its last address from browser memory; an explicit link opens exactly the
 state it names. Parked views keep their own params. Reload preserves only the active URL.
-Saved layouts store tab paths such as `views/events`, tab order, and the default tab, without query strings.
+Personal workspace state in Moi’s `DATA_DIR` stores tab paths such as `views/events`, tab order, and the active tab, without query strings. Changes sync across browser windows connected to that Moi. Each window keeps its own view parameters in memory.
 
 ## Implementation
 

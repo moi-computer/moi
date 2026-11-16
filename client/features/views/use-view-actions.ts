@@ -19,7 +19,6 @@ import {
   changeWorkspaceStateCache,
   getCachedWorkspaceState
 } from '@/client/features/workspace/workspace-state'
-import { useAppConfig } from '@/client/api/app-config'
 import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import {
@@ -34,9 +33,7 @@ import { viewTabId } from '@/lib/workspace-tabs'
 
 export function useViewActions() {
   const queryClient = useQueryClient()
-  const cloud = useAppConfig().environment === 'cloud'
-  const selectionScope = cloud ? 'browser-tab' : 'shared'
-  const { workspaceId, layout } = useWorkspaceLayoutCtx()
+  const { workspaceId } = useWorkspaceLayoutCtx()
   const { pinnedSessionId } = usePinnedSession()
   const modelData = useWorkspaceHarness(workspaceId).data
   const createMutation = useCreateView(workspaceId)
@@ -67,25 +64,21 @@ export function useViewActions() {
       })
     if (!pinnedSessionId) {
       moveChatDraft(workspaceId, draftId, sessionId)
-      setSelectedSessionInCache(
-        queryClient,
-        workspaceId,
-        sessionId,
-        viewTabId(pendingView.id),
-        selectionScope
-      )
+      setSelectedSessionInCache(queryClient, workspaceId, sessionId, viewTabId(pendingView.id))
     }
     const prepared = prepareOptimisticSend(
       { queryClient, workspaceId, sessionId, text },
       attachments
     )
 
-    const config = getCachedWorkspaceState(queryClient, workspaceId)?.sessions[sessionId]?.config
+    const state = getCachedWorkspaceState(queryClient, workspaceId)
+    const config = state?.sessions[sessionId]?.config
+    const defaults = state?.chatDefaults
     const { model, effort, speedMode, stream } = resolveChatRunOptions(
       modelData,
-      config?.model ?? layout.selectedModel,
-      config?.effort ?? layout.selectedEffort,
-      config?.speedMode ?? layout.selectedSpeedMode
+      config?.model ?? defaults?.model,
+      config?.effort ?? defaults?.effort,
+      config?.speedMode ?? defaults?.speedMode
     )
 
     changeWorkspaceStateCache(queryClient, workspaceId, draft => {
@@ -100,7 +93,6 @@ export function useViewActions() {
         sessionId,
         requirements: text,
         optimisticId: prepared.optimisticId,
-        selectedSessionScope: selectionScope,
         ...(attachments.length > 0
           ? {
               attachments: prepared.attachments
@@ -118,8 +110,7 @@ export function useViewActions() {
           queryClient,
           workspaceId,
           result.sessionId,
-          viewTabId(pendingView.id),
-          selectionScope
+          viewTabId(pendingView.id)
         )
       finishComposerSend(workspaceId, attachments)
       const draftKey = composerDraftKey(workspaceId, result.sessionId)
@@ -132,8 +123,7 @@ export function useViewActions() {
         pendingView.id,
         sessionId,
         text,
-        !!pinnedSessionId,
-        selectionScope
+        !!pinnedSessionId
       )
       throw error
     }

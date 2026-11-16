@@ -1,3 +1,4 @@
+import { createDefaultPersonalLayout, parsePersonalLayoutPatch } from '@/lib/workspace-layout'
 import { openSharedWorkspace } from '../workspaces/shared'
 import { executeScratchOp } from '../scratchpad/executor'
 import type { ScratchOp, WorkspaceInfoResponse } from '@/lib/types'
@@ -24,7 +25,6 @@ import type {
   AppletThumbnailBatch,
   AppSettings,
   HarnessAvailability,
-  SelectedSessionScope,
   UploadInfo,
   WorkspaceHarness,
   WorkspaceEntry,
@@ -79,7 +79,7 @@ import {
 import { saveSessionConfig } from '../sessions/config'
 import type { SessionConfigPatch } from '../sessions/config'
 import { archiveWorkspaceSession } from '../sessions/archive'
-import { getWorkspaceState } from '../workspace-state'
+import { getWorkspaceState, updateWorkspaceState } from '../workspace-state'
 import { DIST_DIR, prebuilt } from '../static'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from '../skills/update'
 import { serveWorkspaceImagePreview } from '../workspaces/preview'
@@ -316,7 +316,6 @@ one.post('/views/:viewId/submit', async c => {
     requirements?: string
     sessionId?: string
     optimisticId?: string
-    selectedSessionScope?: SelectedSessionScope
     model?: string
     effort?: string
     speedMode?: SpeedMode
@@ -328,13 +327,6 @@ one.post('/views/:viewId/submit', async c => {
   }
   if (body.optimisticId !== undefined && typeof body.optimisticId !== 'string') {
     return c.text('Invalid optimisticId', 400)
-  }
-  if (
-    body.selectedSessionScope !== undefined &&
-    body.selectedSessionScope !== 'shared' &&
-    body.selectedSessionScope !== 'browser-tab'
-  ) {
-    return c.text('Invalid selectedSessionScope', 400)
   }
   const attachments = body.attachments ?? []
   if (!isMessageAttachments(attachments)) return c.text('Invalid attachments', 400)
@@ -350,7 +342,6 @@ one.post('/views/:viewId/submit', async c => {
     const result = await submitView(ws, c.req.param('viewId'), {
       requirements: body.requirements,
       sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
-      selectedSessionScope: body.selectedSessionScope,
       attachments,
       optimisticId: body.optimisticId,
       model: typeof body.model === 'string' ? body.model : undefined,
@@ -528,6 +519,16 @@ one.get('/uploads/:uploadId', c => {
 // state; other clients get it as `state:changed`.
 one.get('/state', async c => c.json(await getWorkspaceState(c.get('ws'))))
 
+one.patch('/state/layout', async c => {
+  const patch = parsePersonalLayoutPatch(await c.req.json().catch(() => undefined))
+  if (!patch) return c.text('Invalid personal layout', 400)
+  const ws = c.get('ws')
+  await updateWorkspaceState(ws, state => {
+    state.layout = { ...(state.layout ?? createDefaultPersonalLayout()), ...patch }
+  })
+  return c.json(await getWorkspaceState(ws))
+})
+
 // The agent's chats. Tab ownership and settings come from `/state`.
 one.get('/sessions', async c => {
   const ws = c.get('ws')
@@ -586,7 +587,7 @@ one.delete('/sessions/:sessionId/selection', async c => {
 })
 
 // Change run settings. Omitted fields stay; null clears one.
-one.patch('/sessions/:sessionId/config', async c => {
+one.on('PATCH', ['/sessions/:sessionId/config', '/state/chat-defaults'], async c => {
   const body = await c.req.json().catch(() => null)
   if (typeof body !== 'object' || body === null) {
     return c.text('Expected a JSON object', 400)
@@ -996,7 +997,7 @@ one.put('/', async c => {
   const body = await c.req.json()
   if (!body) return c.text('Bad request', 400)
   // `origin` is the writing tab's id, echoed so that tab skips its own event.
-  const { origin, harness, apiBase: _apiBase, isRemote: _isRemote, ...layout } = body
+  const { origin, harness: _harness, apiBase: _apiBase, isRemote: _isRemote, ...layout } = body
   // Preserve server-owned identity (name/icon) across a grid/theme save so the
   // client's PUT can't erase a `moi config`-set name. See mergeLayoutForSave.
   const config = await loadWorkspaceFileConfig(ws.path)
@@ -1010,11 +1011,6 @@ one.put('/', async c => {
   if (body.version !== 1) return c.text('Bad request', 400)
   const existing = await loadLayout(ws.path)
   const next = mergeLayoutForSave(existing, layout)
-  if (harness !== undefined && harness !== (ws.type ?? 'claude-code')) {
-    next.selectedModel = existing.selectedModel
-    next.selectedEffort = existing.selectedEffort
-    next.selectedSpeedMode = existing.selectedSpeedMode
-  }
   await saveLayout(next, ws.path)
   if (
     JSON.stringify(resolveWorkspaceTheme(existing.theme)) !==

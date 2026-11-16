@@ -16,7 +16,6 @@ import { api } from './index'
 import { setEventServer } from '../events'
 import { codexHarness } from '../harness/codex'
 import { getClientFrameLog } from '../harness/debug'
-import { loadLayout, saveLayout } from '../workspaces/layout'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import { listPendingViews, createPendingView } from '../sessions/pending-views'
 import { buildAllViews, handleBundleViews, updateViewTitle } from '../applets/views'
@@ -122,7 +121,6 @@ test('renaming rebuilds only the selected view and preserves pending views', asy
     'export default function Draft() { return <div>Draft</div> }'
   )
   const pendingViewsBefore = await listPendingViews(ws)
-  const tabsBefore = (await loadLayout(workspaceDir)).tabs
 
   const response = await api.request(`/api/workspaces/${workspaceId}/views/cards`, {
     method: 'PATCH',
@@ -140,7 +138,6 @@ test('renaming rebuilds only the selected view and preserves pending views', asy
     await Bun.file(join(workspaceDir, '.moi', '.build', 'views', 'draft', 'index.js')).exists()
   ).toBe(false)
   expect(await listPendingViews(ws)).toEqual(pendingViewsBefore)
-  expect((await loadLayout(workspaceDir)).tabs).toEqual(tabsBefore)
   expect(published).not.toContainEqual(
     expect.objectContaining({ type: 'view:updated', name: 'draft' })
   )
@@ -217,13 +214,6 @@ test('deletes a view and its owned state while preserving shared files and data'
   await saveSelectedSession(ws, 'child', 'views/cards')
   await saveSelectedSession(ws, 'child')
   await pinSession(ws, 'follow-up')
-  await saveLayout(
-    {
-      ...(await loadLayout(workspaceDir)),
-      tabs: { open: ['overview', 'views/cards'], active: 'views/cards' }
-    },
-    workspaceDir
-  )
   const rpcBeforeDelete = await api.request(`/api/workspaces/${workspaceId}/rpc/views/cards/load`, {
     method: 'POST',
     body: stringify([])
@@ -254,10 +244,7 @@ test('deletes a view and its owned state while preserving shared files and data'
   expect(await Bun.file(sharedPath).exists()).toBe(true)
   expect(await Bun.file(dataPath).exists()).toBe(true)
   expect(await listPendingViews(ws)).toEqual([])
-  expect((await loadLayout(workspaceDir)).tabs).toEqual({
-    open: ['overview'],
-    active: 'overview'
-  })
+
   expect(await (await api.request(`/api/workspaces/${workspaceId}/views`)).json()).toEqual({
     views: []
   })

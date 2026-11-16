@@ -1,6 +1,5 @@
 import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { queryClient as appQueryClient } from '@/client/api/query-client'
-import * as appConfig from '@/client/api/app-config'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { act, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -9,11 +8,9 @@ import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react
 import { Link, Route, Router } from 'wouter'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { browserTabSelectionKey } from '@/client/features/chat/sessions/use-selected-session'
-import type { BrowserTabSelection } from '@/client/features/chat/sessions/browser-tab-state'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { resolveUrl } from '@/lib/navigation'
-import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
+import { createDefaultWorkspaceLayout, createDefaultPersonalLayout } from '@/lib/workspace-layout'
 import type {
   SessionSummary,
   WorkspaceState,
@@ -29,14 +26,12 @@ afterEach(() => cleanup())
 
 function mountNavigation(
   path: string,
-  cloud: boolean,
   tabs: WorkspaceTabsState = { open: ['overview', 'scratchpad'], active: 'scratchpad' },
   remote = false
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const location = new URL(`http://localhost/prefix/workspace/abc/${path}`)
   Object.defineProperty(window, 'location', { configurable: true, value: location })
-  const storage = new Map<string, string>()
   const entries: { kind: 'push' | 'replace'; href: string }[] = []
   const pages = [location.href]
   const globals = {
@@ -65,10 +60,6 @@ function mountNavigation(
         move(pages.at(-1)!)
       }
     },
-    sessionStorage: {
-      getItem: (key: string) => storage.get(key) ?? null,
-      setItem: (key: string, value: string) => storage.set(key, value)
-    },
     IS_REACT_ACT_ENVIRONMENT: true
   }
   function move(href: string) {
@@ -88,6 +79,7 @@ function mountNavigation(
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   // The fake server's copy of the workspace state.
   let server: WorkspaceState = {
+    layout: { ...createDefaultPersonalLayout(), tabs },
     revision: 1,
     selected: { overview: 'previous' },
     pinnedSessionId: 'other',
@@ -103,7 +95,6 @@ function mountNavigation(
   }
   queryClient.setQueryData(workspaceKeys.sessions('abc'), responses.sessions)
   queryClient.setQueryData(workspaceKeys.state('abc'), server)
-  if (cloud) queryClient.setQueryData(browserTabSelectionKey('abc'), { selected: {} })
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
       async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -111,6 +102,14 @@ function mountNavigation(
         const method = init?.method ?? 'GET'
         if (url.endsWith('/sessions')) return Response.json(await responses.sessions)
         if (url.endsWith('/state') && method === 'GET') return Response.json(server)
+        if (url.endsWith('/state/layout')) {
+          server = {
+            ...server,
+            revision: server.revision + 1,
+            layout: { ...server.layout!, ...JSON.parse(String(init?.body)) }
+          }
+          return Response.json(server)
+        }
         const write = url.match(/\/sessions\/([^/]+)\/(pin|selection)$/)
         if (!write) throw new Error(`Unexpected request: ${method} ${url}`)
         const sessionId = decodeURIComponent(write[1]!)
@@ -185,7 +184,7 @@ function mountNavigation(
     )
   }
   function Layout() {
-    const [layout, setLayout] = useState({ ...createDefaultWorkspaceLayout(), tabs })
+    const [layout, setLayout] = useState(createDefaultWorkspaceLayout())
     return (
       <WorkspaceLayoutContext
         value={{
@@ -205,21 +204,15 @@ function mountNavigation(
       </WorkspaceLayoutContext>
     )
   }
-  const configSpy = spyOn(appConfig, 'useAppConfig').mockReturnValue({
-    environment: cloud ? 'cloud' : 'local',
-    demo: false,
-    demoInstallUrl: '/'
-  })
   const root = createRoot(document.getElementById('root')!)
   cleanup = async () => {
     await act(async () => {
       root.unmount()
       queryClient.clear()
       appQueryClient.removeQueries({ queryKey: workspaceKeys.layout('abc') })
-      await Bun.sleep(0)
+      await Bun.sleep(20)
     })
     notifyManager.setNotifyFunction(callback => callback())
-    configSpy.mockRestore()
     fetchSpy.mockRestore()
     navigationSpy.mockRestore()
     eventsSpy.mockRestore()
@@ -255,13 +248,7 @@ function mountNavigation(
     expect(document.getElementById('active-tab')?.textContent).toBe(tab)
     expect(document.getElementById('revealed')?.textContent).toBe('yes')
     expect(cachedState()?.pinnedSessionId).toBeUndefined()
-    expect(
-      cloud
-        ? queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey('abc'))?.selected[
-            tab
-          ]
-        : cachedState()?.selected[tab]
-    ).toBe('source')
+    expect(cachedState()?.selected[tab]).toBe('source')
   }
   return {
     render,
@@ -275,239 +262,260 @@ function mountNavigation(
     cachedState,
     setState,
     responses,
-    storage,
     navigate: (href: string) => Promise.resolve(navigate(href)),
     history: entries
   }
 }
 
-for (const cloud of [false, true]) {
-  describe(`mounted chat links with ${cloud ? 'cloud' : 'local'} environment`, () => {
-    test.each(['overview', 'scratchpad?after=1'])(
-      'a route change to %s cancels a pending chat lookup',
-      async path => {
-        const fixture = mountNavigation('scratchpad?before=1', cloud)
-        await fixture.render()
-        const lookup = Promise.withResolvers<SessionSummary[]>()
-        fixture.responses.sessions = lookup.promise
-        const opening = fixture.navigate('moi:/chats/new')
-        await act(async () => {
-          fixture.window.history.pushState(null, '', `/prefix/workspace/abc/${path}`)
-        })
-        lookup.resolve([{ sessionId: 'new', summary: 'New', lastModified: 1 }])
-        await act(async () => {
-          await expect(opening).rejects.toMatchObject({ name: 'AbortError' })
-        })
-        expect(fixture.window.location.pathname + fixture.window.location.search).toBe(
-          `/prefix/workspace/abc/${path}`
-        )
-        expect(fixture.document.getElementById('revealed')?.textContent).toBe('no')
-        expect(fixture.writes()).toEqual([])
-      }
-    )
-    test.each(['chat', 'chats/source'])(
-      'navigation immediately followed by %s resolves the chat destination',
-      async path => {
-        const fixture = mountNavigation('scratchpad', cloud)
-        await fixture.render()
-        await act(async () => {
-          const switching = fixture.navigate('moi:/views/orders?order=o-3')
-          const opening = fixture.navigate(`moi:/${path}`)
-          await switching
-          await opening
-        })
-        await fixture.waitForReveal()
-        if (path.startsWith('chats/')) {
-          await fixture.waitForNavigation('scratchpad')
-        } else {
-          expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
-          expect(new URLSearchParams(fixture.window.location.search).get('order')).toBe('o-3')
-        }
-      }
-    )
-    test.each(['chats', 'chats/%', 'chats/a/b'])(
-      'invalid chat route %s restores the saved tab without changing selection or pin',
-      async path => {
-        const fixture = mountNavigation(path, cloud)
-        const before = fixture.cachedState()
-        await fixture.render()
-        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
-        expect(fixture.document.getElementById('revealed')?.textContent).toBe('no')
-        expect(fixture.cachedState()).toEqual(before)
-        expect(fixture.writes()).toEqual([])
-      }
-    )
-    test('tab navigation restores params and avoids a duplicate history entry', async () => {
-      const fixture = mountNavigation('views/orders?order=o-1&literal=%252F', cloud)
+describe('mounted chat links', () => {
+  test.each(['overview', 'scratchpad?after=1'])(
+    'a route change to %s cancels a pending chat lookup',
+    async path => {
+      const fixture = mountNavigation('scratchpad?before=1')
       await fixture.render()
-      const clickTab = (tab: string) =>
-        act(async () => {
-          const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
-          Object.assign(click, { button: 0 })
-          fixture.document.querySelector(`button[data-tab="${tab}"]`)!.dispatchEvent(click)
-        })
-      await clickTab('scratchpad')
+      const lookup = Promise.withResolvers<SessionSummary[]>()
+      fixture.responses.sessions = lookup.promise
+      const opening = fixture.navigate('moi:/chats/new')
+      await act(async () => {
+        fixture.window.history.pushState(null, '', `/prefix/workspace/abc/${path}`)
+      })
+      lookup.resolve([{ sessionId: 'new', summary: 'New', lastModified: 1 }])
+      await act(async () => {
+        await expect(opening).rejects.toMatchObject({ name: 'AbortError' })
+      })
+      expect(fixture.window.location.pathname + fixture.window.location.search).toBe(
+        `/prefix/workspace/abc/${path}`
+      )
+      expect(fixture.document.getElementById('revealed')?.textContent).toBe('no')
+      expect(fixture.writes()).toEqual([])
+    }
+  )
+  test.each(['chat', 'chats/source'])(
+    'navigation immediately followed by %s resolves the chat destination',
+    async path => {
+      const fixture = mountNavigation('scratchpad')
+      await fixture.render()
+      await act(async () => {
+        const switching = fixture.navigate('moi:/views/orders?order=o-3')
+        const opening = fixture.navigate(`moi:/${path}`)
+        await switching
+        await opening
+      })
+      await fixture.waitForReveal()
+      if (path.startsWith('chats/')) {
+        await fixture.waitForNavigation('scratchpad')
+      } else {
+        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
+        expect(new URLSearchParams(fixture.window.location.search).get('order')).toBe('o-3')
+      }
+    }
+  )
+  test.each(['chats', 'chats/%', 'chats/a/b'])(
+    'invalid chat route %s restores the saved tab without changing selection or pin',
+    async path => {
+      const fixture = mountNavigation(path)
+      const before = fixture.cachedState()
+      await fixture.render()
       expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
-      await clickTab('orders')
+      expect(fixture.document.getElementById('revealed')?.textContent).toBe('no')
+      expect(fixture.cachedState()).toEqual(before)
+      expect(fixture.writes()).toEqual([])
+    }
+  )
+  test('tab navigation restores params and avoids a duplicate history entry', async () => {
+    const fixture = mountNavigation('views/orders?order=o-1&literal=%252F')
+    await fixture.render()
+    const clickTab = (tab: string) =>
+      act(async () => {
+        const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
+        Object.assign(click, { button: 0 })
+        fixture.document.querySelector(`button[data-tab="${tab}"]`)!.dispatchEvent(click)
+      })
+    await clickTab('scratchpad')
+    expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
+    await clickTab('orders')
+    expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
+    const params = new URLSearchParams(fixture.window.location.search)
+    expect(params.get('order')).toBe('o-1')
+    expect(params.get('literal')).toBe('%2F')
+    await clickTab('orders')
+    expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(2)
+    expect(fixture.cachedState()?.layout?.tabs.active).toBe('views/orders')
+  })
+
+  test.each([undefined, 'other'])(
+    'a direct current-chat URL restores the saved tab and preserves pin %s and selection',
+    async pinned => {
+      const fixture = mountNavigation('chat')
+      fixture.setState({ selected: { overview: 'previous' }, pinnedSessionId: pinned })
+      const before = fixture.cachedState()
+      await fixture.render()
+      await fixture.waitForReveal()
+      expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
+      expect(fixture.document.getElementById('active-tab')?.textContent).toBe('scratchpad')
+      expect(fixture.history).toEqual([
+        { kind: 'replace', href: '/prefix/workspace/abc/scratchpad' }
+      ])
+      expect(fixture.cachedState()).toEqual(before)
+      expect(fixture.writes()).toEqual([])
+    }
+  )
+
+  test.each(['chat', 'native-chat'])(
+    'clicking a %s link stays on the current tab and reveals the current chat',
+    async kind => {
+      const fixture = mountNavigation('scratchpad')
+      const before = fixture.cachedState()
+      await fixture.render()
+      const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
+      Object.assign(click, { button: 0 })
+      await act(async () => {
+        fixture.document.querySelector(`a[data-link="${kind}"]`)!.dispatchEvent(click)
+      })
+      expect(click.defaultPrevented).toBe(true)
+      await fixture.waitForReveal()
+      expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
+      expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(
+        kind === 'native-chat' ? 0 : 1
+      )
+      expect(fixture.cachedState()).toEqual(before)
+      await act(async () => fixture.window.history.back())
+      expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
+    }
+  )
+
+  test.each(['chats/source', 'chats/%73ource'])(
+    'a direct chat URL %s selects and reveals its chat through the route effect',
+    async path => {
+      const fixture = mountNavigation(path)
+      await fixture.render()
+      await fixture.waitForNavigation()
+      // A direct load has no origin page, so the entry route is replaced in place.
+      expect(fixture.history).toEqual([
+        { kind: 'replace', href: '/prefix/workspace/abc/scratchpad' }
+      ])
+    }
+  )
+
+  test.each(['chat', 'chats/source'])(
+    'a direct %s URL resolves the current chat or the linked chat owning tab',
+    async path => {
+      const fixture = mountNavigation(path, {
+        open: ['overview', 'scratchpad', 'views/orders'],
+        active: 'views/orders'
+      })
+      await fixture.render()
+      await fixture.waitForReveal()
+      if (path.startsWith('chats/')) {
+        await fixture.waitForNavigation('scratchpad')
+      } else {
+        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
+        expect(fixture.document.getElementById('active-tab')?.textContent).toBe('views/orders')
+      }
+    }
+  )
+
+  test.each(['chat', 'native-chat'])(
+    'clicking a %s link preserves the current view and its parameters',
+    async kind => {
+      const fixture = mountNavigation('views/orders?order=o-2&literal=%252F')
+      await fixture.render()
+      await act(async () => {
+        const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
+        Object.assign(click, { button: 0 })
+        fixture.document.querySelector(`a[data-link="${kind}"]`)!.dispatchEvent(click)
+      })
+      await fixture.waitForReveal()
       expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
       const params = new URLSearchParams(fixture.window.location.search)
-      expect(params.get('order')).toBe('o-1')
+      expect(params.get('order')).toBe('o-2')
       expect(params.get('literal')).toBe('%2F')
-      await clickTab('orders')
-      expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(2)
-      const savedTabs = fixture.storage.get('moi:collab:abc:tabs')
-      if (cloud) expect(JSON.parse(savedTabs!).active).toBe('views/orders')
-      else expect(savedTabs).toBeUndefined()
-    })
+    }
+  )
 
-    test.each([undefined, 'other'])(
-      'a direct current-chat URL restores the saved tab and preserves pin %s and selection',
-      async pinned => {
-        const fixture = mountNavigation('chat', cloud)
-        const local: BrowserTabSelection = { selected: { overview: 'local' } }
-        fixture.setState({ selected: { overview: 'previous' }, pinnedSessionId: pinned })
-        const before = fixture.cachedState()
-        if (cloud) fixture.queryClient.setQueryData(browserTabSelectionKey('abc'), local)
-        await fixture.render()
-        await fixture.waitForReveal()
-        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
-        expect(fixture.document.getElementById('active-tab')?.textContent).toBe('scratchpad')
-        expect(fixture.history).toEqual([
-          { kind: 'replace', href: '/prefix/workspace/abc/scratchpad' }
-        ])
-        expect(fixture.cachedState()).toEqual(before)
-        if (cloud)
-          expect(
-            fixture.queryClient.getQueryData<BrowserTabSelection>(browserTabSelectionKey('abc'))
-          ).toEqual(local)
-        expect(fixture.writes()).toEqual([])
-      }
-    )
-
-    test.each(['chat', 'native-chat'])(
-      'clicking a %s link stays on the current tab and reveals the current chat',
-      async kind => {
-        const fixture = mountNavigation('scratchpad', cloud)
-        const before = fixture.cachedState()
-        await fixture.render()
+  test.each(['source', 'native'])(
+    'opening a generic parent through %s switches from the child view to Overview',
+    async kind => {
+      const fixture = mountNavigation('views/orders?order=o-2')
+      fixture.setState({
+        pinnedSessionId: undefined,
+        sessions: { child: { tabId: 'views/orders' } },
+        selected: { 'views/orders': 'child' }
+      })
+      await fixture.render()
+      await act(async () => {
         const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
         Object.assign(click, { button: 0 })
-        await act(async () => {
-          fixture.document.querySelector(`a[data-link="${kind}"]`)!.dispatchEvent(click)
-        })
-        expect(click.defaultPrevented).toBe(true)
-        await fixture.waitForReveal()
-        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
-        expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(
-          kind === 'native-chat' ? 0 : 1
-        )
-        expect(fixture.cachedState()).toEqual(before)
-        await act(async () => fixture.window.history.back())
-        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
-      }
-    )
+        fixture.document.querySelector(`a[data-link="${kind}"]`)!.dispatchEvent(click)
+      })
+      await fixture.waitForNavigation('overview')
+      expect(fixture.cachedState()?.selected['views/orders']).toBe('child')
+      expect(fixture.cachedState()?.sessions).toEqual({ child: { tabId: 'views/orders' } })
+      await act(async () => fixture.window.history.back())
+      expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
+      expect(fixture.window.location.search).toBe('?order=o-2')
+    }
+  )
 
-    test.each(['chats/source', 'chats/%73ource'])(
-      'a direct chat URL %s selects and reveals its chat through the route effect',
-      async path => {
-        const fixture = mountNavigation(path, cloud)
-        await fixture.render()
-        await fixture.waitForNavigation()
-        // A direct load has no origin page, so the entry route is replaced in place.
-        expect(fixture.history).toEqual([
-          { kind: 'replace', href: '/prefix/workspace/abc/scratchpad' }
-        ])
-      }
-    )
+  test.each(['source', 'native'])(
+    'clicking a %s chat link selects and reveals its chat',
+    async kind => {
+      const fixture = mountNavigation('overview')
+      await fixture.render()
+      const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
+      Object.assign(click, { button: 0 })
+      await act(async () => {
+        fixture.document.querySelector(`a[data-link="${kind}"]`)!.dispatchEvent(click)
+      })
+      expect(click.defaultPrevented).toBe(true)
+      await fixture.waitForNavigation('scratchpad')
+      expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(1)
+      await act(async () => fixture.window.history.back())
+      expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/overview')
+    }
+  )
+})
 
-    test.each(['chat', 'chats/source'])(
-      'a direct %s URL resolves the current chat or the linked chat owning tab',
-      async path => {
-        const fixture = mountNavigation(path, cloud, {
-          open: ['overview', 'scratchpad', 'views/orders'],
-          active: 'views/orders'
-        })
-        await fixture.render()
-        await fixture.waitForReveal()
-        if (path.startsWith('chats/')) {
-          await fixture.waitForNavigation('scratchpad')
-        } else {
-          expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
-          expect(fixture.document.getElementById('active-tab')?.textContent).toBe('views/orders')
-        }
-      }
-    )
-
-    test.each(['chat', 'native-chat'])(
-      'clicking a %s link preserves the current view and its parameters',
-      async kind => {
-        const fixture = mountNavigation('views/orders?order=o-2&literal=%252F', cloud)
-        await fixture.render()
-        await act(async () => {
-          const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
-          Object.assign(click, { button: 0 })
-          fixture.document.querySelector(`a[data-link="${kind}"]`)!.dispatchEvent(click)
-        })
-        await fixture.waitForReveal()
-        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
-        const params = new URLSearchParams(fixture.window.location.search)
-        expect(params.get('order')).toBe('o-2')
-        expect(params.get('literal')).toBe('%2F')
-      }
-    )
-
-    test.each(['source', 'native'])(
-      'opening a generic parent through %s switches from the child view to Overview',
-      async kind => {
-        const fixture = mountNavigation('views/orders?order=o-2', cloud)
-        fixture.setState({
-          pinnedSessionId: undefined,
-          sessions: { child: { tabId: 'views/orders' } },
-          selected: { 'views/orders': 'child' }
-        })
-        await fixture.render()
-        await act(async () => {
-          const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
-          Object.assign(click, { button: 0 })
-          fixture.document.querySelector(`a[data-link="${kind}"]`)!.dispatchEvent(click)
-        })
-        await fixture.waitForNavigation('overview')
-        expect(fixture.cachedState()?.selected['views/orders']).toBe('child')
-        expect(fixture.cachedState()?.sessions).toEqual({ child: { tabId: 'views/orders' } })
-        await act(async () => fixture.window.history.back())
-        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/views/orders')
-        expect(fixture.window.location.search).toBe('?order=o-2')
-      }
-    )
-
-    test.each(['source', 'native'])(
-      'clicking a %s chat link selects and reveals its chat',
-      async kind => {
-        const fixture = mountNavigation('overview', cloud)
-        await fixture.render()
-        const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
-        Object.assign(click, { button: 0 })
-        await act(async () => {
-          fixture.document.querySelector(`a[data-link="${kind}"]`)!.dispatchEvent(click)
-        })
-        expect(click.defaultPrevented).toBe(true)
-        await fixture.waitForNavigation('scratchpad')
-        expect(fixture.history.filter(entry => entry.kind === 'push')).toHaveLength(1)
-        await act(async () => fixture.window.history.back())
-        expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/overview')
-      }
-    )
-  })
-}
-
-test('remote tab navigation persists in browser storage without changing the reference', async () => {
-  const fixture = mountNavigation('overview', true, undefined, true)
+test('remote tab navigation persists in personal state without changing the reference', async () => {
+  const fixture = mountNavigation('overview', undefined, true)
   await fixture.render()
   await act(async () => {
     const click = new fixture.window.Event('click', { bubbles: true, cancelable: true })
     Object.assign(click, { button: 0 })
     fixture.document.querySelector('button[data-tab="scratchpad"]')!.dispatchEvent(click)
   })
-  expect(JSON.parse(fixture.storage.get('moi:collab:abc:tabs')!).active).toBe('scratchpad')
+  expect(fixture.cachedState()?.layout?.tabs.active).toBe('scratchpad')
   expect(fixture.writes()).toEqual([])
 })
+
+test.each([false, true])(
+  'another browser changes the active tab without navigation bouncing back (remote: %s)',
+  async remote => {
+    const fixture = mountNavigation('overview', { open: ['overview'], active: 'overview' }, remote)
+    await fixture.render()
+    const tabs = {
+      open: ['overview', 'scratchpad'] as WorkspaceTabId[],
+      active: 'scratchpad' as const
+    }
+    await act(async () => {
+      fixture.setState({ layout: { ...createDefaultPersonalLayout(), tabs } })
+      await Bun.sleep(10)
+    })
+    expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/scratchpad')
+    expect(fixture.document.getElementById('active-tab')?.textContent).toBe('scratchpad')
+    expect(fixture.cachedState()?.layout?.tabs).toEqual(tabs)
+    expect(fixture.history.at(-1)?.kind).toBe('replace')
+    await act(async () => {
+      fixture.setState({
+        layout: {
+          ...createDefaultPersonalLayout(),
+          tabs: { open: ['overview'], active: 'overview' }
+        }
+      })
+      await Bun.sleep(10)
+    })
+    expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/overview')
+    expect(fixture.cachedState()?.layout?.tabs.open).toEqual(['overview'])
+    expect(fixture.fetchSpy.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toEqual([])
+  }
+)

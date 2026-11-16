@@ -15,8 +15,7 @@ describe('owner startup', () => {
   let visitor: ReturnType<typeof Bun.serve>
   const remoteConfig = {
     version: 2,
-    remote: { user_id: 'alice', workspace_id: 'owner-board' },
-    layoutMode: 'fullscreen'
+    remote: { user_id: 'alice', workspace_id: 'owner-board' }
   }
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'moi-mock-test-'))
@@ -25,10 +24,10 @@ describe('owner startup', () => {
     await Bun.write(
       join(root, 'owner-board/.moi/.workspace.json'),
       JSON.stringify({
-        version: 1,
+        version: 2,
         name: 'Shared counter',
         widgetGrid: [{ i: 'counter', x: 0, y: 0 }],
-        selectedModel: 'keep-model'
+        theme: { font: 'mono' }
       })
     )
     await Bun.write(join(root, 'owner-board/.moi/count.json'), '7')
@@ -67,14 +66,14 @@ describe('owner startup', () => {
     if (child) await child.exited
     if (root) await rm(root, { recursive: true, force: true })
   })
-  test('owner provides two static launch widgets and a plan without resetting visitor settings', async () => {
+  test('owner provides two static launch widgets and a plan while preserving existing data', async () => {
     const layout = await (await fetch(origin + '/api/workspaces/owner-board')).json()
     expect(layout.widgetGrid.map((item: { i: string }) => item.i)).toEqual([
       '_moi_views',
       'launch-brief',
       'launch-progress'
     ])
-    expect(layout.selectedModel).toBe('keep-model')
+    expect(layout.theme).toEqual({ font: 'mono' })
     expect(await Bun.file(join(root, 'owner-board/.moi/count.json')).json()).toBe(7)
     expect(await Bun.file(join(root, 'visitor/.moi/.workspace.json')).json()).toEqual(remoteConfig)
     const { views } = await (await fetch(origin + '/api/workspaces/owner-board/views')).json()

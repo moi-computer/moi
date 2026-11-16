@@ -10,21 +10,13 @@ import {
   getLayoutPath,
   getWorkspacePreview,
   loadLayout,
-  saveLayout,
   mergeLayoutForSave
 } from '../workspaces/layout'
 import { getThumbnailsDir } from '../applets/thumbnails'
 
-// The grid editor and `moi config` write the same `.workspace.json`. A layout
-// PUT is authoritative for the editor fields but must NOT touch identity
-// (name/icon) — otherwise the client's name-stripped body erases a configured
-// name. mergeLayoutForSave enforces that.
-
 const base: WorkspaceLayout = {
-  version: 1,
-  widgetGrid: [],
-  layoutMode: 'fullscreen',
-  tabs: { open: ['overview', 'scratchpad'], active: 'overview' }
+  version: 2,
+  widgetGrid: []
 }
 
 async function withWorkspaceFile<T>(
@@ -70,284 +62,48 @@ async function seedThumbnails(
 const thumbnailUrl = (kind: AppletKind, id: string) => `${kind}:${id}`
 
 describe('loadLayout', () => {
-  test('opens a new workspace in split view with the default tabs', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'moi-layout-'))
-    try {
-      const loaded = await loadLayout(dir)
-      expect(loaded.layoutMode).toBe('split')
-      expect(loaded.widgetGrid).toEqual([{ i: DEFAULT_VIEWS_WIDGET.id, x: 0, y: 0 }])
-      expect(loaded.tabs).toEqual({
-        open: ['overview'],
-        active: 'overview'
-      })
-    } finally {
-      await rm(dir, { recursive: true, force: true })
-    }
-  })
-
-  test('defaults missing layoutMode to split', async () => {
-    await withWorkspaceFile({ version: 1, widgetGrid: [] }, async dir => {
-      const loaded = await loadLayout(dir)
-      expect(loaded.layoutMode).toBe('split')
-      expect(loaded.tabs).toEqual({
-        open: ['overview'],
-        active: 'overview'
+  test('new workspaces have shared widgets without personal layout', async () => {
+    await withWorkspaceFile({ version: 2 }, async dir => {
+      expect(await loadLayout(dir)).toEqual({
+        version: 2,
+        widgetGrid: [{ i: DEFAULT_VIEWS_WIDGET.id, x: 0, y: 0 }]
       })
     })
   })
 
-  test('keeps an existing saved empty grid empty', async () => {
-    await withWorkspaceFile({ ...base, widgetGrid: [] }, async dir => {
-      expect((await loadLayout(dir)).widgetGrid).toEqual([])
-    })
-  })
-
-  test('defaults invalid layoutMode to split', async () => {
-    await withWorkspaceFile({ version: 1, widgetGrid: [], layoutMode: 'collapsed' }, async dir => {
-      const loaded = await loadLayout(dir)
-      expect(loaded.layoutMode).toBe('split')
-    })
-  })
-
-  test('preserves valid fullscreen layoutMode', async () => {
-    await withWorkspaceFile({ version: 1, widgetGrid: [], layoutMode: 'fullscreen' }, async dir => {
-      const loaded = await loadLayout(dir)
-      expect(loaded.layoutMode).toBe('fullscreen')
-    })
-  })
-
-  test('preserves valid split layoutMode', async () => {
-    await withWorkspaceFile({ version: 1, widgetGrid: [], layoutMode: 'split' }, async dir => {
-      const loaded = await loadLayout(dir)
-      expect(loaded.layoutMode).toBe('split')
-    })
-  })
-
-  test('defaults invalid tabs to the standard set', async () => {
+  test('reads only shared presentation fields', async () => {
     await withWorkspaceFile(
-      { version: 1, widgetGrid: [], tabs: { open: [], active: 'widgets' } },
+      { ...base, tabs: { active: 'scratchpad' }, selectedModel: 'old', unknown: true },
       async dir => {
-        const loaded = await loadLayout(dir)
-        expect(loaded.tabs).toEqual({
-          open: ['overview'],
-          active: 'overview'
-        })
+        expect(await loadLayout(dir)).toEqual(base)
       }
     )
-  })
-
-  test('pins Overview first and silently drops old and invalid tab ids', async () => {
-    await withWorkspaceFile(
-      {
-        version: 1,
-        widgetGrid: [],
-        tabs: {
-          open: [
-            'widgets',
-            'bad',
-            'view:old',
-            'view-builder:old-builder',
-            'views/dashboard',
-            'view-builders/builder-1',
-            'widgets',
-            'scratchpad'
-          ],
-          active: 'bad'
-        }
-      },
-      async dir => {
-        const loaded = await loadLayout(dir)
-        expect(loaded.tabs).toEqual({
-          open: ['overview', 'views/dashboard', 'scratchpad'],
-          active: 'overview'
-        })
-      }
-    )
-  })
-
-  test('falls back to default tabs when only colon-style tabs were saved', async () => {
-    await withWorkspaceFile(
-      {
-        version: 1,
-        widgetGrid: [],
-        tabs: { open: ['view:dashboard', 'view-builder:old'], active: 'view:dashboard' }
-      },
-      async dir => {
-        expect((await loadLayout(dir)).tabs).toEqual({
-          open: ['overview'],
-          active: 'overview'
-        })
-      }
-    )
-  })
-
-  test('preserves saved tab order and a valid active tab after Overview', async () => {
-    await withWorkspaceFile(
-      {
-        version: 1,
-        widgetGrid: [],
-        tabs: {
-          open: ['views/dashboard', 'overview', 'scratchpad'],
-          active: 'views/dashboard'
-        }
-      },
-      async dir => {
-        expect((await loadLayout(dir)).tabs).toEqual({
-          open: ['overview', 'views/dashboard', 'scratchpad'],
-          active: 'views/dashboard'
-        })
-      }
-    )
-  })
-
-  test('drops legacy thumbnail caches without migrating them', async () => {
-    await withWorkspaceFile(
-      {
-        ...base,
-        widgetThumbnails: { key: 'old', images: { widget: 'image' } },
-        viewThumbnails: [{ viewId: 'view', image: 'image' }],
-        appletThumbnails: [{ kind: 'widget', id: 'w', revision: 'r', image: 'inline-image' }]
-      },
-      async dir => {
-        const loaded = await loadLayout(dir)
-        expect('widgetThumbnails' in loaded).toBe(false)
-        expect('viewThumbnails' in loaded).toBe(false)
-        expect('appletThumbnails' in loaded).toBe(false)
-      }
-    )
-  })
-
-  test('normalizes legacy uploaded icons into an icon object', async () => {
-    await withWorkspaceFile({ ...base, icon: 'data:image/webp;base64,legacy' }, async dir => {
-      expect((await loadLayout(dir)).icon).toEqual({
-        type: 'upload',
-        value: 'data:image/webp;base64,legacy'
-      })
-    })
   })
 })
 
-describe('mergeLayoutForSave', () => {
-  test('preserves a stored name when the body omits it (the reset bug)', () => {
-    const existing: WorkspaceLayout = { ...base, name: 'Trip Photos' }
-    const body: WorkspaceLayout = { ...base, widgetGrid: [{ i: 'a', x: 0, y: 0 }] }
-    const merged = mergeLayoutForSave(existing, body)
-    expect(merged.name).toBe('Trip Photos')
-    expect(merged.widgetGrid).toEqual([{ i: 'a', x: 0, y: 0 }])
+test('layout edits update widgets and theme while preserving identity', () => {
+  const existing: WorkspaceLayout = {
+    ...base,
+    name: 'Photos',
+    icon: { type: 'emoji', value: '📷' }
+  }
+  const edit: WorkspaceLayout = {
+    ...base,
+    name: 'Stale name',
+    icon: { type: 'emoji', value: '💡' },
+    widgetGrid: [{ i: 'w', x: 1, y: 2 }],
+    theme: { font: 'sans', color: 'rose', radius: 'square', agent: 'dorito' }
+  }
+  expect(mergeLayoutForSave(existing, edit)).toEqual({
+    ...edit,
+    name: existing.name,
+    icon: existing.icon
   })
-
-  test('ignores a name the body carries — identity comes only from existing', () => {
-    const existing: WorkspaceLayout = { ...base, name: 'Real Name' }
-    // A stale client might round-trip the resolved/old name; it must not win.
-    const body = { ...base, name: 'stale-folder-name' } as WorkspaceLayout
-    expect(mergeLayoutForSave(existing, body).name).toBe('Real Name')
-  })
-
-  test('keeps the stored icon and ignores a stale icon in the body', () => {
-    const existing: WorkspaceLayout = {
-      ...base,
-      icon: { type: 'glyph', value: 'rocket', background: 'theme' }
-    }
-    const body = {
-      ...base,
-      icon: { type: 'upload', value: 'data:image/webp;base64,OLD' }
-    } as WorkspaceLayout
-    expect(mergeLayoutForSave(existing, body)).toMatchObject({
-      icon: { type: 'glyph', value: 'rocket', background: 'theme' }
-    })
-  })
-
-  test('emits no name/icon keys when the workspace has neither (no undefined leak)', () => {
-    const body = {
-      ...base,
-      name: 'x',
-      icon: { type: 'emoji', value: '💡' }
-    } as WorkspaceLayout
-    const merged = mergeLayoutForSave(base, body)
-    expect('name' in merged).toBe(false)
-    expect('icon' in merged).toBe(false)
-    // and it round-trips clean through JSON (the persisted shape)
-    expect(JSON.parse(JSON.stringify(merged))).toEqual({
-      version: 1,
-      widgetGrid: [],
-      layoutMode: 'fullscreen',
-      tabs: { open: ['overview', 'scratchpad'], active: 'overview' }
-    })
-  })
-
-  test('passes editor-owned fields through from the body', () => {
-    const existing: WorkspaceLayout = { ...base, name: 'Keep' }
-    const body: WorkspaceLayout = {
-      version: 1,
-      widgetGrid: [{ i: 'w', x: 1, y: 2 }],
-      layoutMode: 'split',
-      tabs: { open: ['scratchpad', 'overview'], active: 'scratchpad' },
-      selectedModel: 'sonnet',
-      selectedSpeedMode: 'normal',
-      theme: { font: 'sans', color: 'rose', radius: 'square', agent: 'dorito' }
-    }
-    const merged = mergeLayoutForSave(existing, body)
-    expect(merged.layoutMode).toBe('split')
-    expect(merged.tabs).toEqual({ open: ['overview', 'scratchpad'], active: 'scratchpad' })
-    expect(merged.selectedModel).toBe('sonnet')
-    expect(merged.selectedSpeedMode).toBe('normal')
-    expect(merged.theme).toEqual({
-      font: 'sans',
-      color: 'rose',
-      radius: 'square',
-      agent: 'dorito'
-    })
-    expect(merged.name).toBe('Keep')
-  })
-
-  test('a layout save omitting tabs preserves newer authored tabs', () => {
-    const existing: WorkspaceLayout = {
-      ...base,
-      tabs: { open: ['overview', 'views/board'], active: 'views/board' }
-    }
-    // This client loaded base before another client changed the workspace tabs.
-    const { tabs: _staleTabs, ...body } = base
-    const merged = mergeLayoutForSave(existing, {
-      ...body,
-      widgetGrid: [{ i: 'w', x: 2, y: 3 }]
-    })
-    expect(merged.tabs).toEqual(existing.tabs)
-    expect(merged.widgetGrid).toEqual([{ i: 'w', x: 2, y: 3 }])
-  })
-
-  test('explicit undefined tabs have the same effect as an omitted JSON field', () => {
-    const { tabs: _tabs, ...body } = base
-    expect(mergeLayoutForSave(base, { ...body, tabs: undefined }).tabs).toEqual(base.tabs)
-  })
-
-  test('an explicit tab update still changes authored defaults after an unrelated save', () => {
-    const { tabs: _tabs, ...body } = base
-    const saved = mergeLayoutForSave(base, { ...body, layoutMode: 'split' })
-    const tabs: WorkspaceLayout['tabs'] = { open: ['overview', 'scratchpad'], active: 'scratchpad' }
-    expect(mergeLayoutForSave(saved, { ...saved, tabs })).toEqual({
-      ...saved,
-      tabs
-    })
-  })
-
-  test('drops the old Widgets tab id from stale client saves', () => {
-    const body = {
-      ...base,
-      tabs: { open: ['widgets', 'scratchpad'], active: 'widgets' }
-    } as unknown as WorkspaceLayout
-
-    expect(mergeLayoutForSave(base, body).tabs).toEqual({
-      open: ['overview', 'scratchpad'],
-      active: 'overview'
-    })
-  })
-
-  test('never lets a stale client write thumbnail records back into the layout', () => {
-    const body = {
-      ...base,
-      appletThumbnails: [{ kind: 'widget', id: 'w', image: 'inline-image' }]
-    } as unknown as WorkspaceLayout
-    expect('appletThumbnails' in mergeLayoutForSave(base, body)).toBe(false)
+  expect(mergeLayoutForSave({ ...existing, theme: edit.theme }, base).theme).toEqual(edit.theme)
+  expect(mergeLayoutForSave(base, edit)).toEqual({
+    version: 2,
+    widgetGrid: edit.widgetGrid,
+    theme: edit.theme
   })
 })
 
@@ -528,27 +284,5 @@ describe('getWorkspacePreview', () => {
         })
       ).toEqual({ thumbnails: [] })
     })
-  })
-})
-
-test.each([
-  { saved: { selectedFastMode: true }, expected: undefined },
-  { saved: { selectedFastMode: false }, expected: undefined },
-  { saved: { selectedFastMode: 'ultrafast' }, expected: undefined },
-  { saved: { selectedSpeedMode: false }, expected: undefined },
-  { saved: { selectedSpeedMode: 'normal', selectedFastMode: true }, expected: 'normal' },
-  { saved: { selectedSpeedMode: 'fast' }, expected: 'fast' },
-  { saved: { selectedSpeedMode: 'ultrafast' }, expected: 'ultrafast' },
-  { saved: {}, expected: undefined },
-  { saved: { selectedSpeedMode: 'unknown' }, expected: undefined }
-])('loads and rewrites workspace speed settings: $saved', async ({ saved, expected }) => {
-  await withWorkspaceFile({ ...base, ...saved }, async dir => {
-    const layout = await loadLayout(dir)
-    expect(layout.selectedSpeedMode).toBe(expected)
-    expect(layout).not.toHaveProperty('selectedFastMode')
-    await saveLayout(layout, dir)
-    const stored = await Bun.file(getLayoutPath(dir)).json()
-    expect(stored.selectedSpeedMode).toBe(expected)
-    expect(stored).not.toHaveProperty('selectedFastMode')
   })
 })

@@ -1,4 +1,3 @@
-import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { getWorkspaceApiBase, isRemoteWorkspace } from './remote'
 import { toast } from '@/client/components/ui/toast'
 import { receiveWorkspaceHarness } from './harness-transition'
@@ -14,7 +13,7 @@ import type {
   WorkspaceHarness,
   WorkspaceLayoutResponse,
   WorkspaceInfoResponse,
-  WorkspaceLayoutSave,
+  WorkspaceLayout,
   WorkspaceSkillsStatus,
   WorkspaceSkillsUpdateFailure,
   WorkspaceType
@@ -46,16 +45,8 @@ export function useWorkspaceLayout(workspaceId: string) {
       const owner = await client.fetchQuery(workspaceInfoOptions(local.apiBase))
       if (context.signal.aborted) throw context.signal.reason
       if (owner.isRemote) throw new Error('The owner address points to another remote reference')
-      const {
-        selectedModel: _model,
-        selectedEffort: _effort,
-        selectedSpeedMode: _speed,
-        ...shared
-      } = owner
       return {
-        ...shared,
-        layoutMode: 'fullscreen',
-        tabs: createDefaultWorkspaceLayout().tabs,
+        ...owner,
         apiBase: local.apiBase,
         isRemote: local.isRemote,
         cwd: local.cwd
@@ -150,34 +141,14 @@ export function useUpdateWorkspaceSkills(workspaceId: string) {
   })
 }
 
-export type WorkspaceLayoutMutation = WorkspaceLayoutSave & { saveShared?: boolean }
-
 export function useSaveLayout(workspaceId: string) {
   const queryClient = useQueryClient()
-  return useMutation<void, Error, WorkspaceLayoutMutation>({
-    mutationFn: async ({ saveShared, ...layout }) => {
-      const remote = isRemoteWorkspace(workspaceId, queryClient)
-      if (!remote)
-        return requestVoid(
-          `/api/workspaces/${workspaceId}`,
-          jsonRequest('PUT', { ...layout, origin: BROWSER_TAB_ID })
-        )
-      if (!saveShared) return
-      const {
-        tabs: _tabs,
-        layoutMode: _mode,
-        selectedModel: _model,
-        selectedEffort: _effort,
-        selectedSpeedMode: _speed,
-        // The harness is the owner's to choose; a stale visitor tab must not revert it.
-        harness: _harness,
-        ...shared
-      } = layout
-      await requestVoid(
+  return useMutation<void, Error, WorkspaceLayout>({
+    mutationFn: layout =>
+      requestVoid(
         getWorkspaceApiBase(workspaceId, queryClient),
-        jsonRequest('PUT', { ...shared, origin: BROWSER_TAB_ID })
-      )
-    },
+        jsonRequest('PUT', { ...layout, origin: BROWSER_TAB_ID })
+      ),
     onError: error => {
       toast.add({ title: 'Couldn’t save workspace', description: error.message, type: 'error' })
       if (isRemoteWorkspace(workspaceId, queryClient))
@@ -187,8 +158,8 @@ export function useSaveLayout(workspaceId: string) {
         })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
     },
-    onSuccess: (_, { saveShared }) => {
-      if (saveShared && isRemoteWorkspace(workspaceId, queryClient))
+    onSuccess: () => {
+      if (isRemoteWorkspace(workspaceId, queryClient))
         void queryClient.invalidateQueries({
           queryKey: workspaceInfoOptions(getWorkspaceApiBase(workspaceId, queryClient)).queryKey
         })

@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs'
 
-import { viewTabId } from '@/lib/workspace-tabs'
 import type { CompiledView, ViewConfig, ViewInfo, WorkspaceEntry } from '@/lib/types'
 
 import { syncAppletLogAfterBuild } from './log'
@@ -14,7 +13,6 @@ import {
 } from './'
 import { serializeWorkspaceBundle } from './bundle-queue'
 import { reloadModules } from './functions'
-import { loadLayout, saveLayout } from '../workspaces/layout'
 import { completeViewBuild, listPendingViews } from '../sessions/pending-views'
 import { archiveViewSessions } from '../sessions/archive'
 import type { WorkspaceRef } from '../workspace-state'
@@ -307,19 +305,6 @@ export async function deleteView(
     }
     reloadModules([`views/${viewId}`], workspacePath)
     await completeViewBuild(ws, viewId)
-    const layout = await loadLayout(workspacePath)
-    const tab = viewTabId(viewId)
-    await saveLayout(
-      {
-        ...layout,
-        tabs: {
-          open: layout.tabs.open.filter(candidate => candidate !== tab),
-          active: layout.tabs.active === tab ? 'overview' : layout.tabs.active
-        }
-      },
-      workspacePath
-    )
-
     publish({ type: 'view:deleted', workspaceId, name: viewId })
     publish({ type: 'workspace:updated', workspaceId })
     await handleBundleViews(publish, workspaceId, workspacePath, false, viewId)

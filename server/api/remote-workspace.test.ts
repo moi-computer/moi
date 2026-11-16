@@ -1,3 +1,4 @@
+import { DEFAULT_WORKSPACE_STATE_ROOT, setWorkspaceStateRoot } from '../workspace-state'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 import * as appConfig from '../app-config'
 import { mkdtemp, mkdir, rm, symlink } from 'node:fs/promises'
@@ -16,6 +17,7 @@ let local: string
 const spies: { mockRestore(): void }[] = []
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'moi-remote-'))
+  setWorkspaceStateRoot(join(root, 'state'))
   owner = join(root, 'owner-board')
   visitor = join(root, 'visitor-alias')
   await mkdir(join(owner, '.moi/views'), { recursive: true })
@@ -27,9 +29,7 @@ beforeEach(async () => {
   await saveLayout(
     {
       ...createDefaultWorkspaceLayout(),
-      name: 'Owner board',
-      layoutMode: 'fullscreen',
-      selectedModel: 'owner-model'
+      name: 'Owner board'
     },
     owner
   )
@@ -37,9 +37,7 @@ beforeEach(async () => {
     join(visitor, '.moi/.workspace.json'),
     JSON.stringify({
       version: 2,
-      remote: { user_id: 'alice', workspace_id: ownerId },
-      layoutMode: 'split',
-      selectedModel: 'visitor-model'
+      remote: { user_id: 'alice', workspace_id: ownerId }
     })
   )
   local = `/api/workspaces/${visitorId}`
@@ -53,6 +51,7 @@ beforeEach(async () => {
 afterEach(async () => {
   for (const spy of spies.splice(0)) spy.mockRestore()
   killAllWorkers()
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   await rm(root, { recursive: true, force: true })
 })
@@ -76,7 +75,6 @@ test('visitor API returns the reference, folder and resolved routing', async () 
     remote: { user_id: 'alice', workspace_id: ownerId }
   })
   expect(layout.widgetGrid).toBeUndefined()
-  expect(layout.selectedModel).toBeUndefined()
   expect(layout.tabs).toBeUndefined()
   expect((await api.request(`${base}/widgets`)).status).toBe(200)
 })
@@ -96,9 +94,7 @@ test('visitor layout writes cannot add preferences or overwrite the reference', 
   const response = await api.request(
     local,
     put({
-      version: 2,
-      layoutMode: 'fullscreen',
-      tabs: { open: ['scratchpad'], active: 'scratchpad' }
+      version: 2
     })
   )
   expect(response.status).toBe(403)
@@ -275,19 +271,4 @@ test('standalone can reorder visible workspaces while preserving remote registra
   expect((await response.json()).map((entry: { id: string }) => entry.id)).toEqual([ownerId])
   const { listWorkspaces } = await import('../workspaces/registry')
   expect((await listWorkspaces()).map(entry => entry.id)).toEqual([ownerId, visitorId])
-})
-
-test('shared layout edits preserve owner preferences and local config version', async () => {
-  const previous = await loadLayout(owner)
-  await saveLayout({ ...previous, selectedEffort: 'high', selectedSpeedMode: 'fast' }, owner)
-  expect((await api.request(base, put({ version: 1, widgetGrid: [] }))).status).toBe(204)
-  expect(await loadLayout(owner)).toMatchObject({
-    version: 1,
-    selectedModel: 'owner-model',
-    selectedEffort: 'high',
-    selectedSpeedMode: 'fast',
-    tabs: previous.tabs,
-    layoutMode: previous.layoutMode,
-    widgetGrid: []
-  })
 })
