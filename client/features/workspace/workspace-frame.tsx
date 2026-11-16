@@ -1,6 +1,6 @@
 import type { MouseEventHandler, ReactNode } from 'react'
 
-import { useWorkspaceUi } from './personal-layout'
+import { useWorkspaceUi } from './workspace-preferences'
 import type { LayoutMode } from '@/lib/types'
 
 import { useFitsSplitLayout } from './use-fits-split-layout'
