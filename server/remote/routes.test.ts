@@ -4,17 +4,21 @@ import { allowedCloudRequest, cloudRoutes } from './routes'
 const workspace = { user_id: 'owner', workspace_id: 'board' }
 
 test('every path a route builds is allowed for each of its methods', () => {
-  const values = { id: 'inv_1', workspace, file: 'assets/my photo (1).png', name: 'image 1.png' }
-  for (const route of Object.values(cloudRoutes)) {
-    const path = (route.path as (params: typeof values) => string)(values)
+  const { files, scratchpadAsset, acceptInvitation, ...rest } = cloudRoutes
+  const built = [
+    [files, files.path(workspace, 'assets/my photo (1).png')],
+    [scratchpadAsset, scratchpadAsset.path(workspace, 'image 1.png')],
+    [acceptInvitation, acceptInvitation.path('inv_1')],
+    ...Object.values(rest).map(route => [route, route.path(workspace)] as const)
+  ] as const
+  for (const [route, path] of built)
     for (const method of route.methods)
       expect(allowedCloudRequest(method, path)).toEqual({
         access: route.access,
         ...(path.includes('owner:board') ? { workspace } : {})
       })
-  }
   expect(cloudRoutes.leave.access).toBe('own login')
-  expect(() => cloudRoutes.files.path({ workspace, file: '../secret' })).toThrow()
+  expect(() => files.path(workspace, '../secret')).toThrow()
 })
 
 test('refuses unlisted requests and paths that would resolve elsewhere', () => {
@@ -26,6 +30,7 @@ test('refuses unlisted requests and paths that would resolve elsewhere', () => {
     ['GET', 'api/workspaces/owner:board/ops/files/%2e%2e/secret'],
     ['GET', 'api/workspaces/owner:board/ops/files/a%2Fb'],
     ['GET', '/api/workspaces/owner:board/widgets'],
+    ['GET', '/api/me'],
     ['GET', 'https://evil.example/api/me']
   ] as const)
     expect(() => allowedCloudRequest(method, path)).toThrow('This Cloud request is not allowed')

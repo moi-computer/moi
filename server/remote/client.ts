@@ -533,7 +533,7 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
       .transform(parseRemoteWorkspaceTarget),
     membershipId: z.string()
   })
-  const acceptPath = (id: string) => cloudRoutes.acceptInvitation.path({ id })
+  const acceptPath = (id: string) => cloudRoutes.acceptInvitation.path(id)
   async function accept(value: string, name?: string, client?: string) {
     if (client !== undefined && !agentClientSchema.safeParse(client).success)
       throw new Error(`Invalid client — choose ${AGENT_CLIENTS.join(', ')}`)
@@ -642,7 +642,7 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
   }
   async function leave(ownerId: string, workspaceId: string) {
     return request(
-      cloudRoutes.leave.path({ workspace: { user_id: ownerId, workspace_id: workspaceId } }),
+      cloudRoutes.leave.path({ user_id: ownerId, workspace_id: workspaceId }),
       {},
       z.object({ success: z.literal(true) })
     )

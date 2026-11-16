@@ -31,7 +31,7 @@ const linked = [
   { id: 'w1', path: '/workspaces/board', remote: { user_id: 'owner', workspace_id: 'board' } }
 ] as WorkspaceEntry[]
 const board = { user_id: 'owner', workspace_id: 'board' }
-const file = (name: string, workspace = board) => cloudRoutes.files.path({ workspace, file: name })
+const file = (name: string, workspace = board) => cloudRoutes.files.path(workspace, name)
 
 async function signIn(directory: string, name: string) {
   await Bun.write(join(directory, 'config.json'), JSON.stringify({ remote: { url: cloudUrl() } }))

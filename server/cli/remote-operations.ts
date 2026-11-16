@@ -27,7 +27,7 @@ async function printCommandResult(response: Response, json = false) {
 export async function runLinkedWorkspaceCommand(command: string, args: string[], folder: string) {
   const linked = await currentRemoteWorkspace(folder)
   if (!linked) return false
-  const response = await remoteRequest(cloudRoutes.commands.path({ workspace: linked }), {
+  const response = await remoteRequest(cloudRoutes.commands.path(linked), {
     method: 'POST',
     body: JSON.stringify({ command, args }),
     contentType: 'application/json'
@@ -49,9 +49,8 @@ async function target(folder?: string) {
   type Options = Parameters<typeof remoteRequest>[1]
   return {
     file: (file: string, options?: Options) =>
-      remoteRequest(cloudRoutes.files.path({ workspace: current, file }), options),
-    exec: (options?: Options) =>
-      remoteRequest(cloudRoutes.exec.path({ workspace: current }), options)
+      remoteRequest(cloudRoutes.files.path(current, file), options),
+    exec: (options?: Options) => remoteRequest(cloudRoutes.exec.path(current), options)
   }
 }
 async function stdin() {

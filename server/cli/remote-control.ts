@@ -25,7 +25,7 @@ export async function remoteControl(
   if (!remote) return
   const workspace = { remote }
   const request = (route: keyof typeof routes, init?: RequestInit) =>
-    requestWorkspace(routes[route].path({ workspace: remote }), init)
+    requestWorkspace(routes[route].path(remote), init)
   if (payload.type === 'tabs') {
     const { views }: { views: ViewInfo[] } = await (await request('views')).json()
     return { tabs: assembleTabRows(views) }

@@ -233,7 +233,7 @@ test('development requires a target; published installs default to production', 
 
 test('workspace content requests authenticate and refresh through the same client', async () => {
   await credentials()
-  const response = await client.remoteRequest(cloudRoutes.config.path({ workspace: board }))
+  const response = await client.remoteRequest(cloudRoutes.config.path(board))
   expect(response.status).toBe(200)
   expect(refreshes).toBe(1)
 })
@@ -255,8 +255,6 @@ test('workspace content requests reject path escapes and authenticated redirects
     'not allowed'
   )
   responseMode = 'redirect'
-  await expect(
-    client.remoteRequest(cloudRoutes.config.path({ workspace: board }))
-  ).rejects.toThrow()
+  await expect(client.remoteRequest(cloudRoutes.config.path(board))).rejects.toThrow()
   expect(requests).toBe(1)
 })

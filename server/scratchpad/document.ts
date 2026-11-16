@@ -295,7 +295,7 @@ export async function readScratchpadShapes(
 async function readSnapshot(workspace: string | WorkspaceApiTarget): Promise<ScratchpadSnapshot> {
   return typeof workspace === 'string'
     ? loadScratchpadDoc(workspace)
-    : (await requestWorkspace(cloudRoutes.scratchpad.path({ workspace: workspace.remote }))).json()
+    : (await requestWorkspace(cloudRoutes.scratchpad.path(workspace.remote))).json()
 }
 
 async function readAsset(
@@ -304,9 +304,7 @@ async function readAsset(
 ): Promise<Blob | undefined> {
   if (typeof workspace !== 'string')
     return (
-      await requestWorkspace(
-        cloudRoutes.scratchpadAsset.path({ workspace: workspace.remote, name: fileName })
-      )
+      await requestWorkspace(cloudRoutes.scratchpadAsset.path(workspace.remote, fileName))
     ).blob()
   const asset = scratchpadAssetFile(workspace, fileName)
   if (!asset || !(await asset.file.exists())) return undefined
