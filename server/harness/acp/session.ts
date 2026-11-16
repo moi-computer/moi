@@ -26,7 +26,7 @@ import {
 } from '../../sessions/attachment-message'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import { type Part, applyEvent, emptyViewState } from '@/lib/format'
-import type { Model, SessionActivity, StreamEvent, ViewState, WorkspaceType } from '@/lib/types'
+import type { Model, SessionActivity, StreamEvent, ViewState, HarnessType } from '@/lib/types'
 
 import {
   type AcpProviderId,
@@ -62,7 +62,7 @@ export type AcpSpawnContext = {
 }
 
 export type AcpProviderConfig = {
-  id: WorkspaceType
+  id: HarnessType
   provider: AcpProviderId
   spawn: (ctx: AcpSpawnContext) => Promise<AcpSpawnSpec>
   // Session mode that disables approval prompts, matching moi's
@@ -363,9 +363,9 @@ function handleNotification(
 // Force a fresh probe so the composer's banner flips right away.
 function refreshAvailability(
   rec: Pick<SessionRecord, 'workspaceId' | 'workspacePath'>,
-  id: WorkspaceType
+  id: HarnessType
 ) {
-  void harnessStore.refresh({ id: rec.workspaceId, path: rec.workspacePath, type: id })
+  void harnessStore.refresh({ id: rec.workspaceId, path: rec.workspacePath, harness: id })
 }
 
 function createRecord(input: {

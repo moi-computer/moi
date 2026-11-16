@@ -2,14 +2,14 @@ import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { HarnessUnavailableState } from './workspace-recovery-states'
 
-for (const [type, label] of [
+for (const [harness, label] of [
   ['codex', 'ChatGPT'],
   ['claude-code', 'Claude']
 ] as const) {
   test(`${label} manual installation fallback retains the installation instructions`, () => {
     const html = renderToStaticMarkup(
       <HarnessUnavailableState
-        type={type}
+        harness={harness}
         availability={{
           status: 'unavailable',
           code: 'not-installed',
@@ -28,7 +28,7 @@ for (const [type, label] of [
 test('other unavailable errors retain their reason instead of claiming the agent is uninstalled', () => {
   const html = renderToStaticMarkup(
     <HarnessUnavailableState
-      type="codex"
+      harness="codex"
       availability={{ status: 'unavailable', reason: 'Network failed' }}
       retrying
       onRetry={() => {}}

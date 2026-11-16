@@ -15,7 +15,7 @@ import {
   resolveEffortIndex,
   resolveSpeedMode,
   resolveSelectedModel,
-  sortModelsByProviderOrder
+  sortModelsByHarnessOrder
 } from './model-order'
 import { Button } from '@/client/components/ui/button'
 import {
@@ -339,9 +339,9 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
   const allModels = data?.models ?? []
   const defaultEntry = allModels.find(model => model.value === 'default')
   const models = data
-    ? sortModelsByProviderOrder(
+    ? sortModelsByHarnessOrder(
         allModels.filter(model => model.value !== 'default'),
-        data.provider
+        data.harness
       )
     : []
 

@@ -22,7 +22,7 @@ import { useWorkspaceSetup } from '@/client/features/workspace/setup/workspace-s
 import { WorkspaceWelcomeState } from '@/client/features/workspace/setup/workspace-welcome-state'
 import { WorkspaceLoadingState } from '@/client/features/workspace/setup/workspace-recovery-states'
 import type { AppEnvironment } from '@/lib/types'
-import { workspaceTypeLabel } from '@/client/features/workspace/workspace-presentation'
+import { harnessLabel } from '@/client/features/harness/harness-presentation'
 import { useHarnessStatus, type LoginHarness } from '@/client/features/harness/api'
 import {
   createSetupMocks,
@@ -104,7 +104,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
               variant={harness === value ? 'default' : 'secondary'}
               onClick={() => restart({ harness: value })}
             >
-              {workspaceTypeLabel[value]}
+              {harnessLabel[value]}
             </Button>
           ))}
         </div>
@@ -129,9 +129,8 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
           setLayout: update => setLayout(current => ({ ...current, ...update })),
           name: 'My workspace',
           cwd: null,
-          provider: harness,
+          harness: harness,
           apiBase: '/api/workspaces/test',
-          chatAvailable: true,
           isRemote: false,
           isLoading: false
         }}
@@ -139,7 +138,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
         <main className="flex min-h-0 flex-1 overflow-y-auto bg-muted">
           {scenario === 'welcome' ? (
             <WorkspacePendingScreen setupRequired>
-              <WorkspaceWelcomeState name="My workspace" workspaceType={harness} />
+              <WorkspaceWelcomeState name="My workspace" harness={harness} />
             </WorkspacePendingScreen>
           ) : scenario === 'loading' ? (
             <WorkspacePendingScreen>

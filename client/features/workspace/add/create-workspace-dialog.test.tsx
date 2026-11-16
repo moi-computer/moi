@@ -94,7 +94,9 @@ test('create blocks dismissal while submitting and permits it again after failur
 
     let submission!: Promise<unknown>
     await act(async () => {
-      submission = mutation.mutateAsync({ name: 'test', type: 'claude-code' }).catch(error => error)
+      submission = mutation
+        .mutateAsync({ name: 'test', harness: 'claude-code' })
+        .catch(error => error)
       await new Promise(resolve => setTimeout(resolve, 0))
     })
     expect(mutation.isPending).toBe(true)

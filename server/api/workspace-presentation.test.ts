@@ -27,7 +27,7 @@ beforeEach(async () => {
   workspaceDir = join(tempDir, 'workspace')
   await mkdir(join(workspaceDir, '.moi'), { recursive: true })
   setRegistryPath(join(tempDir, 'workspaces.json'))
-  workspaceId = (await registerWorkspace(workspaceDir, { type: 'codex' })).id
+  workspaceId = (await registerWorkspace(workspaceDir, { harness: 'codex' })).id
   published = []
   setEventServer({
     publish: (_topic, data) => {

@@ -1,4 +1,3 @@
-import { useWorkspaceLayoutCtx } from '../workspace-layout-context'
 import { useHarnessStatus, useRetryHarnessStatus } from '@/client/features/harness/api'
 import { useCallback } from 'react'
 import { useAppConfig } from '@/client/api/app-config'
@@ -22,13 +21,11 @@ export function useWorkspaceSetup(
   contentPending = false,
   welcome: WorkspaceWelcomeStateProps = {}
 ) {
-  // Remote chat support is deferred, so the visitor's agent needs no setup.
-  const { chatAvailable } = useWorkspaceLayoutCtx()
   const { environment, demo } = useAppConfig()
   const workspace = useWorkspaceHarness(workspaceId)
   const { data } = workspace
   const status = useHarnessStatus(
-    !chatAvailable || data?.hasAuthOverrides || data?.isFolderMissing ? undefined : data?.provider
+    data?.hasAuthOverrides || data?.isFolderMissing ? undefined : data?.harness
   )
   const retry = useRetryHarnessStatus()
   const readiness = status.isEnabled ? status : workspace
@@ -56,7 +53,7 @@ export function useWorkspaceSetup(
     if (data.isFolderMissing) {
       return <WorkspaceMissingState workspaceId={workspaceId} />
     }
-    const { provider } = data
+    const { harness } = data
     if (availability.status === 'available') return undefined
     if (
       (availability.status === 'login-required' ||
@@ -64,11 +61,11 @@ export function useWorkspaceSetup(
           !demo &&
           availability.status === 'unavailable' &&
           availability.code === 'not-installed')) &&
-      (provider === 'claude-code' || provider === 'codex')
+      (harness === 'claude-code' || harness === 'codex')
     ) {
       return (
         <WorkspaceLoginState
-          type={provider}
+          harness={harness}
           reason={availability.reason}
           checking={isFetching}
           onConnected={recheck}
@@ -78,7 +75,7 @@ export function useWorkspaceSetup(
     }
     return (
       <HarnessUnavailableState
-        type={provider}
+        harness={harness}
         availability={availability}
         retrying={isFetching}
         onRetry={retryStatus}
@@ -87,9 +84,6 @@ export function useWorkspaceSetup(
   }
 
   const welcoming = useWorkspaceWelcome(workspaceId)
-  if (!chatAvailable) {
-    return { content: <WorkspaceLoadingState />, ready: !contentPending, setupRequired: false }
-  }
   const recovery = renderRecovery()
   const ready = !recovery && !contentPending && !checking
   return {

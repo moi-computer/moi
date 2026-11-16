@@ -1,13 +1,13 @@
-import type { WorkspaceType } from '@/lib/types'
-export { workspaceProviderIcon as harnessIcon } from '@/client/components/shared/workspace-icon'
-export const harnessLabel: Record<WorkspaceType, string> = {
+import type { HarnessType } from '@/lib/types'
+export { harnessIcon } from '@/client/components/shared/workspace-icon'
+export const harnessLabel: Record<HarnessType, string> = {
   'claude-code': 'Claude',
   openclaw: 'OpenClaw',
   codex: 'ChatGPT',
   hermes: 'Hermes'
 }
 
-export const harnessDescription: Record<WorkspaceType, string> = {
+export const harnessDescription: Record<HarnessType, string> = {
   'claude-code': 'Anthropic',
   codex: 'OpenAI',
   openclaw: 'Open-source',

@@ -14,8 +14,8 @@ import { columns } from '../ui'
 // same way `moi bundle` does, so it works from `.moi/` or any subdirectory.
 async function runSkillUpdate(cwd: string): Promise<void> {
   // Include the primary harness destination and existing copies for other agents.
-  const { root, type } = await resolveWorkspace(cwd)
-  const result = await updateWorkspaceSkills(root, type)
+  const { root, harness } = await resolveWorkspace(cwd)
+  const result = await updateWorkspaceSkills(root, harness)
   const { changedSkills, updatedAppletTypes } = result
   const heading = changedSkills.length > 0 ? 'Skills updated in ' : 'Skills unchanged in '
 
@@ -97,8 +97,8 @@ export const skill = defineCommand({
     const sub = rawArgs.find(a => !a.startsWith('-'))
     if (sub && sub in skillSubCommands) return
 
-    const { root, type } = await resolveWorkspace(resolve(args.dir))
-    const statuses = await skillStatuses(root, type)
+    const { root, harness } = await resolveWorkspace(resolve(args.dir))
+    const statuses = await skillStatuses(root, harness)
 
     console.log('\n' + pc.bold('moi skill') + pc.dim(' — workspace skills') + '\n')
     console.log(

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type * as CollabApi from 'moi/collab'
 import type { AppletCollabApi } from '@/client/features/collab/applet-api'
 import type { USER_COLORS } from '@/lib/collab/colors'
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessType } from '@/lib/types'
 import { resetAppConfig } from '../../app-config'
 import { updateWorkspaceSkills } from '../../skills/update'
 import { provisionWorkspace } from '../../workspaces/init'
@@ -27,23 +27,23 @@ test('cloud setup and skill updates install presence resources for each harness'
   const original = process.env.MOI_ENVIRONMENT
   const root = await mkdtemp(join(tmpdir(), 'moi-cloud-skills-'))
   try {
-    const types: WorkspaceType[] = ['claude-code', 'codex', 'openclaw', 'hermes']
-    for (const type of types) {
-      const path = join(root, type)
+    const harnesses: HarnessType[] = ['claude-code', 'codex', 'openclaw', 'hermes']
+    for (const harness of harnesses) {
+      const path = join(root, harness)
       await Bun.write(join(path, '.moi', 'package.json'), '{}')
       process.env.MOI_ENVIRONMENT = 'local'
       resetAppConfig()
-      await provisionWorkspace(path, type)
-      const guide = collabSkillReferencePath(path, type)
+      await provisionWorkspace(path, harness)
+      const guide = collabSkillReferencePath(path, harness)
       const declaration = join(path, '.moi', 'collab.d.ts')
       expect(await Bun.file(guide).exists()).toBe(false)
       expect(await Bun.file(declaration).exists()).toBe(false)
       process.env.MOI_ENVIRONMENT = 'cloud'
       resetAppConfig()
-      await updateWorkspaceSkills(path, type)
+      await updateWorkspaceSkills(path, harness)
       expect(await Bun.file(guide).exists()).toBe(true)
       expect(await Bun.file(declaration).exists()).toBe(true)
-      await provisionWorkspace(path, type)
+      await provisionWorkspace(path, harness)
       expect(await Bun.file(guide).exists()).toBe(true)
     }
   } finally {

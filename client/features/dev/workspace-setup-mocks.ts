@@ -53,7 +53,7 @@ export function createSetupMocks(
       return new Response(null, { status: 204 })
     if (path === `/api/workspaces/${PREVIEW_WORKSPACE_ID}/harness` && method === 'GET') {
       return Response.json({
-        provider: harness,
+        harness: harness,
         availability,
         models: [],
         supportsStreaming: true,

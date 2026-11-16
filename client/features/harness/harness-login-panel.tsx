@@ -11,12 +11,16 @@ import { useHarnessLogin } from './use-harness-login'
 import { useRetryHarnessStatus, type LoginHarness } from './api'
 
 type HarnessLoginPanelProps = {
-  type: LoginHarness
+  harness: LoginHarness
   onConnected: () => void
   connectedContent?: ReactNode
 }
 
-export function HarnessLoginPanel({ type, onConnected, connectedContent }: HarnessLoginPanelProps) {
+export function HarnessLoginPanel({
+  harness,
+  onConnected,
+  connectedContent
+}: HarnessLoginPanelProps) {
   const {
     auth,
     needsInstall,
@@ -32,9 +36,9 @@ export function HarnessLoginPanel({ type, onConnected, connectedContent }: Harne
     action,
     checkError,
     failure
-  } = useHarnessLogin(type)
+  } = useHarnessLogin(harness)
   const retry = useRetryHarnessStatus()
-  const name = harnessLabel[type]
+  const name = harnessLabel[harness]
   useEffect(() => {
     if (connected) onConnected()
   }, [connected, onConnected])
@@ -92,7 +96,7 @@ export function HarnessLoginPanel({ type, onConnected, connectedContent }: Harne
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center p-6 text-center">
-      <img src={harnessIcon[type]} alt="" className="mb-4 size-10" />
+      <img src={harnessIcon[harness]} alt="" className="mb-4 size-10" />
       <h1 className="text-center text-xl font-medium">Set up {name}</h1>
       <section
         className={cn('flex w-full flex-col items-center', !pending?.userCode && 'max-w-xs')}

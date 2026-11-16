@@ -69,7 +69,7 @@ async function discoverWorkspaces(
     const worktree = await Promise.all(candidates.map(isLinkedGitWorktree))
     return candidates
       .filter((_, i) => !worktree[i])
-      .map(path => ({ path, type: 'claude-code' as const }))
+      .map(path => ({ path, harness: 'claude-code' as const }))
   } catch {
     return []
   }

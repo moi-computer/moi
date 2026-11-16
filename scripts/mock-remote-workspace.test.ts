@@ -136,6 +136,15 @@ async function setup() {
               }
             : null
         )
+      if (path === '/cloud/api/bootstrap')
+        return Response.json({
+          identity: { id: 'visitor', type: 'user' },
+          workspaces: [{ id: 'local', members: [], invitations: [] }]
+        })
+      if (path === '/page')
+        return new Response('<html><script id="moi-start" type="module">mount()</script></html>', {
+          headers: { 'content-type': 'text/html' }
+        })
       forwarded.push(path)
       if (path === '/redirect')
         return new Response(null, {
@@ -548,5 +557,62 @@ test('mismatched registry preserves the visitor folder', async () => {
   } finally {
     visitor.stop(true)
     await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('mock members join the initial page and every bootstrap snapshot', async () => {
+  const { origin, request } = await setup()
+  const snapshot = async () => (await (await request('/cloud/api/bootstrap')).json()).workspaces
+  expect((await fetch(origin + '/cloud/api/bootstrap')).status).toBe(401)
+  expect(await snapshot()).toEqual([{ id: 'local', members: [], invitations: [] }])
+  await request('/cloud/api/invitations/mock-owner-invite/accept', { method: 'POST' })
+  let workspaces = await snapshot()
+  expect(workspaces.map((workspace: { id: string }) => workspace.id)).toEqual([
+    'local',
+    'alice:owner-board'
+  ])
+  expect(workspaces[1].members.map((member: { id: string }) => member.id)).toEqual([
+    'alice',
+    'jamie',
+    'visitor'
+  ])
+  const html = await (await request('/page')).text()
+  expect(html).toContain('api.workspaceMembers.set(workspace.id, workspace)')
+  expect(html.indexOf('alice:owner-board')).toBeLessThan(html.indexOf('id="moi-start"'))
+  await request('/cloud/api/workspaces/alice:owner-board/invitations', {
+    method: 'POST',
+    body: JSON.stringify({ email: 'new@example.com' })
+  })
+  workspaces = await snapshot()
+  expect(workspaces[1].invitations[0].email).toBe('new@example.com')
+  await request('/cloud/api/workspaces/alice:owner-board/members/member-jamie', {
+    method: 'DELETE'
+  })
+  expect((await snapshot())[1].members.map((member: { id: string }) => member.id)).toEqual([
+    'alice',
+    'visitor'
+  ])
+  await request('/cloud/api/workspaces/alice:owner-board/members/member-visitor', {
+    method: 'DELETE'
+  })
+  expect(await snapshot()).toEqual([{ id: 'local', members: [], invitations: [] }])
+  expect(await (await request('/mock/snapshot')).json()).toEqual({ workspaces: [] })
+})
+
+test('mock membership mutations notify connected browsers', async () => {
+  const { origin, request } = await setup()
+  expect((await fetch(origin + '/mock/member-events')).status).toBe(401)
+  const abort = new AbortController()
+  const response = await request('/mock/member-events', { signal: abort.signal })
+  const reader = response.body!.getReader()
+  try {
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain('data: ready')
+    await request('/cloud/api/invitations/mock-owner-invite/accept', { method: 'POST' })
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain('data: updated')
+    const snapshot = await (await request('/mock/snapshot')).json()
+    expect(snapshot.workspaces[0].members).toHaveLength(3)
+  } finally {
+    abort.abort()
+    reader.releaseLock()
   }
 })

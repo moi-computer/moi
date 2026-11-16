@@ -1,13 +1,13 @@
 import { Hono } from 'hono'
 
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessType } from '@/lib/types'
 
 import { loginShellPath } from '../harness/shell-path'
 import { installHarness } from '../harness/install'
 import { harnessStore } from '../harness/auth'
 import { allHarnesses, harnessFor, isHarnessType } from '../harness/registry'
 
-export const harnesses = new Hono<{ Variables: { harnessType: WorkspaceType } }>()
+export const harnesses = new Hono<{ Variables: { harnessType: HarnessType } }>()
 
 harnesses.get('/status', async c => {
   c.header('Cache-Control', 'no-store')
@@ -41,9 +41,9 @@ harnesses.post('/:type/auth/install', async c => {
   const origin = c.req.header('Origin')
   if (origin && origin !== new URL(c.req.url).origin) return c.text('Invalid origin', 403)
   try {
-    const type = c.get('harnessType')
-    await installHarness(type)
-    await harnessStore.refresh(type)
+    const harness = c.get('harnessType')
+    await installHarness(harness)
+    await harnessStore.refresh(harness)
     return c.json({ ok: true })
   } catch (error) {
     return c.text(error instanceof Error ? error.message : 'Could not install agent', 400)

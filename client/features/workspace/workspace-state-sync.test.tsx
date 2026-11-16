@@ -140,10 +140,9 @@ test('a finished view stays visible through pending cleanup and a stale list rep
         setLayout: () => {},
         name: null,
         cwd: null,
-        provider: 'claude-code',
+        harness: 'claude-code',
         workspaceId: WORKSPACE_ID,
         apiBase: `/api/workspaces/${WORKSPACE_ID}`,
-        chatAvailable: true,
         isRemote: false,
         isLoading: false
       }}

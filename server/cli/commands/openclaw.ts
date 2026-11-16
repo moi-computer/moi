@@ -108,7 +108,7 @@ const openclawInit = defineCommand({
     // Register in the moi registry so the agent's workspace appears in the
     // UI workspace list. Mirrors what `moi init` does for Claude Code.
     const entry = await registerWorkspace(target.path, {
-      type: 'openclaw',
+      harness: 'openclaw',
       name: target.name,
       agentId: target.agentId,
       isDefault: target.isDefault,

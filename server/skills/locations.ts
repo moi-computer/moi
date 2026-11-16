@@ -1,7 +1,7 @@
 import { lstat, realpath } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessType } from '@/lib/types'
 
 import { skillsDirFor } from '../workspaces/init'
 import { bundledSkillNames } from './template'
@@ -47,10 +47,10 @@ async function inspectDirectory(path: string): Promise<SkillDirectory> {
 // their primary destination and include existing Claude/Codex installations.
 export async function resolveSkillLocations(
   workspaceRoot: string,
-  type?: WorkspaceType
+  harness?: HarnessType
 ): Promise<SkillLocation[]> {
   const root = resolve(workspaceRoot)
-  const primary = resolve(skillsDirFor(root, type))
+  const primary = resolve(skillsDirFor(root, harness))
   const directories = [
     ...new Set([primary, join(root, '.claude', 'skills'), join(root, '.agents', 'skills')])
   ]
@@ -61,7 +61,7 @@ export async function resolveSkillLocations(
       try {
         const inspected = await inspectDirectory(path)
         if (
-          usesSharedWorkspaceSkill(type) ||
+          usesSharedWorkspaceSkill(harness) ||
           directory === primary ||
           inspected.exists ||
           inspected.brokenLink

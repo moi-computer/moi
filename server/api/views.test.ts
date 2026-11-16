@@ -73,7 +73,7 @@ beforeEach(async () => {
   codexHarness.archiveSession = async (_, sessionId) => {
     archived.push(sessionId)
   }
-  workspaceId = (await registerWorkspace(workspaceDir, { type: 'codex' })).id
+  workspaceId = (await registerWorkspace(workspaceDir, { harness: 'codex' })).id
   ws = { id: workspaceId, path: workspaceDir }
   published = []
   setEventServer({ publish: (_topic, data) => published.push(JSON.parse(data)) })

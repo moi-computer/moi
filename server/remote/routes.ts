@@ -76,6 +76,7 @@ export const cloudRoutes = {
     `${OWNER}/views?includePending=true`,
     (w: Workspace) => `${owner(w)}/views?includePending=true`
   ),
+  compiledViews: route('GET', `${OWNER}/views`, (w: Workspace) => `${owner(w)}/views`),
   config: route('GET PUT', `${OWNER}/config`, (w: Workspace) => `${owner(w)}/config`),
   icon: route('PUT DELETE', `${OWNER}/icon`, (w: Workspace) => `${owner(w)}/icon`),
   scratchpad: route('GET', `${OWNER}/scratchpad`, (w: Workspace) => `${owner(w)}/scratchpad`),

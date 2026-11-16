@@ -1,5 +1,6 @@
 import type { ArgsDef, CommandDef } from 'citty'
 import { resolve } from 'node:path'
+import { notifyLocalServer } from './control'
 import { runLinkedWorkspaceCommand } from './remote-operations'
 
 // Wrap owner-executed commands only. Preserve their parser/help while running
@@ -59,7 +60,12 @@ export function remoteWorkspaceCommand<T extends ArgsDef>(
         } else if (position++ !== positionalDir) forwarded.push(arg)
       }
       try {
-        if (await runLinkedWorkspaceCommand(name, [...prefix, ...forwarded], folder)) return
+        if (await runLinkedWorkspaceCommand(name, [...prefix, ...forwarded], folder)) {
+          // A view the owner just built is still marked as building in this Moi.
+          if (name === 'bundle' && !process.exitCode)
+            await notifyLocalServer({ type: 'views:reconcile', path: folder })
+          return
+        }
       } catch (error) {
         console.error(error instanceof Error ? error.message : 'Remote command failed')
         process.exitCode = 1

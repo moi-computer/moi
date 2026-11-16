@@ -4,13 +4,14 @@ import { Mutex } from 'async-mutex'
 import { createdWorkspacesRoot } from '../app-config'
 import { workspaceIdFromName } from '@/lib/workspace-name'
 import { parseRemoteWorkspaceTarget, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
+import type { HarnessType } from '@/lib/types'
 import { listWorkspaces, registerWorkspace } from './registry'
 import { provisionWorkspace } from './init'
 import { getLayoutPath, initializeRemoteWorkspaceConfig, loadWorkspaceFileConfig } from './layout'
 import { publishEvent } from '../events'
 
 const opening = new Mutex()
-export async function openSharedWorkspace(remote: RemoteWorkspaceTarget) {
+export async function openSharedWorkspace(remote: RemoteWorkspaceTarget, harness?: HarnessType) {
   remote = parseRemoteWorkspaceTarget(remote)
   return opening.runExclusive(async () => {
     const matches = (target?: RemoteWorkspaceTarget) =>
@@ -38,7 +39,7 @@ export async function openSharedWorkspace(remote: RemoteWorkspaceTarget) {
     }
     let entry
     try {
-      entry = await registerRemoteWorkspaceReference(path, remote)
+      entry = await registerRemoteWorkspaceReference(path, remote, harness)
     } catch (error) {
       // Only remove an empty directory we created; keep a provisioned reference for retry.
       if (created && !(await Bun.file(getLayoutPath(path)).exists()))
@@ -52,9 +53,11 @@ export async function openSharedWorkspace(remote: RemoteWorkspaceTarget) {
 
 // Shared filesystem operation for UI opening and CLI linking. Callers choose the folder
 // and authenticate separately; a matching reference is safe to reuse after a partial failure.
+// The agent is the visitor's own: `type` lands on the registry entry, never in the reference.
 export async function registerRemoteWorkspaceReference(
   path: string,
-  remote: RemoteWorkspaceTarget
+  remote: RemoteWorkspaceTarget,
+  harness?: HarnessType
 ) {
   remote = parseRemoteWorkspaceTarget(remote)
   const file = Bun.file(getLayoutPath(path))
@@ -66,6 +69,6 @@ export async function registerRemoteWorkspaceReference(
     )
       throw new Error('This folder already has a different workspace configuration')
   } else await initializeRemoteWorkspaceConfig(path, remote)
-  await provisionWorkspace(path)
-  return registerWorkspace(path)
+  await provisionWorkspace(path, harness)
+  return registerWorkspace(path, harness ? { harness: harness } : {})
 }

@@ -28,11 +28,11 @@ function createWorkspace(type: unknown) {
   return api.request('/api/workspaces/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'test-workspace', type })
+    body: JSON.stringify({ name: 'test-workspace', harness: type })
   })
 }
 
-test('creating a workspace defaults a missing provider type to Claude Code', async () => {
+test('creating a workspace defaults a missing harness to Claude Code', async () => {
   const response = await api.request('/api/workspaces/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -43,7 +43,7 @@ test('creating a workspace defaults a missing provider type to Claude Code', asy
   expect(await response.text()).toBe('Workspace name is required')
 })
 
-test('creating a workspace rejects an unknown provider type', async () => {
+test('creating a workspace rejects an unknown harness', async () => {
   const response = await createWorkspace('unknown-provider')
 
   expect(response.status).toBe(400)
@@ -75,7 +75,7 @@ test('creation checks installation without requiring login', async () => {
     const response = await api.request('/api/workspaces/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '', type: 'codex' })
+      body: JSON.stringify({ name: '', harness: 'codex' })
     })
     expect(response.status).toBe(400)
     expect(await response.text()).toBe('Workspace name is required')
@@ -94,7 +94,7 @@ test('creation uses a unique slug for the ID and folder while preserving the dis
     return { skillsDir: path, scaffold: 'exists' }
   })
   try {
-    for (const [type, name, displayName] of [
+    for (const [harness, name, displayName] of [
       ['codex', 'my-workspace', undefined],
       ['claude-code', 'my-workspace-2', undefined],
       ['codex', 'cafe-research', 'Café / Research'],
@@ -104,7 +104,7 @@ test('creation uses a unique slug for the ID and folder while preserving the dis
       const response = await api.request('/api/workspaces/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, name: displayName })
+        body: JSON.stringify({ harness: harness, name: displayName })
       })
       expect(response.status).toBe(201)
       const workspace = await response.json()
@@ -112,8 +112,8 @@ test('creation uses a unique slug for the ID and folder while preserving the dis
       expect(workspace.id).toBe(name)
       expect(workspace.name).toBe(displayName ?? 'My workspace')
       expect((await getWorkspaceConfig(workspace.path)).name).toBe(displayName ?? 'My workspace')
-      expect(workspace.type).toBe(type)
-      expect(provision).toHaveBeenCalledWith(join(directory, name!), type)
+      expect(workspace.harness).toBe(harness)
+      expect(provision).toHaveBeenCalledWith(join(directory, name!), harness)
     }
   } finally {
     provision.mockRestore()

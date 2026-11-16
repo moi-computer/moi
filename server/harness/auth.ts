@@ -1,12 +1,7 @@
 import { pathHarnessAvailability } from './executable'
 // Login is global per harness. Workspace readiness is checked independently
 // using each workspace’s environment.
-import type {
-  HarnessLoginState,
-  HarnessAvailability,
-  HarnessLogin,
-  WorkspaceType
-} from '@/lib/types'
+import type { HarnessLoginState, HarnessAvailability, HarnessLogin, HarnessType } from '@/lib/types'
 
 import { publishEvent } from '../events'
 import { harnessFor } from './registry'
@@ -19,7 +14,7 @@ export type HarnessUpdatedEvent = {
 }
 
 // Readiness can target a harness account or an individual workspace.
-type HarnessTarget = WorkspaceType | HarnessWorkspace
+type HarnessTarget = HarnessType | HarnessWorkspace
 
 function entryKey(context: HarnessTarget): string {
   return typeof context === 'string' ? `default:${context}` : `workspace:${context.id}`
@@ -27,9 +22,9 @@ function entryKey(context: HarnessTarget): string {
 
 export type HarnessStoreOptions = {
   probe: (ws: HarnessTarget) => Promise<HarnessAvailability>
-  startLogin: (type: WorkspaceType) => Promise<HarnessLoginAttempt>
+  startLogin: (harness: HarnessType) => Promise<HarnessLoginAttempt>
   publish: (event: HarnessUpdatedEvent) => void
-  onAuthChanged?: (type: WorkspaceType, availability: HarnessAvailability) => Promise<void>
+  onAuthChanged?: (harness: HarnessType, availability: HarnessAvailability) => Promise<void>
   availabilityTtlMs?: number
   loginPollMs?: number
   loginDeadlineMs?: number
@@ -124,14 +119,14 @@ export function createHarnessStore(options: HarnessStoreOptions) {
     return value
   }
 
-  function getLogin(context: WorkspaceType): HarnessLoginState | undefined {
+  function getLogin(context: HarnessType): HarnessLoginState | undefined {
     return entries.get(entryKey(context))?.login?.state
   }
 
   // Re-probe until the login lands or the deadline passes. One loop per
   // ceremony; a replaced or completed ceremony stops its loop.
   function watch(
-    type: WorkspaceType,
+    harness: HarnessType,
     login: LoginCeremony,
     initialAvailability: HarnessAvailability
   ) {
@@ -144,12 +139,12 @@ export function createHarnessStore(options: HarnessStoreOptions) {
       clearTimeout(timer)
     }
     const tick = async () => {
-      const value = await probeFresh(type)
+      const value = await probeFresh(harness)
       if (stopped) return
-      const entry = entryFor(type)
+      const entry = entryFor(harness)
       if (value.status === 'available' && (!login.attempt?.completed || login.completed)) {
         entry.login = undefined
-        await publish(type, value)
+        await publish(harness, value)
         return
       }
       if (Date.now() >= deadline) {
@@ -157,12 +152,12 @@ export function createHarnessStore(options: HarnessStoreOptions) {
         // startLogin replaces it.
         stopLogin(login)
         login.state = { state: 'failed', reason: 'Sign-in did not complete. Try again' }
-        await publish(type, value)
+        await publish(harness, value)
         return
       }
       if (!sameAvailability(value, publishedAvailability)) {
         publishedAvailability = value
-        await publish(type, value)
+        await publish(harness, value)
       }
       timer = setTimeout(tick, pollMs)
       timer.unref?.()
@@ -172,8 +167,8 @@ export function createHarnessStore(options: HarnessStoreOptions) {
     timer.unref?.()
   }
 
-  async function startLogin(type: WorkspaceType): Promise<HarnessLogin> {
-    const entry = entryFor(type)
+  async function startLogin(harness: HarnessType): Promise<HarnessLogin> {
+    const entry = entryFor(harness)
     // Concurrent starts share the provider call; active attempts reuse their instructions.
     const current = entry.login
     if (current?.starting) return current.starting
@@ -183,7 +178,7 @@ export function createHarnessStore(options: HarnessStoreOptions) {
     }
 
     if (current) stopLogin(current)
-    const starting = options.startLogin(type).then(attempt => {
+    const starting = options.startLogin(harness).then(attempt => {
       const { completed, cancel: _cancel, submitCode: _submitCode, ...instructions } = attempt
       login.attempt = attempt
       if (entry.login !== login) {
@@ -197,7 +192,7 @@ export function createHarnessStore(options: HarnessStoreOptions) {
           if (entry.login !== login) return
           stopLogin(login)
           login.state = { state: 'failed', reason: 'Sign-in failed or expired. Try again' }
-          void refresh(type)
+          void refresh(harness)
         }
       )
       return instructions
@@ -213,8 +208,8 @@ export function createHarnessStore(options: HarnessStoreOptions) {
         status: 'login-required',
         reason: 'Waiting for sign-in'
       }
-      await publish(type, availability)
-      if (login.state.state === 'pending') watch(type, login, availability)
+      await publish(harness, availability)
+      if (login.state.state === 'pending') watch(harness, login, availability)
       return result
     } catch (err) {
       if (entry.login === login) entry.login = undefined
@@ -239,16 +234,16 @@ export function createHarnessStore(options: HarnessStoreOptions) {
       .catch(() => {})
   }
 
-  function activeLogin(type: WorkspaceType, id: string) {
-    const login = entryFor(type).login
+  function activeLogin(harness: HarnessType, id: string) {
+    const login = entryFor(harness).login
     if (!login || login.state.state !== 'pending' || login.state.id !== id) {
       throw new Error('This sign-in attempt has ended. Start again')
     }
     return login
   }
 
-  async function submitCode(type: WorkspaceType, id: string, code: string) {
-    const login = activeLogin(type, id)
+  async function submitCode(harness: HarnessType, id: string, code: string) {
+    const login = activeLogin(harness, id)
     if (!login.attempt?.submitCode) throw new Error('This sign-in does not accept a code')
     await login.attempt.submitCode(code)
   }
@@ -284,17 +279,17 @@ export const harnessStore = createHarnessStore({
     if (runtime && runtime.status !== 'available') return runtime
     return harness.authStatus()
   },
-  startLogin: type => {
-    const start = harnessFor(type).startLogin
+  startLogin: harness => {
+    const start = harnessFor(harness).startLogin
     if (!start) throw new Error('This agent requires terminal sign-in')
     return start()
   },
   publish: publishEvent,
-  onAuthChanged: async (type, availability) => {
+  onAuthChanged: async (harness, availability) => {
     publishEvent({
       type: 'harness-status:changed',
-      harness: type,
-      status: { availability, login: harnessStore.getLogin(type) }
+      harness: harness,
+      status: { availability, login: harnessStore.getLogin(harness) }
     })
   }
 })

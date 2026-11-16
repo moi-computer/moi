@@ -1,11 +1,11 @@
-import type { WorkspaceType } from './types'
+import type { HarnessType } from './types'
 
 type HarnessInstruction = {
   reason: string
   command: string
 }
 
-export const HARNESS_INSTRUCTIONS: Record<WorkspaceType, HarnessInstruction> = {
+export const HARNESS_INSTRUCTIONS: Record<HarnessType, HarnessInstruction> = {
   'claude-code': {
     reason: 'Run in terminal to install Claude:',
     command: 'curl -fsSL https://claude.ai/install.sh | bash'
@@ -24,7 +24,7 @@ export const HARNESS_INSTRUCTIONS: Record<WorkspaceType, HarnessInstruction> = {
   }
 }
 
-export function harnessInstructionMessage(type: WorkspaceType): string {
-  const { reason, command } = HARNESS_INSTRUCTIONS[type]
+export function harnessInstructionMessage(harness: HarnessType): string {
+  const { reason, command } = HARNESS_INSTRUCTIONS[harness]
   return `${reason} ${command}`
 }

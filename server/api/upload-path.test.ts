@@ -15,7 +15,7 @@ beforeEach(async () => {
   root = join(temp, 'workspace')
   await mkdir(root)
   setRegistryPath(join(temp, 'registry.json'))
-  workspaceId = (await registerWorkspace(root, { type: 'codex' })).id
+  workspaceId = (await registerWorkspace(root, { harness: 'codex' })).id
 })
 afterEach(async () => {
   setRegistryPath(DEFAULT_REGISTRY_PATH)

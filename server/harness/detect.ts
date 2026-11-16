@@ -11,7 +11,7 @@
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessType } from '@/lib/types'
 
 import { discoverCodexWorkspaces } from './codex/discovery'
 import { type HermesProfile, discoverHermesProfiles } from './hermes/discovery'
@@ -19,21 +19,16 @@ import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw/discovery
 
 // Harness names accepted by `--harness`, in the order they are listed to the
 // user. Detection order is separate (see detectHarness).
-export const HARNESS_TYPES: readonly WorkspaceType[] = [
-  'claude-code',
-  'codex',
-  'hermes',
-  'openclaw'
-]
+export const HARNESS_TYPES: readonly HarnessType[] = ['claude-code', 'codex', 'hermes', 'openclaw']
 
-export const harnessLabel: Record<WorkspaceType, string> = {
+export const harnessLabel: Record<HarnessType, string> = {
   'claude-code': 'Claude Code',
   codex: 'Codex',
   hermes: 'Hermes',
   openclaw: 'OpenClaw'
 }
 
-export function isHarnessName(value: string): value is WorkspaceType {
+export function isHarnessName(value: string): value is HarnessType {
   return (HARNESS_TYPES as readonly string[]).includes(value)
 }
 
@@ -48,7 +43,7 @@ export type DetectedAgent = {
 }
 
 export type HarnessDetection = {
-  type: WorkspaceType
+  harness: HarnessType
   agent?: DetectedAgent
   // What gave it away, as a noun phrase for the CLI's "Detected …" line.
   reason: string
@@ -91,7 +86,7 @@ async function safely<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 
 function detectionForProfile(profile: HermesProfile): HarnessDetection {
   return {
-    type: 'hermes',
+    harness: 'hermes',
     agent: {
       agentId: profile.agentId,
       ...(profile.name ? { name: profile.name } : {}),
@@ -103,7 +98,7 @@ function detectionForProfile(profile: HermesProfile): HarnessDetection {
 
 function detectionForAgent(agent: OpenClawAgent): HarnessDetection {
   return {
-    type: 'openclaw',
+    harness: 'openclaw',
     agent: {
       agentId: agent.agentId,
       ...(agent.name ? { name: agent.name } : {}),
@@ -128,7 +123,7 @@ export async function detectHarness(
   if (agent) return detectionForAgent(agent)
 
   if ((await safely(src.codexWorkspaces, [])).includes(path)) {
-    return { type: 'codex', reason: 'Codex session history here' }
+    return { harness: 'codex', reason: 'Codex session history here' }
   }
 
   // Session history first, then the config directory: history means the CLI
@@ -136,10 +131,10 @@ export async function detectHarness(
   // the history scan drops linked git worktrees, so a worktree is recognized
   // by its `.claude/` directory or not at all.
   if ((await safely(src.claudeCodeWorkspaces, [])).includes(path)) {
-    return { type: 'claude-code', reason: 'Claude Code session history here' }
+    return { harness: 'claude-code', reason: 'Claude Code session history here' }
   }
   if (src.hasClaudeConfigDir(path)) {
-    return { type: 'claude-code', reason: 'a .claude/ directory here' }
+    return { harness: 'claude-code', reason: 'a .claude/ directory here' }
   }
 
   return null
@@ -150,18 +145,18 @@ export async function detectHarness(
 // would have found. Null for the directory-only harnesses, and for a provider
 // that cannot confirm the path (gateway down, profile removed).
 export async function agentBindingFor(
-  type: WorkspaceType,
+  harness: HarnessType,
   workspacePath: string,
   sources: Partial<DetectionSources> = {}
 ): Promise<DetectedAgent | null> {
   const src = { ...defaultSources, ...sources }
   const path = resolve(workspacePath)
 
-  if (type === 'hermes') {
+  if (harness === 'hermes') {
     const profile = (await safely(src.hermesProfiles, [])).find(p => p.path === path)
     return profile ? (detectionForProfile(profile).agent ?? null) : null
   }
-  if (type === 'openclaw') {
+  if (harness === 'openclaw') {
     const agent = (await safely(src.openclawAgents, [])).find(a => a.path === path)
     return agent ? (detectionForAgent(agent).agent ?? null) : null
   }

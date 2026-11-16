@@ -62,7 +62,7 @@ const selectedIn = async (tabId: WorkspaceTabId = 'overview') =>
   (await readWorkspaceState(ws)).selected[tabId]
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'moi-view-sessions-'))
-  ws = { id: 'test', path: dir, type: 'codex', addedAt: '' }
+  ws = { id: 'test', path: dir, harness: 'codex', addedAt: '' }
   setWorkspaceStateRoot(join(dir, 'state'))
   forgetSessionRenames()
   sent = []
@@ -394,8 +394,8 @@ test('native rename preserves the execution reference and attached selection', a
 })
 test.each(allHarnesses().map(harness => harness.id))(
   '%s handoff inherits source settings through native fork or fresh fallback',
-  async type => {
-    const target = harnessFor(type)
+  async id => {
+    const target = harnessFor(id)
     const original = {
       forkSession: target.forkSession,
       sendMessage: target.sendMessage,
@@ -404,7 +404,7 @@ test.each(allHarnesses().map(harness => harness.id))(
       activeSessions: target.activeSessions
     }
     const config = { model: 'model', effort: 'high', speedMode: 'normal' as const }
-    const workspace = { ...ws, type, agentId: 'agent' }
+    const workspace = { ...ws, harness: id, agentId: 'agent' }
     await saveSessionConfig(ws, 'source', config)
     target.listSessions = harness.listSessions
     target.activeSessions = harness.activeSessions

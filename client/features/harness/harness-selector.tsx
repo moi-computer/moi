@@ -1,11 +1,11 @@
 import { IconCircleCheckFilled } from '@tabler/icons-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessType } from '@/lib/types'
 import { harnessLabel, harnessIcon } from './harness-presentation'
 
 export type HarnessOption = {
-  type: WorkspaceType
+  harness: HarnessType
   description: string
   disabled: boolean
   disabledReason?: string
@@ -17,8 +17,8 @@ type HarnessSelectorProps = {
   cardClassName?: string
   disabled: boolean
   options: HarnessOption[]
-  selectedType?: WorkspaceType
-  onTypeChange: (type: WorkspaceType) => void
+  selectedHarness?: HarnessType
+  onHarnessChange: (harness: HarnessType) => void
 }
 
 export function HarnessSelector({
@@ -26,8 +26,8 @@ export function HarnessSelector({
   cardClassName,
   disabled,
   options,
-  selectedType,
-  onTypeChange
+  selectedHarness,
+  onHarnessChange
 }: HarnessSelectorProps) {
   return (
     <fieldset
@@ -37,11 +37,11 @@ export function HarnessSelector({
     >
       {options.map(option => (
         <HarnessOptionButton
-          key={option.type}
+          key={option.harness}
           option={option}
           className={cardClassName}
-          selected={mode === 'select' ? selectedType === option.type : undefined}
-          onSelect={onTypeChange}
+          selected={mode === 'select' ? selectedHarness === option.harness : undefined}
+          onSelect={onHarnessChange}
         />
       ))}
     </fieldset>
@@ -52,7 +52,7 @@ type HarnessOptionButtonProps = {
   className?: string
   option: HarnessOption
   selected?: boolean
-  onSelect: (type: WorkspaceType) => void
+  onSelect: (harness: HarnessType) => void
 }
 
 function HarnessOptionButton({ option, selected, onSelect, className }: HarnessOptionButtonProps) {
@@ -68,7 +68,7 @@ function HarnessOptionButton({ option, selected, onSelect, className }: HarnessO
           event.preventDefault()
           return
         }
-        onSelect(option.type)
+        onSelect(option.harness)
       }}
       className={cn(
         'relative flex h-32 min-w-32 flex-1 flex-col items-start justify-between gap-6 rounded-xl bg-card p-4 text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
@@ -79,7 +79,7 @@ function HarnessOptionButton({ option, selected, onSelect, className }: HarnessO
       )}
     >
       <span className="relative inline-flex">
-        <img src={harnessIcon[option.type]} alt="" className="size-8 shrink-0" />
+        <img src={harnessIcon[option.harness]} alt="" className="size-8 shrink-0" />
         {selected && (
           <IconCircleCheckFilled
             size={16}
@@ -90,7 +90,7 @@ function HarnessOptionButton({ option, selected, onSelect, className }: HarnessO
         )}
       </span>
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-sm font-medium text-foreground">{harnessLabel[option.type]}</span>
+        <span className="text-sm font-medium text-foreground">{harnessLabel[option.harness]}</span>
         <span className="text-xs leading-4 text-muted-foreground">{option.description}</span>
       </span>
     </button>

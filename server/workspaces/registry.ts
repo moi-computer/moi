@@ -5,8 +5,8 @@ import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
 
 import { newWorkspaceId, validateWorkspaceId } from '@/lib/ids'
-import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
-import { orderWorkspaceTypes } from '@/lib/workspace-types'
+import type { DiscoveredWorkspace, WorkspaceEntry, HarnessType } from '@/lib/types'
+import { orderHarnesses } from '@/lib/harness-types'
 
 import { DATA_DIR } from '../data-dir'
 import { allHarnesses } from '../harness/registry'
@@ -47,8 +47,11 @@ async function readRegistry(): Promise<WorkspaceEntry[]> {
   if (!existsSync(_registryPath)) return []
   try {
     const text = await Bun.file(_registryPath).text()
-    const entries = JSON.parse(text) as WorkspaceEntry[]
-    return entries.map(({ remote: _storedRemote, ...entry }) => entry)
+    // `type` is the field's name in registries written before it became `harness`.
+    const entries = JSON.parse(text) as (WorkspaceEntry & { type?: HarnessType })[]
+    return entries.map(({ remote: _storedRemote, type, ...entry }) =>
+      type && !entry.harness ? { ...entry, harness: type } : entry
+    )
   } catch {
     return []
   }
@@ -98,7 +101,7 @@ export type RegisterOptions = {
   // Register under this id instead of a generated one. Only accepted while the
   // workspace is unregistered — see `workspaceIdError`.
   id?: string
-  type?: WorkspaceType
+  harness?: HarnessType
   name?: string
   agentId?: string
   isDefault?: boolean
@@ -161,7 +164,7 @@ export async function registerWorkspace(
       ...(remote ? { remote } : {}),
       path: normalPath,
       addedAt: new Date().toISOString(),
-      ...(opts.type ? { type: opts.type } : {}),
+      ...(opts.harness ? { harness: opts.harness } : {}),
       ...(opts.name ? { name: opts.name } : {}),
       ...(opts.agentId ? { agentId: opts.agentId } : {}),
       ...(opts.isDefault ? { isDefault: opts.isDefault } : {}),
@@ -280,23 +283,23 @@ export async function discoverWorkspaceFolders(
 }
 
 export function mergeWorkspaceCandidates(
-  candidates: { path: string; type?: WorkspaceType }[],
+  candidates: { path: string; harness?: HarnessType }[],
   registeredPaths: Set<string> = new Set()
 ): DiscoveredWorkspace[] {
   const normalizedRegisteredPaths = new Set([...registeredPaths].map(path => resolve(path)))
-  const byPath = new Map<string, Set<WorkspaceType>>()
+  const byPath = new Map<string, Set<HarnessType>>()
 
   for (const candidate of candidates) {
     const path = resolve(candidate.path)
     if (normalizedRegisteredPaths.has(path)) continue
-    const types = byPath.get(path) ?? new Set<WorkspaceType>()
-    if (candidate.type) types.add(candidate.type)
+    const types = byPath.get(path) ?? new Set<HarnessType>()
+    if (candidate.harness) types.add(candidate.harness)
     byPath.set(path, types)
   }
 
   return [...byPath].map(([path, types]) => ({
     path,
-    types: orderWorkspaceTypes(types)
+    harnesses: orderHarnesses(types)
   }))
 }
 
@@ -314,13 +317,13 @@ export async function discoverWorkspaces(): Promise<DiscoveredWorkspace[]> {
 
 export async function updateWorkspaceHarness(
   id: string,
-  type: WorkspaceType
+  harness: HarnessType
 ): Promise<WorkspaceEntry> {
   return locked(async () => {
     const entries = await readRegistry()
     const entry = entries.find(entry => entry.id === id)
     if (!entry) throw new Error('Workspace not found')
-    entry.type = type
+    entry.harness = harness
     await writeRegistry(entries)
     return withDisplayPath(entry)
   })

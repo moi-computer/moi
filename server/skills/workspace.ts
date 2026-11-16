@@ -1,7 +1,7 @@
 import { lstat, mkdir, mkdtemp, readlink, realpath, rename, rm, symlink } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessType } from '@/lib/types'
 
 import { installBundledSkill, installBundledSkills, matchesBundledSkill } from './template'
 import { skillsDirFor } from '../workspaces/init'
@@ -9,8 +9,8 @@ import { withSkillLock } from './lock'
 
 const SKILL_NAME = 'moi-workspace'
 
-export function usesSharedWorkspaceSkill(type?: WorkspaceType): boolean {
-  return type === undefined || type === 'claude-code' || type === 'codex'
+export function usesSharedWorkspaceSkill(harness?: HarnessType): boolean {
+  return harness === undefined || harness === 'claude-code' || harness === 'codex'
 }
 
 async function entryAt(path: string) {
@@ -31,24 +31,26 @@ async function checkSkillsDirectory(path: string): Promise<void> {
 
 export async function installWorkspaceSkills(
   root: string,
-  type?: WorkspaceType
+  harness?: HarnessType
 ): Promise<string[]> {
-  return withSkillLock(workspaceSkillLockPath(root, type), () =>
-    installWorkspaceSkillFiles(root, type)
+  return withSkillLock(workspaceSkillLockPath(root, harness), () =>
+    installWorkspaceSkillFiles(root, harness)
   )
 }
 
-export function workspaceSkillLockPath(root: string, type?: WorkspaceType): string {
-  return usesSharedWorkspaceSkill(type) ? join(root, '.agents', 'skills') : skillsDirFor(root, type)
+export function workspaceSkillLockPath(root: string, harness?: HarnessType): string {
+  return usesSharedWorkspaceSkill(harness)
+    ? join(root, '.agents', 'skills')
+    : skillsDirFor(root, harness)
 }
 
 // Callers must hold the workspace skill lock across any surrounding status reads.
 export async function installWorkspaceSkillFiles(
   root: string,
-  type?: WorkspaceType
+  harness?: HarnessType
 ): Promise<string[]> {
-  if (usesSharedWorkspaceSkill(type)) return resetWorkspaceSkill(root)
-  const directory = skillsDirFor(root, type)
+  if (usesSharedWorkspaceSkill(harness)) return resetWorkspaceSkill(root)
+  const directory = skillsDirFor(root, harness)
   return (await installBundledSkills(directory)).map(name => join(directory, name))
 }
 

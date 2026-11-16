@@ -42,7 +42,7 @@ const catalogs: { name: string; model: CodexModel; expected: SpeedMode }[] = [
 test.each(catalogs)('$name safely resolves a saved Ultrafast preference', ({ model, expected }) => {
   const models = codexModelsToModels([model], {})
   const run = resolveChatRunOptions(
-    { provider: 'codex', availability: { status: 'available' }, models },
+    { harness: 'codex', availability: { status: 'available' }, models },
     'model',
     undefined,
     'ultrafast'
@@ -63,7 +63,7 @@ test.each(['fast', 'priority'])(
     ]) {
       const models = codexModelsToModels([model], { service_tier: alias })
       const agent = {
-        provider: 'codex' as const,
+        harness: 'codex' as const,
         availability: { status: 'available' as const },
         models
       }

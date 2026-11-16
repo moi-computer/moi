@@ -15,8 +15,8 @@ import {
 import { Input } from '@/client/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { validateWorkspaceName } from '@/lib/workspace-name'
-import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
-import type { WorkspaceType } from '@/lib/types'
+import { HARNESS_ORDER } from '@/lib/harness-types'
+import type { HarnessType } from '@/lib/types'
 
 import { DemoDialog } from '@/client/features/demo/demo-dialog'
 import { welcomeNewWorkspace } from '../setup/workspace-welcome-state'
@@ -30,7 +30,7 @@ type CreateWorkspaceDialogProps = {
 
 type CreateWorkspaceStep = 'agent' | 'name'
 
-const DEFAULT_WORKSPACE_TYPE = WORKSPACE_TYPE_ORDER[0]
+const DEFAULT_HARNESS = HARNESS_ORDER[0]
 
 export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const [, navigate] = useLocation()
@@ -40,7 +40,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
 
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<CreateWorkspaceStep>('name')
-  const [type, setType] = useState<WorkspaceType>(DEFAULT_WORKSPACE_TYPE)
+  const [harness, setHarness] = useState<HarnessType>(DEFAULT_HARNESS)
   const [name, setName] = useState('')
 
   const trimmedName = name.trim()
@@ -49,7 +49,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const isChecking = info.isPending || info.isFetching
   const installed = info.isError ? undefined : info.data
   const options = getWorkspaceAgentOptions(installed)
-  const selectedAvailable = options.some(option => option.type === type && !option.disabled)
+  const selectedAvailable = options.some(option => option.harness === harness && !option.disabled)
   const detectionError = !isChecking && !installed ? 'Could not check installed agents.' : undefined
   const canUseAgent = !isChecking && !detectionError && selectedAvailable
 
@@ -67,7 +67,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
 
   function resetDialog() {
     setStep('name')
-    setType(DEFAULT_WORKSPACE_TYPE)
+    setHarness(DEFAULT_HARNESS)
     setName('')
     createMutation.reset()
   }
@@ -81,7 +81,10 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   function createWorkspace() {
     if (!trimmedName || nameError || isCreating || !canUseAgent) return
     createMutation.reset()
-    createMutation.mutate({ name: trimmedName, type }, { onSuccess: entry => finish(entry.id) })
+    createMutation.mutate(
+      { name: trimmedName, harness: harness },
+      { onSuccess: entry => finish(entry.id) }
+    )
   }
 
   return (
@@ -109,7 +112,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
         ) : (
           <WorkspaceAgentSelector
             title="Create new workspace"
-            selectedType={type}
+            selectedHarness={harness}
             options={options}
             isLoading={isChecking && !installed}
             errorMessage={detectionError ?? createMutation.error?.message}
@@ -122,7 +125,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
             }
             primaryLabel="Create workspace"
             pendingLabel={isCreating ? 'Creating…' : undefined}
-            onTypeChange={setType}
+            onHarnessChange={setHarness}
             onSubmit={createWorkspace}
           />
         )}

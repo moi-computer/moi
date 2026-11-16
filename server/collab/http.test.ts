@@ -40,7 +40,7 @@ beforeEach(async () => {
   workspace = {
     id: 'test-collab',
     path: directory,
-    type: 'codex',
+    harness: 'codex',
     addedAt: new Date().toISOString()
   }
   registryPath = join(fixtureRoot, 'workspaces.json')
@@ -120,12 +120,14 @@ describe('collab HTTP integration', () => {
     resetAppConfig()
     expect(clientAppConfig().environment === 'cloud').toBe(false)
     expect((await command({ type: 'snapshot', scope: 'board' })).status).toBe(404)
-    expect(await Bun.file(collabSkillReferencePath(directory, workspace.type)).exists()).toBe(false)
+    expect(await Bun.file(collabSkillReferencePath(directory, workspace.harness)).exists()).toBe(
+      false
+    )
     expect(await Bun.file(join(directory, '.moi', 'data', 'collab.sqlite')).exists()).toBe(false)
   })
 
   test('cloud startup does not install documents, profile or workspace configuration', async () => {
-    const referencePath = collabSkillReferencePath(directory, workspace.type)
+    const referencePath = collabSkillReferencePath(directory, workspace.harness)
     const defaultSkillPath = join(dirname(dirname(referencePath)), 'SKILL.md')
     const defaultSkill = '# Moi workspace\nExisting workspace instructions.\n'
     await Bun.write(defaultSkillPath, defaultSkill)
@@ -139,7 +141,7 @@ describe('collab HTTP integration', () => {
 
   test('startup config reports availability without exposing the reference path in workspace info', async () => {
     const workspaceUrl = `/api/workspaces/${workspace.id}`
-    const referencePath = collabSkillReferencePath(directory, workspace.type)
+    const referencePath = collabSkillReferencePath(directory, workspace.harness)
     for (const enabled of [false, true]) {
       if (enabled) useCloudConfig()
       const startup = await api.request('/api/config')
@@ -241,7 +243,7 @@ describe('collab HTTP integration', () => {
 
   test('stopping presence preserves installed guides and any existing database file', async () => {
     useCloudConfig()
-    const referencePath = collabSkillReferencePath(directory, workspace.type)
+    const referencePath = collabSkillReferencePath(directory, workspace.harness)
     const databasePath = join(directory, '.moi', 'data', 'collab.sqlite')
     const previousDatabase = new Uint8Array([83, 81, 76, 105, 116, 101, 0, 1, 2, 3])
     await Bun.write(referencePath, '# Manually installed guide')

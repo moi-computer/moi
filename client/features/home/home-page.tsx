@@ -94,7 +94,6 @@ export function HomePage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
       <HomeLogo className="mb-10" />
-      <WorkspaceInvitations />
 
       {count > 0 ? (
         <section className="mb-12">
@@ -142,6 +141,8 @@ export function HomePage() {
         </div>
       )}
 
+      <WorkspaceInvitations />
+
       {discovered.length > 0 && (
         <section>
           <Collapsible
@@ -182,7 +183,7 @@ export function HomePage() {
           choice={importFlow.choice}
           isPending={importFlow.isPending}
           errorMessage={importFlow.error?.message}
-          onTypeChange={importFlow.selectType}
+          onHarnessChange={importFlow.selectHarness}
           onSubmit={importFlow.submit}
           onReset={importFlow.reset}
         />
@@ -252,7 +253,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
         >
           <WorkspaceIcon
             icon={workspace.icon}
-            workspaceType={workspace.type}
+            harness={workspace.harness}
             workspaceTheme={theme}
             className="size-4 shrink-0 rounded-xs"
           />
@@ -274,11 +275,11 @@ type SuggestedRowProps = {
 }
 
 function SuggestedRow({ suggestion, onAdd }: SuggestedRowProps) {
-  const { path, types } = suggestion
+  const { path, harnesses } = suggestion
   const name = workspaceDisplayName(suggestion)
   return (
     <li className="flex items-center gap-2 border-b border-border px-1 py-3">
-      <WorkspaceAgentIcons types={types} />
+      <WorkspaceAgentIcons harnesses={harnesses} />
       <span className="shrink-0 text-sm font-medium text-foreground">{name}</span>
       <span title={path} className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
         {suggestion.displayPath ?? path}

@@ -11,7 +11,7 @@ import {
 } from '@/client/features/workspace/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { WorkspaceLayout, WorkspaceType } from '@/lib/types'
+import type { WorkspaceLayout, HarnessType } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
 import { useWorkspaceState } from './workspace-state'
@@ -29,12 +29,11 @@ export type WorkspaceLayoutContextValue = {
   // The agent backend (claude-code / openclaw …). Exposed here so descendants
   // can reuse the shared layout query instead of spawning another observer
   // that could refetch on mount and clobber an optimistic layout update.
-  provider: WorkspaceType | null
+  harness: HarnessType | null
   // The workspace's registry id (the route param), so descendants can key
   // their own queries (e.g. the model picker) without prop-drilling.
   workspaceId: string
   apiBase: string
-  chatAvailable: boolean
   isRemote: boolean
   isLoading: boolean
 }
@@ -63,7 +62,7 @@ function stripMeta(data: WorkspaceLayoutResponse): WorkspaceLayout {
   const {
     cwd: _cwd,
     name: _name,
-    provider: _provider,
+    harness: _harness,
     agentId: _agentId,
     apiBase: _apiBase,
     isRemote: _isRemote,
@@ -130,12 +129,10 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       setLayout,
       name: query.data?.name ?? null,
       cwd: query.data?.cwd ?? null,
-      provider: query.data ? (query.data.provider ?? 'claude-code') : null,
+      harness: query.data ? (query.data.harness ?? 'claude-code') : null,
       workspaceId: id,
       apiBase: query.data?.apiBase ?? '',
       isRemote: query.data?.isRemote ?? false,
-      // Remote chat support is deferred.
-      chatAvailable: !query.data?.isRemote,
       isLoading: query.isLoading
     }),
     [query.data, query.isLoading, setLayout, id]

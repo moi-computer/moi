@@ -233,7 +233,7 @@ for (const [agent, type] of [
     await page.click('Skip onboarding')
     expect(page.location.history?.at(-1)).toBe('/workspace/empty-workspace/overview')
     expect(page.calls).toEqual([
-      { path: '/api/workspaces/create', body: { type } },
+      { path: '/api/workspaces/create', body: { harness: type } },
       { path: '/api/settings', body: { showOnboarding: false } }
     ])
   })

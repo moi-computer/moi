@@ -4,7 +4,7 @@ import type { Identity } from '@/client/features/identity/types'
 import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
 import type { ClientAppConfig } from '@/lib/types'
 
-import { suite, WORKSPACE } from './fixtures'
+import { API, suite, WORKSPACE } from './fixtures'
 
 const { describe, test } = suite(import.meta.path)
 const WORKSPACE_PAGE = `/#/workspace/${WORKSPACE}`
@@ -197,7 +197,7 @@ test(
   }
 )
 
-// Cloud browsers fetch owner content directly and keep visitor preferences local.
+// Cloud browsers fetch owner content directly. Chats, the agent and preferences stay with the visitor.
 const REMOTE = 'shared-board'
 const remoteBase = `/api/workspaces/${REMOTE}`
 const ownerBase = '/api/workspaces/alice:owner-board'
@@ -218,9 +218,12 @@ const remoteAnswers = {
     isRemote: true,
     version: 2,
     remote: { user_id: 'alice', workspace_id: 'owner-board' },
-    cwd: '/visitor'
+    cwd: '/visitor',
+    harness: 'claude-code'
   },
   [`${remoteBase}/state`]: { revision: 1, selected: {}, sessions: {}, pendingViews: {} },
+  [`${remoteBase}/harness`]: API[`/api/workspaces/${WORKSPACE}/harness`],
+  [`${remoteBase}/sessions`]: [],
   [`${ownerBase}/widgets`]: { widgets: [] },
   [`${ownerBase}/views`]: { views: [] },
   [`${ownerBase}/applet-thumbnails`]: { thumbnails: [] }
@@ -235,23 +238,23 @@ const remoteOptions = {
 }
 
 test(
-  'remote workspace without chat or setup',
+  'remote workspace with the visitor’s own chat and settings',
   async page => {
     await page.goto(remotePage)
     await expect(page.getByRole('button', { name: 'Customize', exact: true })).toBeVisible()
     await expect(
       page.getByText('Widgets can surface information, read data, and perform actions')
     ).toBeVisible()
-    await expect(page.getByRole('button', { name: 'New widget', exact: true })).toHaveCount(0)
+    await expect(page.getByPlaceholder('Do anything')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Create tab', exact: true })).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Users in this workspace', exact: true })
     ).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible()
     await takeSnapshot('remote overview')
     await page.getByRole('button', { name: 'Shared board menu', exact: true }).click()
     await expect(page.getByRole('menuitem', { name: 'Theme', exact: true })).toBeVisible()
-    await expect(page.getByRole('menuitem', { name: 'Settings', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('menuitem', { name: 'Settings', exact: true })).toBeVisible()
   },
   remoteOptions
 )
@@ -544,14 +547,16 @@ test(
     await page.goto('/#/')
     await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Invitations', exact: true })).toBeVisible()
-    await takeSnapshot('pending invitation')
+    await expect(page.getByText('Import other workspaces', { exact: true })).toBeVisible()
+    await takeSnapshot('invitation below workspaces and above imports')
     await page.getByRole('button', { name: 'Accept', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
     expect(registrations).toBe(1)
   },
   {
     api: {
-      ...remoteAnswers
+      ...remoteAnswers,
+      '/api/workspaces/discover': [{ path: '/projects/notes', harnesses: ['claude-code'] }]
     }
   }
 )

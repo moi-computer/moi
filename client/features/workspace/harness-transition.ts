@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { matchQuery, useQueryClient, type QueryClient, type Query } from '@tanstack/react-query'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
-import type { WorkspaceLayoutResponse, WorkspaceType } from '@/lib/types'
+import type { WorkspaceLayoutResponse, HarnessType } from '@/lib/types'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { liveStore } from '@/client/features/chat/chat-store'
 import { changeWorkspaceStateCache } from './workspace-state'
@@ -9,13 +9,13 @@ import { changeWorkspaceStateCache } from './workspace-state'
 export async function receiveWorkspaceHarness(
   queryClient: QueryClient,
   id: string,
-  harness: WorkspaceType
+  harness: HarnessType
 ) {
   const cached = queryClient.getQueryData<WorkspaceLayoutResponse>(workspaceKeys.layout(id))
-  let previous = cached ? (cached.provider ?? 'claude-code') : undefined
+  let previous = cached ? (cached.harness ?? 'claude-code') : undefined
   try {
     const key = `moi:workspace-harness:${id}`
-    previous = (sessionStorage.getItem(key) as WorkspaceType | null) ?? previous
+    previous = (sessionStorage.getItem(key) as HarnessType | null) ?? previous
     sessionStorage.setItem(key, harness)
   } catch {
     /* Cached layout still detects live changes when storage is unavailable. */
@@ -42,7 +42,7 @@ export async function receiveWorkspaceHarness(
     previous
       ? {
           ...previous,
-          provider: harness
+          harness
         }
       : previous
   )
@@ -68,7 +68,7 @@ export async function receiveWorkspaceHarness(
   ])
 }
 
-export function useWorkspaceHarnessChanges(id: string, harness: WorkspaceType | null) {
+export function useWorkspaceHarnessChanges(id: string, harness: HarnessType | null) {
   const queryClient = useQueryClient()
   useEffect(() => {
     if (harness) void receiveWorkspaceHarness(queryClient, id, harness)

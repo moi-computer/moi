@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 
-import type { WorkspaceSkillsStatus, WorkspaceSkillStatus, WorkspaceType } from '@/lib/types'
+import type { WorkspaceSkillsStatus, WorkspaceSkillStatus, HarnessType } from '@/lib/types'
 
 import type { AppletDeclarationFile } from '../applets/declarations'
 import { syncAppletDeclarations } from '../applets/declarations'
@@ -31,29 +31,29 @@ export function summarizeSkillStatuses(skills: WorkspaceSkillStatus[]): Workspac
 
 export async function getWorkspaceSkillsStatus(
   workspaceRoot: string,
-  type?: WorkspaceType
+  harness?: HarnessType
 ): Promise<WorkspaceSkillsStatus> {
-  return summarizeSkillStatuses(await skillStatuses(workspaceRoot, type))
+  return summarizeSkillStatuses(await skillStatuses(workspaceRoot, harness))
 }
 
 export async function updateWorkspaceSkills(
   workspaceRoot: string,
-  type: WorkspaceType = 'claude-code'
+  harness: HarnessType = 'claude-code'
 ): Promise<WorkspaceSkillUpdateResult> {
-  return withSkillLock(workspaceSkillLockPath(workspaceRoot, type), () =>
-    updateWorkspaceSkillFiles(workspaceRoot, type)
+  return withSkillLock(workspaceSkillLockPath(workspaceRoot, harness), () =>
+    updateWorkspaceSkillFiles(workspaceRoot, harness)
   )
 }
 
 async function updateWorkspaceSkillFiles(
   workspaceRoot: string,
-  type: WorkspaceType
+  harness: HarnessType
 ): Promise<WorkspaceSkillUpdateResult> {
-  const locations = await resolveSkillLocations(workspaceRoot, type)
+  const locations = await resolveSkillLocations(workspaceRoot, harness)
   const before = await skillStatusesForLocations(locations)
   let changedSkillPaths: string[]
-  if (usesSharedWorkspaceSkill(type)) {
-    changedSkillPaths = await installWorkspaceSkillFiles(workspaceRoot, type)
+  if (usesSharedWorkspaceSkill(harness)) {
+    changedSkillPaths = await installWorkspaceSkillFiles(workspaceRoot, harness)
   } else {
     for (const location of locations) {
       if (location.brokenLink) {
@@ -82,7 +82,7 @@ async function updateWorkspaceSkillFiles(
   // Applet declarations ship with the CLI, so refresh installed copies along
   // with skills.
   const updatedAppletTypes = await syncAppletDeclarations(workspaceRoot)
-  const skills = await skillStatuses(workspaceRoot, type)
+  const skills = await skillStatuses(workspaceRoot, harness)
 
   return {
     before,

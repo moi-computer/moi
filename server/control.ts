@@ -27,7 +27,11 @@ import { assembleTabRows, assertNavigableTab } from './workspaces/tabs'
 import { applyThemeUpdate } from './workspaces/theme'
 import { handleBundle } from './applets/widgets'
 import { getWorkspaceViews, handleBundleViews } from './applets/views'
-import { updatePendingView, PendingViewError } from './sessions/pending-views'
+import {
+  completeRemoteViewBuilds,
+  updatePendingView,
+  PendingViewError
+} from './sessions/pending-views'
 import { createViewFromSession, ViewStartupError } from './sessions/view-sessions'
 import {
   getWorkspaceConfig,
@@ -359,6 +363,15 @@ export const control = Bun.serve({
               })
             )
           }
+          return
+        }
+
+        // Sent by the CLI after a build on a remote workspace's owner.
+        if (data.type === 'views:reconcile') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          await completeRemoteViewBuilds(match)
+          ws.send(JSON.stringify({ ok: true }))
           return
         }
 

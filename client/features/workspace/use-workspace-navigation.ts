@@ -45,7 +45,7 @@ type UseWorkspaceNavigationOptions = {
 
 export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNavigationOptions) {
   const queryClient = useQueryClient()
-  const { workspaceId, chatAvailable, apiBase } = useWorkspaceLayoutCtx()
+  const { workspaceId, apiBase } = useWorkspaceLayoutCtx()
   const [tabsState, saveTabs] = useWorkspaceTabs()
   const latest = useRef({ views, tabsState, onOpenChat })
   useLayoutEffect(() => {
@@ -118,8 +118,6 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       }
       try {
         const targetPath = target.slice(prefix.length).split('?', 1)[0]
-        if (!chatAvailable && (targetPath === 'chat' || targetPath.startsWith('chats/')))
-          throw new Error('This destination is unavailable in this workspace')
         if (targetPath === 'chat' || targetPath.startsWith('chats/')) {
           const { tab, href } = currentPage()
           const destination =
@@ -162,7 +160,6 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
       prefix,
       queryClient,
       remembered,
-      chatAvailable,
       apiBase,
       selectLinkedChat,
       setLocation,

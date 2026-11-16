@@ -28,7 +28,7 @@ afterEach(async () => {
 
 test('removing a workspace stops its harness', async () => {
   const workspacePath = join(tempDir, 'workspace')
-  const workspace = await registerWorkspace(workspacePath, { type: 'codex' })
+  const workspace = await registerWorkspace(workspacePath, { harness: 'codex' })
   const stopped: string[] = []
   codexHarness.stopWorkspace = path => stopped.push(path)
 

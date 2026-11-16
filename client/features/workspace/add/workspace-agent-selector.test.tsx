@@ -1,4 +1,4 @@
-import type { HarnessStatuses, WorkspaceType } from '@/lib/types'
+import type { HarnessStatuses, HarnessType } from '@/lib/types'
 import { describe, expect, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -27,11 +27,11 @@ function renderStep(installed?: HarnessInstallations, isChecking = false, errorM
         isLoading: isChecking && !installed,
         errorMessage,
         emptyMessage: 'Install Claude or ChatGPT to create a new workspace.',
-        selectedType: 'claude-code',
+        selectedHarness: 'claude-code',
         isPending: isChecking || Boolean(errorMessage),
         secondaryAction: null,
         primaryLabel: 'Create workspace',
-        onTypeChange: () => {},
+        onHarnessChange: () => {},
         onSubmit: () => {}
       })
     )
@@ -89,7 +89,7 @@ test('locks agent choices while pending and enables them again when idle', () =>
 
 function getWorkspaceAgentOptions(
   installed?: HarnessInstallations,
-  detectedTypes: WorkspaceType[] = []
+  detectedHarnesses: HarnessType[] = []
 ) {
   const statuses =
     installed &&
@@ -103,5 +103,5 @@ function getWorkspaceAgentOptions(
         }
       ])
     ) as HarnessStatuses | undefined)
-  return optionsFromStatuses(statuses, detectedTypes)
+  return optionsFromStatuses(statuses, detectedHarnesses)
 }

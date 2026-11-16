@@ -47,8 +47,8 @@ afterEach(async () => {
   await rm(tempDir, { recursive: true, force: true })
 })
 
-describe('workspace import provider', () => {
-  test('defaults a missing provider type to Claude Code', async () => {
+describe('workspace import harness', () => {
+  test('defaults a missing harness to Claude Code', async () => {
     const workspacePath = join(tempDir, 'workspace')
     await mkdir(join(workspacePath, '.moi'), { recursive: true })
     await Bun.write(join(workspacePath, '.moi', 'package.json'), '{}\n')
@@ -61,17 +61,17 @@ describe('workspace import provider', () => {
 
     expect(response.status).toBe(201)
     const workspace = (await response.json()) as WorkspaceEntry
-    expect(workspace.type).toBe('claude-code')
+    expect(workspace.harness).toBe('claude-code')
     expect(
       await Bun.file(join(workspacePath, '.claude', 'skills', 'moi-workspace', 'SKILL.md')).exists()
     ).toBe(true)
   })
 
-  test('rejects an unknown provider type', async () => {
+  test('rejects an unknown harness', async () => {
     const response = await api.request('/api/workspaces', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: join(tempDir, 'workspace'), type: 'unknown-provider' })
+      body: JSON.stringify({ path: join(tempDir, 'workspace'), harness: 'unknown-provider' })
     })
 
     expect(response.status).toBe(400)
@@ -80,24 +80,24 @@ describe('workspace import provider', () => {
 
   test.each([
     {
-      type: 'claude-code' as const,
+      id: 'claude-code' as const,
       harness: claudeCodeHarness,
       reason: 'Run in terminal to install Claude Code: curl -fsSL https://claude.ai/install.sh | sh'
     },
     {
-      type: 'codex' as const,
+      id: 'codex' as const,
       harness: codexHarness,
       reason:
         'Run in terminal to install Codex: curl -fsSL https://chatgpt.com/codex/install.sh | sh'
     }
-  ])('rejects unavailable $type before provisioning', async ({ type, harness, reason }) => {
+  ])('rejects unavailable $id before provisioning', async ({ id, harness, reason }) => {
     harness.availability = async () => ({ status: 'unavailable', reason })
-    const workspacePath = join(tempDir, type)
+    const workspacePath = join(tempDir, id)
 
     const response = await api.request('/api/workspaces', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: workspacePath, type })
+      body: JSON.stringify({ path: workspacePath, harness: id })
     })
 
     expect(response.status).toBe(400)
@@ -107,29 +107,29 @@ describe('workspace import provider', () => {
 
   test.each([
     {
-      type: 'claude-code' as const,
+      id: 'claude-code' as const,
       harness: claudeCodeHarness,
       reason: 'Run in terminal to install Claude Code: curl -fsSL https://claude.ai/install.sh | sh'
     },
     {
-      type: 'codex' as const,
+      id: 'codex' as const,
       harness: codexHarness,
       reason:
         'Run in terminal to install Codex: curl -fsSL https://chatgpt.com/codex/install.sh | sh'
     }
-  ])('reports unavailable $type for a registered workspace', async ({ type, harness, reason }) => {
+  ])('reports unavailable $id for a registered workspace', async ({ id, harness, reason }) => {
     harness.availability = async () => ({ status: 'unavailable', reason })
-    await mkdir(join(tempDir, type))
-    const entry = await registerWorkspace(join(tempDir, type), { type })
+    await mkdir(join(tempDir, id))
+    const entry = await registerWorkspace(join(tempDir, id), { harness: id })
 
     const response = await api.request(`/api/workspaces/${entry.id}/harness`)
 
     expect(response.status).toBe(200)
     const snapshot = (await response.json()) as WorkspaceHarness
-    expect(snapshot.provider).toBe(type)
+    expect(snapshot.harness).toBe(id)
     expect(snapshot.hasAuthOverrides).toBe(false)
     const status = await api.request('/api/harnesses/status?refresh=true')
-    expect((await status.json())[type].availability).toEqual({ status: 'unavailable', reason })
+    expect((await status.json())[id].availability).toEqual({ status: 'unavailable', reason })
   })
 
   test('reports a signed-out workspace and starts its login', async () => {
@@ -142,7 +142,7 @@ describe('workspace import provider', () => {
         : { status: 'available' }
     codexHarness.startLogin = async () => ({ id: 'attempt', url: 'https://example.com/login' })
     await mkdir(join(tempDir, 'codex-login'))
-    const entry = await registerWorkspace(join(tempDir, 'codex-login'), { type: 'codex' })
+    const entry = await registerWorkspace(join(tempDir, 'codex-login'), { harness: 'codex' })
 
     const response = await api.request('/api/harnesses/status')
     expect((await response.json()).codex.availability.status).toBe('login-required')
@@ -181,7 +181,7 @@ test('remote import returns its owner reference and preserves the config', async
   const response = await api.request('/api/workspaces', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, type: 'codex' })
+    body: JSON.stringify({ path, harness: 'codex' })
   })
   expect(response.status).toBe(201)
   expect((await response.json()).remote).toEqual(config.remote)

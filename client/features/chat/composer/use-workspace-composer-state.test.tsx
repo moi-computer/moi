@@ -40,7 +40,7 @@ test.each([
     const availability: HarnessAvailability =
       status === 'available' ? { status } : { status, reason: 'Agent needs attention' }
     client.setQueryData<WorkspaceHarness>(key, {
-      provider: 'codex',
+      harness: 'codex',
       availability,
       models: [],
       supportsStreaming: true,

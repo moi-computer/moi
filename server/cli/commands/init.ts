@@ -1,7 +1,7 @@
 import { initializeRemoteWorkspace } from '../../remote/workspace'
 import { loadWorkspaceFileConfig } from '../../workspaces/layout'
 import { parseRemoteWorkspaceAddress } from '@/lib/workspace-config'
-import type { WorkspaceType, WorkspaceEntry } from '@/lib/types'
+import type { HarnessType, WorkspaceEntry } from '@/lib/types'
 import { defineCommand } from 'citty'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'path'
@@ -37,7 +37,7 @@ import { keyValue } from '../ui'
 async function resolveInitHarness(
   target: string,
   requested: string | undefined
-): Promise<{ type: WorkspaceType; agent: DetectedAgent | null }> {
+): Promise<{ harness: HarnessType; agent: DetectedAgent | null }> {
   if (requested !== undefined) {
     const value = requested.trim()
     if (!isHarnessName(value)) {
@@ -64,7 +64,7 @@ async function resolveInitHarness(
           pc.dim(' to bind it once ' + harnessLabel[value] + ' can see the workspace.')
       )
     }
-    return { type: value, agent }
+    return { harness: value, agent }
   }
 
   // A registered workspace has already answered this question, and may carry no
@@ -73,12 +73,12 @@ async function resolveInitHarness(
   // to refresh skills.
   const known = (await listWorkspaces()).find(e => e.path === target)
   if (known) {
-    const type = known.type ?? 'claude-code'
+    const harness = known.harness ?? 'claude-code'
     console.log(
-      '\n' + pc.dim('  Already registered — initializing for ') + pc.bold(harnessLabel[type])
+      '\n' + pc.dim('  Already registered — initializing for ') + pc.bold(harnessLabel[harness])
     )
     return {
-      type,
+      harness,
       agent: known.agentId
         ? {
             agentId: known.agentId,
@@ -98,10 +98,10 @@ async function resolveInitHarness(
         ' Detected ' +
         detected.reason +
         ' — initializing for ' +
-        pc.bold(harnessLabel[detected.type]) +
+        pc.bold(harnessLabel[detected.harness]) +
         '.'
     )
-    return { type: detected.type, agent: detected.agent ?? null }
+    return { harness: detected.harness, agent: detected.agent ?? null }
   }
 
   console.error('\n' + pc.red('✗') + ' No agent harness detected in ' + pc.bold(target))
@@ -234,12 +234,12 @@ export const init = defineCommand({
       // provisioning: each harness reads skills from a different directory, and
       // agent-owned ones (OpenClaw, Hermes) need their agent metadata on the
       // registry entry — same as `moi <provider> init`.
-      const { type, agent } = await resolveInitHarness(target, args.harness)
+      const { harness, agent } = await resolveInitHarness(target, args.harness)
 
       // Provision: bundled skills + the `.moi/` bootstrap (widgets dir +
       // package.json + bun install). An existing `.moi/` is left untouched.
       console.log()
-      const { scaffold, skillsDir, installLogPath } = await provisionWorkspace(target, type)
+      const { scaffold, skillsDir, installLogPath } = await provisionWorkspace(target, harness)
       if (scaffold !== 'exists' && scaffold !== 'skipped') {
         if (scaffold === 'installing') {
           console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
@@ -257,7 +257,7 @@ export const init = defineCommand({
       // Always register the workspace in the persistent registry
       entry = await registerWorkspace(target, {
         ...(args.id ? { id: args.id } : {}),
-        type,
+        harness: harness,
         ...(agent
           ? {
               name: agent.name,
@@ -268,12 +268,12 @@ export const init = defineCommand({
           : {})
       })
 
-      console.log(pc.green('✓') + ' Initialized ' + pc.bold(target) + pc.dim(' (' + type + ')'))
+      console.log(pc.green('✓') + ' Initialized ' + pc.bold(target) + pc.dim(' (' + harness + ')'))
       console.log(
         '  Skills installed to ' +
           pc.dim(skillsDir) +
           ' — ask ' +
-          (type === 'claude-code' ? 'Claude' : 'your agent') +
+          (harness === 'claude-code' ? 'Claude' : 'your agent') +
           ' to build a widget or a view to get started\n'
       )
     }

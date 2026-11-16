@@ -222,23 +222,23 @@ describe('workspace discovery grouping', () => {
   test('groups providers by normalized path in display order', () => {
     const path = '/Users/foo/project'
     const grouped = mergeWorkspaceCandidates([
-      { path, type: 'openclaw' },
-      { path: '/Users/foo/project/../project', type: 'codex' },
-      { path, type: 'claude-code' },
-      { path, type: 'codex' }
+      { path, harness: 'openclaw' },
+      { path: '/Users/foo/project/../project', harness: 'codex' },
+      { path, harness: 'claude-code' },
+      { path, harness: 'codex' }
     ])
 
     expect(grouped).toEqual([
       {
         path,
-        types: ['claude-code', 'codex', 'openclaw']
+        harnesses: ['claude-code', 'codex', 'openclaw']
       }
     ])
   })
 
   test('filters registered paths after normalization', () => {
     const grouped = mergeWorkspaceCandidates(
-      [{ path: '/Users/foo/project/../project', type: 'codex' }],
+      [{ path: '/Users/foo/project/../project', harness: 'codex' }],
       new Set(['/Users/foo/project'])
     )
 
@@ -265,14 +265,14 @@ describe('discoverWorkspaceFolders', () => {
     await mkdir(join(workspace, '.moi'), { recursive: true })
     await mkdir(join(withoutHistory, '.moi'), { recursive: true })
     const folders = await discoverWorkspaceFolders(tmpDir)
-    const history = [{ path: workspace, type: 'codex' as const }]
+    const history = [{ path: workspace, harness: 'codex' as const }]
 
     expect(mergeWorkspaceCandidates([...history, ...folders])).toEqual([
-      { path: workspace, types: ['codex'] },
-      { path: withoutHistory, types: [] }
+      { path: workspace, harnesses: ['codex'] },
+      { path: withoutHistory, harnesses: [] }
     ])
     expect(mergeWorkspaceCandidates([...history, ...folders], new Set([workspace]))).toEqual([
-      { path: withoutHistory, types: [] }
+      { path: withoutHistory, harnesses: [] }
     ])
   })
 
@@ -329,6 +329,18 @@ describe('readRegistry', () => {
   })
 })
 
+test('a registry written with the old `type` field reads as `harness` and is saved that way', async () => {
+  const path = join(tmpDir, 'old')
+  await mkdir(path, { recursive: true })
+  const file = join(tmpDir, 'data', 'workspaces.json')
+  await Bun.write(file, JSON.stringify([{ id: 'old', path, type: 'codex', addedAt: '2026-01-01' }]))
+  expect((await listWorkspaces())[0]).toMatchObject({ id: 'old', harness: 'codex' })
+  await registerWorkspace(join(tmpDir, 'new'))
+  const stored = (await Bun.file(file).json()).find((entry: { id: string }) => entry.id === 'old')
+  expect(stored).toMatchObject({ harness: 'codex' })
+  expect(stored.type).toBeUndefined()
+})
+
 describe('reorderWorkspaces', () => {
   test('persists workspace order', async () => {
     const a = await registerWorkspace('/Users/foo/project-a')
@@ -380,13 +392,13 @@ describe('reorderWorkspaces', () => {
 
   test('preserves workspace metadata', async () => {
     const a = await registerWorkspace('/Users/foo/project-a', {
-      type: 'openclaw',
+      harness: 'openclaw',
       name: 'Agent A',
       agentId: 'agent-a',
       isDefault: true,
       lastRunAt: '2026-07-08T10:00:00.000Z'
     })
-    const b = await registerWorkspace('/Users/foo/project-b', { type: 'claude-code' })
+    const b = await registerWorkspace('/Users/foo/project-b', { harness: 'claude-code' })
 
     await reorderWorkspaces([b.id, a.id])
 
@@ -394,7 +406,7 @@ describe('reorderWorkspaces', () => {
     expect(list[1]).toMatchObject({
       id: a.id,
       path: '/Users/foo/project-a',
-      type: 'openclaw',
+      harness: 'openclaw',
       name: 'Agent A',
       agentId: 'agent-a',
       isDefault: true,

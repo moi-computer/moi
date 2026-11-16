@@ -49,7 +49,7 @@ export async function sendWorkspaceMessage(
   try {
     const { getWorkspace } = await import('../workspaces/registry')
     const current = await getWorkspace(ws.id)
-    if (current && (current.type ?? 'claude-code') !== (ws.type ?? 'claude-code'))
+    if (current && (current.harness ?? 'claude-code') !== (ws.harness ?? 'claude-code'))
       throw new HarnessTransitionError('Agent changed. Start a new chat')
     const { prepareWorkspaceHarness } = await import('../workspaces/change-harness')
     await prepareWorkspaceHarness(ws)
@@ -85,7 +85,7 @@ export async function sendWorkspaceMessage(
       await patchPendingView(ws, pending.id, {
         buildSessionId: sessionId
       })
-    const collabReference = await getCollabReferencePath(ws.path, ws.type)
+    const collabReference = await getCollabReferencePath(ws.path, ws.harness)
     const pinnedSessionId = await getPinnedSession(ws)
     await harnessFor(ws).sendMessage({
       ...message,

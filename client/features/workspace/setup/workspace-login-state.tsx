@@ -4,7 +4,7 @@ import { harnessLabel } from '@/client/features/harness/harness-presentation'
 import type { LoginHarness } from '@/client/features/harness/api'
 
 type WorkspaceLoginStateProps = {
-  type: LoginHarness
+  harness: LoginHarness
   reason: string
   checking: boolean
   onRecheck: () => void
@@ -12,7 +12,7 @@ type WorkspaceLoginStateProps = {
 }
 
 export function WorkspaceLoginState({
-  type,
+  harness,
   reason,
   checking,
   onRecheck,
@@ -20,11 +20,11 @@ export function WorkspaceLoginState({
 }: WorkspaceLoginStateProps) {
   return (
     <HarnessLoginPanel
-      type={type}
+      harness={harness}
       onConnected={onConnected}
       connectedContent={
         <WorkspaceAccessState
-          name={harnessLabel[type]}
+          name={harnessLabel[harness]}
           reason={reason}
           checking={checking}
           onRecheck={onRecheck}

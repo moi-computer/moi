@@ -6,6 +6,9 @@ startup `status`, while compiled views carry `status: "compiled"`. `GET /views` 
 compiled views; unfinished ones come from the workspace state (`GET /state`), and the
 client merges the two. Native transcripts remain owned by each harness.
 
+In a remote workspace, unfinished views are the visitor's and compiled ones the owner's; see
+[Chat and agent](remote-workspaces.md#chat-and-agent).
+
 Chats belong to a workspace. A chat's `tabId` in the workspace state optionally attributes it to
 a view or Scratchpad. Completion changes neither attribution nor selection.
 The displayed chat is `pinnedSessionId ?? selectedSessionIdForTab ?? null`.

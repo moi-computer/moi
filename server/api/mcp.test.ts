@@ -28,8 +28,8 @@ test('workspace connector status dispatches through the selected harness', async
   claudeCodeHarness.mcpStatus = async () => [{ name: 'claude-only', status: 'connected' }]
   codexHarness.mcpStatus = async () => [{ name: 'codex-only', status: 'needs-auth' }]
 
-  const claude = await registerWorkspace(join(tempDir, 'claude'), { type: 'claude-code' })
-  const codex = await registerWorkspace(join(tempDir, 'codex'), { type: 'codex' })
+  const claude = await registerWorkspace(join(tempDir, 'claude'), { harness: 'claude-code' })
+  const codex = await registerWorkspace(join(tempDir, 'codex'), { harness: 'codex' })
 
   const claudeResponse = await api.request(`/api/workspaces/${claude.id}/mcp`)
   const codexResponse = await api.request(`/api/workspaces/${codex.id}/mcp`)
@@ -41,7 +41,7 @@ test('workspace connector status dispatches through the selected harness', async
 })
 
 test('workspace connector status is empty for a harness without MCP support', async () => {
-  const openclaw = await registerWorkspace(join(tempDir, 'openclaw'), { type: 'openclaw' })
+  const openclaw = await registerWorkspace(join(tempDir, 'openclaw'), { harness: 'openclaw' })
 
   const response = await api.request(`/api/workspaces/${openclaw.id}/mcp`)
 
@@ -65,7 +65,7 @@ test('streams connector progress before discovery completes', async () => {
       { name: 'second', status: 'connected' }
     ]
   }
-  const ws = await registerWorkspace(join(tempDir, 'stream'), { type: 'codex' })
+  const ws = await registerWorkspace(join(tempDir, 'stream'), { harness: 'codex' })
   const response = await api.request(`/api/workspaces/${ws.id}/mcp?stream=true`)
   const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader()
   try {

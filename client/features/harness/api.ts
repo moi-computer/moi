@@ -1,10 +1,10 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
-import type { HarnessStatuses, HarnessLogin, WorkspaceType } from '@/lib/types'
+import type { HarnessStatuses, HarnessLogin, HarnessType } from '@/lib/types'
 
-export function startHarnessLogin(type: WorkspaceType): Promise<HarnessLogin> {
+export function startHarnessLogin(harness: HarnessType): Promise<HarnessLogin> {
   return requestJson(
-    `/api/harnesses/${type}/auth/login`,
+    `/api/harnesses/${harness}/auth/login`,
     { method: 'POST' },
     'Could not start sign-in'
   )
@@ -49,18 +49,21 @@ export function useHarnessStatuses() {
   return useQuery(harnessStatusOptions)
 }
 
-export function useHarnessStatus(type: WorkspaceType | undefined) {
+export function useHarnessStatus(harness: HarnessType | undefined) {
   return useQuery({
     ...harnessStatusOptions,
-    enabled: type === 'claude-code' || type === 'codex',
-    select: statuses => (type ? statuses[type] : undefined)
+    enabled: harness === 'claude-code' || harness === 'codex',
+    select: statuses => (harness ? statuses[harness] : undefined)
   })
 }
 
-export function submitHarnessLoginCode(type: WorkspaceType, id: string, code: string) {
-  return requestVoid(`/api/harnesses/${type}/auth/login/${id}/code`, jsonRequest('POST', { code }))
+export function submitHarnessLoginCode(harness: HarnessType, id: string, code: string) {
+  return requestVoid(
+    `/api/harnesses/${harness}/auth/login/${id}/code`,
+    jsonRequest('POST', { code })
+  )
 }
 
-export function installHarness(type: LoginHarness) {
-  return requestVoid(`/api/harnesses/${type}/auth/install`, { method: 'POST' })
+export function installHarness(harness: LoginHarness) {
+  return requestVoid(`/api/harnesses/${harness}/auth/install`, { method: 'POST' })
 }

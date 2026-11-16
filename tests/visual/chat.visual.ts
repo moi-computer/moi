@@ -108,7 +108,7 @@ describe('Chat', () => {
           }
         },
         [`/api/workspaces/${WORKSPACE}/harness`]: {
-          provider: 'claude-code',
+          harness: 'claude-code',
           availability: { status: 'login-required', reason: 'Claude is signed out' },
           models: []
         }

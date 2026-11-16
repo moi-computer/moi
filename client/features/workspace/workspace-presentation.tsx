@@ -1,25 +1,21 @@
-import { workspaceProviderIcon } from '@/client/components/shared/workspace-icon'
-import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
+import { harnessIcon } from '@/client/components/shared/workspace-icon'
+import type { DiscoveredWorkspace, WorkspaceEntry, HarnessType } from '@/lib/types'
 
-import { harnessLabel as workspaceTypeLabel } from '@/client/features/harness/harness-presentation'
-export {
-  harnessLabel as workspaceTypeLabel,
-  harnessDescription as workspaceTypeDescription
-} from '@/client/features/harness/harness-presentation'
+import { harnessLabel } from '@/client/features/harness/harness-presentation'
 
 type WorkspaceAgentIconsProps = {
-  types: WorkspaceType[]
+  harnesses: HarnessType[]
 }
 
-export function WorkspaceAgentIcons({ types }: WorkspaceAgentIconsProps) {
-  const label = types.map(type => workspaceTypeLabel[type]).join(', ')
+export function WorkspaceAgentIcons({ harnesses }: WorkspaceAgentIconsProps) {
+  const label = harnesses.map(harness => harnessLabel[harness]).join(', ')
 
   return (
     <span role="img" aria-label={label} className="inline-flex shrink-0 items-center -space-x-0.5">
-      {types.map(type => (
+      {harnesses.map(harness => (
         <img
-          key={type}
-          src={workspaceProviderIcon[type]}
+          key={harness}
+          src={harnessIcon[harness]}
           alt=""
           className="size-4 shrink-0 rounded-full bg-muted ring-2 ring-muted"
         />
@@ -31,9 +27,9 @@ export function WorkspaceAgentIcons({ types }: WorkspaceAgentIconsProps) {
 type WorkspaceDisplaySource = WorkspaceEntry | DiscoveredWorkspace
 
 export function workspaceDisplayName(workspace: WorkspaceDisplaySource): string {
-  if ('types' in workspace) return workspace.path.split('/').pop() || workspace.path
+  if ('harnesses' in workspace) return workspace.path.split('/').pop() || workspace.path
   if (workspace.name) return workspace.name
-  if (workspace.type === 'openclaw') return workspace.agentId ?? 'OpenClaw agent'
-  if (workspace.type === 'hermes') return workspace.agentId ?? 'Hermes agent'
+  if (workspace.harness === 'openclaw') return workspace.agentId ?? 'OpenClaw agent'
+  if (workspace.harness === 'hermes') return workspace.agentId ?? 'Hermes agent'
   return workspace.path.split('/').pop() || workspace.path
 }

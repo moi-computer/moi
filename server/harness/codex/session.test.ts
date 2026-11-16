@@ -114,7 +114,7 @@ describe('Codex live session lifecycle', () => {
       const workspace = {
         id: f.input.workspaceId,
         path: f.input.workspacePath,
-        type: 'codex' as const
+        harness: 'codex' as const
       }
       expect((await store.getAvailability(workspace)).status).toBe('available')
       await f.send()

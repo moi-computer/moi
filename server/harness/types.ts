@@ -16,7 +16,7 @@ import type {
   SessionSummary,
   StreamEvent,
   WorkspaceEntry,
-  WorkspaceType
+  HarnessType
 } from '@/lib/types'
 
 // The superset of what any backend needs to accept a user message; harnesses
@@ -78,10 +78,10 @@ export type WorkspaceActivityPreview = {
 
 export type DiscoveredWorkspaceCandidate = {
   path: string
-  type: WorkspaceType
+  harness: HarnessType
 }
 
-export type HarnessWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'type' | 'agentId'>
+export type HarnessWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'harness' | 'agentId'>
 
 export type ActionModel = 'fast' | 'normal' | 'smart'
 
@@ -100,7 +100,7 @@ export type HarnessActionInput<TResult = unknown, TProgress = never> = {
 )
 
 export type Harness = {
-  id: WorkspaceType
+  id: HarnessType
   capabilities: HarnessCapabilities
 
   // Ephemeral read/search action without a workspace or visible chat.

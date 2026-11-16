@@ -38,7 +38,7 @@ test('cloud demo blocks creating a workspace', async () => {
   const response = await api.request('/api/workspaces/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'my-workspace', type: 'claude-code' })
+    body: JSON.stringify({ name: 'my-workspace', harness: 'claude-code' })
   })
 
   expect(response.status).toBe(403)
@@ -49,7 +49,7 @@ test('cloud demo blocks adding an existing folder', async () => {
   const response = await api.request('/api/workspaces', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: '/tmp/some-folder', type: 'claude-code' })
+    body: JSON.stringify({ path: '/tmp/some-folder', harness: 'claude-code' })
   })
 
   expect(response.status).toBe(403)

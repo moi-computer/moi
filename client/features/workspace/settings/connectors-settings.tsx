@@ -90,16 +90,16 @@ function ConnectorsState({ children }: ConnectorsStateProps) {
 }
 
 export function ConnectorsSettings() {
-  const { workspaceId, provider } = useWorkspaceLayoutCtx()
+  const { workspaceId, harness } = useWorkspaceLayoutCtx()
   const connectors = useWorkspaceMcp(workspaceId, true)
 
   return (
     <SettingsPage
       title="Connectors"
       description={
-        provider === 'codex'
+        harness === 'codex'
           ? 'Manage your connectors in the ChatGPT app'
-          : provider === 'claude-code'
+          : harness === 'claude-code'
             ? 'Manage your connectors in the Claude app'
             : 'Manage your connectors in your agent’s settings'
       }

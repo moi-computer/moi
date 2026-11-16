@@ -22,7 +22,9 @@ afterEach(async () => {
 })
 
 test('history retries without changing a fork cutoff', async () => {
-  const workspace = await registerWorkspace(join(directory, 'workspace'), { type: 'claude-code' })
+  const workspace = await registerWorkspace(join(directory, 'workspace'), {
+    harness: 'claude-code'
+  })
   const path = `/api/workspaces/${workspace.id}/sessions/child/events`
   const harness = harnessFor(workspace)
   const original = harness.sessionEvents
@@ -72,7 +74,9 @@ test('history retries without changing a fork cutoff', async () => {
 })
 
 test('changing chat settings keeps the chat’s tab and fork history', async () => {
-  const workspace = await registerWorkspace(join(directory, 'workspace'), { type: 'claude-code' })
+  const workspace = await registerWorkspace(join(directory, 'workspace'), {
+    harness: 'claude-code'
+  })
   const entry = {
     tabId: 'scratchpad' as const,
     fork: { fromSessionId: 'parent', throughMessageId: 'boundary' }

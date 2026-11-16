@@ -36,7 +36,8 @@ const workspaceCommands = {
   bundle: remoteWorkspaceCommand('bundle', bundle),
   check: remoteWorkspaceCommand('check', check),
   refresh,
-  views: remoteWorkspaceCommand('views', views),
+  // A view under construction belongs to the caller's chat, so these stay on local control.
+  views,
   'call-server-fn': remoteWorkspaceCommand('call-server-fn', callServerFn),
   debug: remoteWorkspaceCommand('debug', debug),
   theme: remoteWorkspaceCommand('theme', theme),

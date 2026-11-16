@@ -19,7 +19,7 @@ beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-state-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
   setWorkspaceStateRoot(join(tempDir, 'state'))
-  workspace = await registerWorkspace(join(tempDir, 'workspace'), { type: 'claude-code' })
+  workspace = await registerWorkspace(join(tempDir, 'workspace'), { harness: 'claude-code' })
   claudeCodeHarness.listSessions = async () => [
     { sessionId: 'existing', summary: 'Existing', lastModified: 1 }
   ]

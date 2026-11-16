@@ -7,7 +7,7 @@ import { loadWorkspaceFileConfig } from './layout'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessType } from '@/lib/types'
 import { workspaceIdFromName } from '@/lib/workspace-name'
 import { validateWorkspaceId } from '@/lib/ids'
 import { getWorkspace } from './registry'
@@ -41,8 +41,8 @@ export async function createWorkspaceDirectory(
 // (Claude Code: `.claude/skills/`; OpenClaw: `<workspace>/skills/`; Codex:
 // `.agents/skills/` per the Agent Skills standard). An untyped entry is
 // Claude Code.
-export function skillsDirFor(workspaceRoot: string, type?: WorkspaceType): string {
-  return harnessFor(type).skillsDir?.(workspaceRoot) ?? join(workspaceRoot, '.claude', 'skills')
+export function skillsDirFor(workspaceRoot: string, harness?: HarnessType): string {
+  return harnessFor(harness).skillsDir?.(workspaceRoot) ?? join(workspaceRoot, '.claude', 'skills')
 }
 
 export type ProvisionResult = {
@@ -60,12 +60,12 @@ export type ProvisionResult = {
 // Registration in the workspace registry is a separate, caller-owned step.
 export async function provisionWorkspace(
   workspaceRoot: string,
-  type?: WorkspaceType
+  harness?: HarnessType
 ): Promise<ProvisionResult> {
-  const skillsDir = skillsDirFor(workspaceRoot, type)
+  const skillsDir = skillsDirFor(workspaceRoot, harness)
   await mkdir(workspaceRoot, { recursive: true })
   const config = await loadWorkspaceFileConfig(workspaceRoot)
-  await installWorkspaceSkills(workspaceRoot, type)
+  await installWorkspaceSkills(workspaceRoot, harness)
   if (config.remote) return { skillsDir, scaffold: 'skipped' }
   const installLogPath = createDependencyInstallLogPath()
   const scaffold = await scaffoldMoiDir(workspaceRoot, undefined, undefined, installLogPath)

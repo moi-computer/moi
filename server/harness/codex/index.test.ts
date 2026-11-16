@@ -8,7 +8,12 @@ import { formatCodexStatusLines } from './status'
 test.each(['gpt-6.1-sol', undefined])(
   'Codex fork applies saved model %s at creation',
   async model => {
-    const ws: WorkspaceEntry = { id: 'workspace', path: '/workspace', type: 'codex', addedAt: '' }
+    const ws: WorkspaceEntry = {
+      id: 'workspace',
+      path: '/workspace',
+      harness: 'codex',
+      addedAt: ''
+    }
     const calls: { method: string; params?: Json }[] = []
     const client: clients.CodexClient = {
       workspacePath: ws.path,

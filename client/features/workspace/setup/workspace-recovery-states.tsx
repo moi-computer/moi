@@ -4,11 +4,11 @@ import { HttpError } from '@/client/api/http'
 import { useLocation } from 'wouter'
 import { IconFolderOff } from '@tabler/icons-react'
 
-import { workspaceProviderIcon } from '@/client/components/shared/workspace-icon'
+import { harnessIcon } from '@/client/components/shared/workspace-icon'
 import { Button } from '@/client/components/ui/button'
 import { Spinner } from '@/client/components/ui/spinner'
 import { useRemoveWorkspace } from '@/client/features/home/api'
-import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
+import type { HarnessAvailability, HarnessType } from '@/lib/types'
 
 type RecoveryRetryProps = {
   retrying: boolean
@@ -53,12 +53,12 @@ export function WorkspaceMissingState({ workspaceId }: WorkspaceMissingStateProp
 }
 
 type HarnessUnavailableStateProps = RecoveryRetryProps & {
-  type: WorkspaceType
+  harness: HarnessType
   availability: Exclude<HarnessAvailability, { status: 'available' }>
 }
 
 export function HarnessUnavailableState({
-  type,
+  harness,
   availability,
   ...retry
 }: HarnessUnavailableStateProps) {
@@ -66,7 +66,7 @@ export function HarnessUnavailableState({
   return (
     <RecoveryMessage
       title={needsTerminalLogin ? 'Connect your agent' : 'Your agent is unavailable'}
-      type={type}
+      harness={harness}
       {...retry}
     >
       {availability.reason}
@@ -108,14 +108,14 @@ export function WorkspaceOpenError({ error, retrying, onRetry }: WorkspaceOpenEr
 
 type RecoveryMessageProps = RecoveryRetryProps & {
   title: string
-  type?: WorkspaceType
+  harness?: HarnessType
   children?: ReactNode
   actionLabel?: string
 }
 
 export function RecoveryMessage({
   title,
-  type,
+  harness,
   children,
   retrying,
   onRetry,
@@ -124,7 +124,7 @@ export function RecoveryMessage({
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="flex w-full max-w-md flex-col gap-6">
-        {type && <img src={workspaceProviderIcon[type]} alt="" className="size-10 self-center" />}
+        {harness && <img src={harnessIcon[harness]} alt="" className="size-10 self-center" />}
         <h1 className="text-center text-xl font-medium">{title}</h1>
         <div role="alert" className="flex flex-col items-center gap-4">
           {children && (

@@ -459,7 +459,7 @@ export type WorkspaceSwitchMessage = {
   workspaceId: string
 }
 
-export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex' | 'hermes'
+export type HarnessType = 'claude-code' | 'openclaw' | 'codex' | 'hermes'
 
 export type WorkspaceSkillStatus = {
   name: string
@@ -477,11 +477,11 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
   error: string
 }
 
-export type HarnessInstallations = Record<WorkspaceType, boolean>
+export type HarnessInstallations = Record<HarnessType, boolean>
 
 // Shared runtime/account readiness and the current sign-in attempt.
 export type HarnessStatus = { availability: HarnessAvailability; login?: HarnessLoginState }
-export type HarnessStatuses = Record<WorkspaceType, HarnessStatus>
+export type HarnessStatuses = Record<HarnessType, HarnessStatus>
 
 export type HarnessAvailability =
   | { status: 'available' }
@@ -525,7 +525,8 @@ export type WorkspaceEntry = {
   id: string
   path: string
   addedAt: string
-  type?: WorkspaceType
+  // The agent backend that runs this workspace's chats.
+  harness?: HarnessType
   // Display name captured at add time (e.g. OpenClaw IDENTITY.md "Name:" or
   // basename). Persisted so we don't re-probe the gateway for each listing.
   // The list endpoint overrides this with the live layout `name` when set.
@@ -549,7 +550,7 @@ export type DiscoveredWorkspace = {
   path: string
   displayPath?: string
   // Deduplicated in canonical provider order; empty for folders without agent history.
-  types: WorkspaceType[]
+  harnesses: HarnessType[]
 }
 
 export type SessionRenamedMessage = {
@@ -638,10 +639,15 @@ export type WorkspaceLayout = {
 
 // GET /api/workspaces/:id returns either a complete local layout or a remote reference.
 type WorkspaceRouting = { apiBase: string; cwd: string }
-type WorkspaceMetadata = { name: string; provider?: WorkspaceType; agentId?: string }
+type WorkspaceMetadata = { name: string; harness?: HarnessType; agentId?: string }
 export type WorkspaceInfoResponse =
   | (WorkspaceLayout & WorkspaceRouting & WorkspaceMetadata & { isRemote: false })
-  | (WorkspaceRouting & { version: 2; isRemote: true; remote: RemoteWorkspaceTarget })
+  | (WorkspaceRouting &
+      Pick<WorkspaceMetadata, 'harness' | 'agentId'> & {
+        version: 2
+        isRemote: true
+        remote: RemoteWorkspaceTarget
+      })
 
 // The client resolves a remote reference before exposing a complete layout to consumers.
 export type WorkspaceLayoutResponse = WorkspaceLayout &
@@ -760,9 +766,8 @@ export type WorkspaceHarness = {
   /** Credential overrides require workspace readiness instead of shared account status. */
   hasAuthOverrides?: boolean
   isFolderMissing?: boolean
-  // The harness that produced this snapshot — matches the workspace
-  // provider.
-  provider: WorkspaceType
+  // The harness that produced this snapshot — matches the workspace's harness.
+  harness: HarnessType
   // Runtime presence and provider auth state, from the server-side cache.
   availability: HarnessAvailability
   models: Model[]

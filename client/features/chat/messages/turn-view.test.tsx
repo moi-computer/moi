@@ -14,10 +14,9 @@ test('renders Markdown in user message bubbles', () => {
           setLayout: () => {},
           name: null,
           cwd: null,
-          provider: 'codex',
+          harness: 'codex',
           workspaceId: 'test',
           apiBase: '/api/workspaces/test',
-          chatAvailable: true,
           isRemote: false,
           isLoading: false
         }}

@@ -50,14 +50,14 @@ const workspaces: WorkspaceEntry[] = [
     path: '/Users/mole/projects/northwind',
     displayPath: '~/projects/northwind',
     addedAt: '2026-05-01T09:00:00.000Z',
-    type: 'claude-code'
+    harness: 'claude-code'
   },
   {
     id: 'acme-store',
     path: '/Users/mole/projects/acme-store',
     displayPath: '~/projects/acme-store',
     addedAt: '2026-05-02T09:00:00.000Z',
-    type: 'claude-code'
+    harness: 'claude-code'
   }
 ]
 
@@ -68,11 +68,11 @@ const layout: WorkspaceLayoutResponse = {
   widgetGrid: [{ i: '_moi_views', x: 0, y: 0 }],
   name: WORKSPACE,
   cwd: DEV_CWD,
-  provider: 'claude-code'
+  harness: 'claude-code'
 }
 
 const harness: WorkspaceHarness = {
-  provider: 'claude-code',
+  harness: 'claude-code',
   availability: { status: 'available' },
   supportsStreaming: true,
   supportsArchiving: true,

@@ -11,7 +11,6 @@ export type SharedWorkspace = {
   name?: string
   icon?: WorkspaceEntry['icon']
   theme?: WorkspaceEntry['theme']
-  type?: WorkspaceEntry['type']
 }
 
 export function useSharedWorkspaces() {
@@ -31,7 +30,7 @@ export function useSharedWorkspaces() {
   })
 }
 
-export type HomeWorkspace = Pick<WorkspaceEntry, 'id' | 'icon' | 'theme' | 'type' | 'remote'> & {
+export type HomeWorkspace = Pick<WorkspaceEntry, 'id' | 'icon' | 'theme' | 'harness' | 'remote'> & {
   name: string
   href: string
   addedAt?: string
@@ -62,7 +61,6 @@ export function homeWorkspaces(
       name: share.name || share.id,
       icon: share.icon,
       theme: share.theme,
-      type: share.type,
       remote: { user_id: share.owner.id, workspace_id: share.id },
       ownerName: share.owner.name,
       href: `/workspace/${address}`

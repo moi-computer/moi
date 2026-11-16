@@ -14,7 +14,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessType } from '@/lib/types'
 
 import {
   BASE_DECLARATION_SOURCE_PATH,
@@ -39,10 +39,10 @@ afterEach(async () => {
 
 async function writeInstalledVersion(
   workspaceRoot: string,
-  type: WorkspaceType,
+  harness: HarnessType,
   version: string
 ): Promise<void> {
-  const skillDir = join(skillsDirFor(workspaceRoot, type), 'moi-workspace')
+  const skillDir = join(skillsDirFor(workspaceRoot, harness), 'moi-workspace')
   await mkdir(skillDir, { recursive: true })
   await Bun.write(join(skillDir, 'SKILL.md'), `<moi-skill version="${version}" />\n`)
 }
@@ -61,17 +61,17 @@ describe('workspace skill update service', () => {
     expect(summarizeSkillStatuses(skills)).toEqual({ skills, updateAvailable: true })
   })
 
-  for (const type of ['claude-code', 'codex', 'openclaw', 'hermes'] as const) {
-    test(`reads ${type} skills from the agent-specific directory`, async () => {
-      tempRoot = await mkdtemp(join(tmpdir(), `moi-skill-status-${type}-`))
-      await writeInstalledVersion(tempRoot, type, '0.7.1')
+  for (const harness of ['claude-code', 'codex', 'openclaw', 'hermes'] as const) {
+    test(`reads ${harness} skills from the agent-specific directory`, async () => {
+      tempRoot = await mkdtemp(join(tmpdir(), `moi-skill-status-${harness}-`))
+      await writeInstalledVersion(tempRoot, harness, '0.7.1')
 
-      const status = await getWorkspaceSkillsStatus(tempRoot, type)
+      const status = await getWorkspaceSkillsStatus(tempRoot, harness)
 
       expect(status.updateAvailable).toBe(true)
       expect(status.skills).toContainEqual({
         name: 'moi-workspace',
-        path: join(skillsDirFor(tempRoot, type), 'moi-workspace'),
+        path: join(skillsDirFor(tempRoot, harness), 'moi-workspace'),
         installed: '0.7.1',
         bundled: await readSkillVersion(join(bundledSkillDirectory('moi-workspace'), 'SKILL.md'))
       })
@@ -82,8 +82,8 @@ describe('workspace skill update service', () => {
     for (const stale of ['claude-code', 'codex'] as const) {
       test(`updates a stale ${stale} copy with ${primary ?? 'unregistered'} primary`, async () => {
         tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-copies-'))
-        for (const type of ['claude-code', 'codex'] as const) {
-          await installBundledSkills(skillsDirFor(tempRoot, type))
+        for (const harness of ['claude-code', 'codex'] as const) {
+          await installBundledSkills(skillsDirFor(tempRoot, harness))
         }
         await writeInstalledVersion(tempRoot, stale, '0.13.0')
         const stalePath = join(skillsDirFor(tempRoot, stale), 'moi-workspace')
@@ -230,21 +230,21 @@ describe('workspace skill update service', () => {
     )
   }
 
-  for (const type of ['openclaw', 'hermes'] as const) {
-    test(`updates ${type} primary plus existing Claude and Codex copies`, async () => {
+  for (const primary of ['openclaw', 'hermes'] as const) {
+    test(`updates ${primary} primary plus existing Claude and Codex copies`, async () => {
       tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-harnesses-'))
       const workspace = join(tempRoot, 'workspace')
-      for (const harness of [type, 'claude-code', 'codex'] as const) {
+      for (const harness of [primary, 'claude-code', 'codex'] as const) {
         await writeInstalledVersion(workspace, harness, '0.13.0')
         const path = join(skillsDirFor(workspace, harness), 'moi-workspace')
         await Bun.write(join(path, 'local.md'), 'keep')
         await Bun.write(join(path, 'references', 'COLLAB.md'), 'keep collab')
       }
       const primaryPath =
-        type === 'hermes'
+        primary === 'hermes'
           ? join(tempRoot, 'skills', 'moi-workspace')
           : join(workspace, 'skills', 'moi-workspace')
-      const result = await updateWorkspaceSkills(workspace, type)
+      const result = await updateWorkspaceSkills(workspace, primary)
       expect(result.status.skills).toHaveLength(3)
       expect(result.changedSkillPaths).toContain(primaryPath)
       expect(result.status.updateAvailable).toBe(false)

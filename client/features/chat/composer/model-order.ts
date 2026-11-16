@@ -1,4 +1,4 @@
-import type { SpeedMode, Model, WorkspaceType } from '@/lib/types'
+import type { SpeedMode, Model, HarnessType } from '@/lib/types'
 
 export const DEFAULT_EFFORT = 'high'
 
@@ -41,7 +41,7 @@ function compareAnthropicModels(a: Model, b: Model): number {
   return compareOptionalRanks(anthropicModelFamilyRank(a), anthropicModelFamilyRank(b))
 }
 
-const PROVIDER_MODEL_COMPARATORS: Partial<Record<WorkspaceType, ModelComparator>> = {
+const HARNESS_MODEL_COMPARATORS: Partial<Record<HarnessType, ModelComparator>> = {
   'claude-code': compareAnthropicModels
 }
 
@@ -88,8 +88,8 @@ export function resolveSpeedMode(
   return mode !== 'normal' && model.supportsFastMode ? 'fast' : 'normal'
 }
 
-export function sortModelsByProviderOrder(models: Model[], provider: WorkspaceType): Model[] {
-  const compare = PROVIDER_MODEL_COMPARATORS[provider]
+export function sortModelsByHarnessOrder(models: Model[], harness: HarnessType): Model[] {
+  const compare = HARNESS_MODEL_COMPARATORS[harness]
   return compare ? stableSortModels(models, compare) : models
 }
 

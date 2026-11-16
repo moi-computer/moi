@@ -15,7 +15,7 @@ export function AgentSetupStep({ onComplete }: AgentSetupStepProps) {
     if (harness) onComplete(harness)
   }, [harness, onComplete])
   if (!harness) return <ChooseAgent onSelect={setHarness} />
-  return <HarnessLoginPanel type={harness} onConnected={onConnected} />
+  return <HarnessLoginPanel harness={harness} onConnected={onConnected} />
 }
 
 type ChooseAgentProps = { onSelect: (harness: OnboardingHarness) => void }
@@ -26,12 +26,12 @@ function ChooseAgent({ onSelect }: ChooseAgentProps) {
   const retry = useRetryHarnessStatus()
   if (installed.isPending || installed.error)
     return <OnboardingStatus error={installed.error ?? undefined} onRetry={() => retry.mutate()} />
-  const options = (['claude-code', 'codex'] as const).map(type => ({
-    type,
-    description: harnessDescription[type],
-    disabled: !canInstall && installed.data[type].availability.status === 'unavailable',
+  const options = (['claude-code', 'codex'] as const).map(harness => ({
+    harness,
+    description: harnessDescription[harness],
+    disabled: !canInstall && installed.data[harness].availability.status === 'unavailable',
     disabledReason:
-      canInstall || installed.data[type].availability.status !== 'unavailable'
+      canInstall || installed.data[harness].availability.status !== 'unavailable'
         ? undefined
         : 'This agent is not installed on your computer'
   }))
@@ -48,8 +48,8 @@ function ChooseAgent({ onSelect }: ChooseAgentProps) {
         mode="action"
         cardClassName="h-36"
         disabled={false}
-        onTypeChange={type => {
-          if (type === 'claude-code' || type === 'codex') onSelect(type)
+        onHarnessChange={harness => {
+          if (harness === 'claude-code' || harness === 'codex') onSelect(harness)
         }}
       />
     </OnboardingScreen>

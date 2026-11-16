@@ -56,7 +56,7 @@ afterEach(async () => {
 })
 
 test('each archive stops its chat before archiving and requests can overlap', async () => {
-  const workspace = await registerWorkspace(join(tempDir, 'claude'), { type: 'claude-code' })
+  const workspace = await registerWorkspace(join(tempDir, 'claude'), { harness: 'claude-code' })
   const calls: string[] = []
   let releaseFirst: (() => void) | undefined
   const firstStopped = new Promise<void>(resolve => {
@@ -92,7 +92,7 @@ test('each archive stops its chat before archiving and requests can overlap', as
 })
 
 test('one archive failure does not block another chat', async () => {
-  const workspace = await registerWorkspace(join(tempDir, 'claude'), { type: 'claude-code' })
+  const workspace = await registerWorkspace(join(tempDir, 'claude'), { harness: 'claude-code' })
   claudeCodeHarness.interrupt = async () => {}
   claudeCodeHarness.archiveSession = async (_, sessionId) => {
     if (sessionId === 'failed') throw new Error('archive failed')
@@ -110,7 +110,7 @@ test('one archive failure does not block another chat', async () => {
 })
 
 test('archiving the selected session switches the workspace to New chat', async () => {
-  const workspace = await registerWorkspace(join(tempDir, 'claude'), { type: 'claude-code' })
+  const workspace = await registerWorkspace(join(tempDir, 'claude'), { harness: 'claude-code' })
   await saveSelectedSession(workspace, 'selected')
   claudeCodeHarness.interrupt = async () => {}
   claudeCodeHarness.archiveSession = async () => {}
@@ -125,9 +125,9 @@ test('archiving the selected session switches the workspace to New chat', async 
 })
 
 test('every provider supports archiving, openclaw via gateway patch', async () => {
-  const claude = await registerWorkspace(join(tempDir, 'claude'), { type: 'claude-code' })
-  const codex = await registerWorkspace(join(tempDir, 'codex'), { type: 'codex' })
-  const openclaw = await registerWorkspace(join(tempDir, 'openclaw'), { type: 'openclaw' })
+  const claude = await registerWorkspace(join(tempDir, 'claude'), { harness: 'claude-code' })
+  const codex = await registerWorkspace(join(tempDir, 'codex'), { harness: 'codex' })
+  const openclaw = await registerWorkspace(join(tempDir, 'openclaw'), { harness: 'openclaw' })
   claudeCodeHarness.listModels = async () => []
   codexHarness.listModels = async () => []
   claudeCodeHarness.availability = async () => ({ status: 'available' })
@@ -153,7 +153,7 @@ test('every provider supports archiving, openclaw via gateway patch', async () =
 // Hermes has no usable archive RPC — ACP's `session/delete` comes back
 // "Method not found" — so the route has to work off moi's own store.
 test('archiving a hermes chat records it in the acp store', async () => {
-  const hermes = await registerWorkspace(join(tempDir, 'hermes'), { type: 'hermes' })
+  const hermes = await registerWorkspace(join(tempDir, 'hermes'), { harness: 'hermes' })
   // The real interrupt would spawn an agent process; the route calls it first.
   hermesHarness.interrupt = async () => {}
 

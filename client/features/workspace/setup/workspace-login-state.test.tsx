@@ -15,7 +15,7 @@ beforeEach(() => {
 afterEach(() => cfg.mockRestore())
 
 function render(
-  type: LoginHarness,
+  harness: LoginHarness,
   environment: 'local' | 'cloud',
   data?: HarnessStatus,
   checking = false
@@ -26,11 +26,11 @@ function render(
     demoInstallUrl: ''
   })
   const client = new QueryClient()
-  if (data) client.setQueryData(['harness-status'], { [type]: data })
+  if (data) client.setQueryData(['harness-status'], { [harness]: data })
   const html = renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <WorkspaceLoginState
-        type={type}
+        harness={harness}
         reason="Workspace credentials need attention"
         checking={checking}
         onRecheck={() => {}}
@@ -157,9 +157,9 @@ test('cloud Codex shows Log in before a login attempt starts', () => {
 })
 
 test('starting login keeps the button until the browser link is ready', () => {
-  for (const type of ['claude-code', 'codex'] as const) {
+  for (const harness of ['claude-code', 'codex'] as const) {
     for (const environment of ['local', 'cloud'] as const) {
-      const html = render(type, environment, {
+      const html = render(harness, environment, {
         availability: signedOut,
         login: { state: 'starting' }
       })
@@ -211,7 +211,7 @@ test('local Claude switches to manual code entry only through the trouble action
       root.render(
         <QueryClientProvider client={client}>
           <WorkspaceLoginState
-            type="claude-code"
+            harness="claude-code"
             reason="Sign in"
             checking={false}
             onRecheck={() => {}}

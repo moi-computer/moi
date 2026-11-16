@@ -7,13 +7,9 @@ import openclawIcon from '@/client/assets/openclaw.svg'
 import { resolveIdentityIcon } from '@/client/lib/identity-icon-registry'
 import { cn } from '@/client/lib/cn'
 import { DEFAULT_PRIMARY_COLOR, deriveThemeColors, resolveThemeColorOverrides } from '@/lib/themes'
-import type {
-  WorkspaceIcon as WorkspaceIconValue,
-  WorkspaceLayout,
-  WorkspaceType
-} from '@/lib/types'
+import type { WorkspaceIcon as WorkspaceIconValue, WorkspaceLayout, HarnessType } from '@/lib/types'
 
-export const workspaceProviderIcon: Record<WorkspaceType, string> = {
+export const harnessIcon: Record<HarnessType, string> = {
   'claude-code': claudeIcon,
   openclaw: openclawIcon,
   codex: openaiIcon,
@@ -23,14 +19,14 @@ export const workspaceProviderIcon: Record<WorkspaceType, string> = {
 type WorkspaceIconProps = {
   className?: string
   icon?: WorkspaceIconValue
-  workspaceType?: WorkspaceType | null
+  harness?: HarnessType | null
   workspaceTheme?: WorkspaceLayout['theme']
 }
 
 function renderIconContent(
   icon: WorkspaceIconValue | undefined,
   themed: boolean,
-  providerIcon: string
+  fallbackIcon: string
 ) {
   switch (icon?.type) {
     case 'emoji':
@@ -59,21 +55,16 @@ function renderIconContent(
       // Fall through to the default provider icon.
     }
     default:
-      return <img src={providerIcon} alt="" className="size-[95%]" />
+      return <img src={fallbackIcon} alt="" className="size-[95%]" />
   }
 }
 
-export function WorkspaceIcon({
-  className,
-  icon,
-  workspaceType,
-  workspaceTheme
-}: WorkspaceIconProps) {
+export function WorkspaceIcon({ className, icon, harness, workspaceTheme }: WorkspaceIconProps) {
   const themed = icon?.type !== 'upload' && icon?.background === 'theme'
   const colors = themed
     ? (resolveThemeColorOverrides(workspaceTheme) ?? deriveThemeColors(DEFAULT_PRIMARY_COLOR))
     : undefined
-  const providerIcon = workspaceProviderIcon[workspaceType ?? 'claude-code']
+  const fallbackIcon = harnessIcon[harness ?? 'claude-code']
 
   return (
     <span
@@ -86,7 +77,7 @@ export function WorkspaceIcon({
         colors ? { backgroundColor: colors.primary, color: colors.primaryForeground } : undefined
       }
     >
-      {renderIconContent(icon, themed, providerIcon)}
+      {renderIconContent(icon, themed, fallbackIcon)}
     </span>
   )
 }

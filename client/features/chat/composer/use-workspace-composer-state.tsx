@@ -27,7 +27,7 @@ export function useWorkspaceComposerState(
   const workspace = useWorkspaceHarness(workspaceId)
   const harness = workspace.data
   const status = useHarnessStatus(
-    harness?.hasAuthOverrides || harness?.isFolderMissing ? undefined : harness?.provider
+    harness?.hasAuthOverrides || harness?.isFolderMissing ? undefined : harness?.harness
   )
   const readiness = status.isEnabled ? status : workspace
   const error = readiness.error ?? workspace.error

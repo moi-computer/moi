@@ -5,7 +5,7 @@ import type {
   HarnessAvailability,
   HarnessStatus,
   WidgetInfo,
-  WorkspaceType,
+  HarnessType,
   WorkspaceState
 } from '@/lib/types'
 
@@ -13,10 +13,10 @@ export type WorkspaceEvent =
   | { type: 'connection:opened' }
   | {
       type: 'harness-status:changed'
-      harness: WorkspaceType
+      harness: HarnessType
       status: HarnessStatus
     }
-  | { type: 'workspace-harness:switched'; workspaceId: string; harness: WorkspaceType }
+  | { type: 'workspace-harness:switched'; workspaceId: string; harness: HarnessType }
   | { type: 'widget:updated'; workspaceId?: string; name: string }
   | { type: 'widget-layout:updated'; workspaceId: string; widgets: WidgetInfo[] }
   // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`

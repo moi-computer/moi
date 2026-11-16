@@ -2,6 +2,8 @@ import { isIdentityIconId } from '@/lib/identity-icons'
 import { newViewId } from '@/lib/ids'
 import type { PendingView, WorkspaceEntry, WorkspaceState } from '@/lib/types'
 import { readWorkspaceState, updateWorkspaceState, type WorkspaceRef } from '../workspace-state'
+import { requestWorkspace } from '../workspaces/api'
+import { cloudRoutes } from '../remote/routes'
 import { archiveViewSessions } from './archive'
 
 export class PendingViewError extends Error {
@@ -105,6 +107,21 @@ export async function updatePendingView(
 export async function completeViewBuild(ws: WorkspaceRef, id: string) {
   await updateWorkspaceState(ws, state => {
     delete state.pendingViews[id]
+  })
+}
+
+// A remote view compiles on its owner, which cannot reach this Moi's state. The
+// visitor's CLI calls this after a build to clear the views the owner now lists.
+export async function completeRemoteViewBuilds(ws: WorkspaceEntry, request = requestWorkspace) {
+  if (!ws.remote) return
+  if (!Object.keys((await readWorkspaceState(ws)).pendingViews).length) return
+  const response = await request(cloudRoutes.compiledViews.path(ws.remote), { method: 'GET' })
+  if (!response.ok) throw new Error(`Could not list the owner's views (${response.status})`)
+  const { views } = (await response.json()) as { views: { id: string }[] }
+  const compiled = new Set(views.map(view => view.id))
+  await updateWorkspaceState(ws, state => {
+    for (const id of Object.keys(state.pendingViews))
+      if (compiled.has(id)) delete state.pendingViews[id]
   })
 }
 

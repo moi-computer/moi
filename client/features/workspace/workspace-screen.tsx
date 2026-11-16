@@ -12,11 +12,11 @@ type WorkspaceScreenProps = {
 }
 
 export function WorkspaceScreen({ contentPending, widgets, views }: WorkspaceScreenProps) {
-  const { layout, workspaceId, name, provider } = useWorkspaceLayoutCtx()
+  const { layout, workspaceId, name, harness } = useWorkspaceLayoutCtx()
   const { content, ready, setupRequired } = useWorkspaceSetup(workspaceId, contentPending, {
     name: name ?? 'Workspace',
     icon: layout.icon,
-    workspaceType: provider,
+    harness: harness,
     workspaceTheme: layout.theme
   })
 

@@ -118,8 +118,8 @@ export function GeneralSettings() {
 
 function WorkspaceHarnessSetting() {
   const { demo } = useAppConfig()
-  const { workspaceId, provider } = useWorkspaceLayoutCtx()
-  const type = provider ?? 'claude-code'
+  const { workspaceId, harness } = useWorkspaceLayoutCtx()
+  const current = harness ?? 'claude-code'
   const change = useChangeWorkspaceHarness(workspaceId)
   const active = useLive(state =>
     Object.entries(state.activity).some(
@@ -128,7 +128,7 @@ function WorkspaceHarnessSetting() {
   )
   const reason = demo
     ? 'Changing agents is unavailable in the demo'
-    : type === 'hermes' || type === 'openclaw'
+    : current === 'hermes' || current === 'openclaw'
       ? 'This workspace belongs to its agent and cannot use another agent'
       : active
         ? 'Wait for the agent to finish before changing it'
@@ -147,13 +147,13 @@ function WorkspaceHarnessSetting() {
                   disabled={Boolean(reason) || change.isPending}
                   aria-label="Agent"
                 >
-                  <img src={harnessIcon[type]} alt="" className="size-4 shrink-0" />
-                  {harnessLabel[type]}
+                  <img src={harnessIcon[current]} alt="" className="size-4 shrink-0" />
+                  {harnessLabel[current]}
                   <IconChevronDown stroke={1.5} />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-44">
                   <DropdownMenuRadioGroup
-                    value={type}
+                    value={current}
                     onValueChange={value => change.mutate(value)}
                   >
                     {(['claude-code', 'codex'] as const).map(option => (
