@@ -98,7 +98,6 @@ window.moi.workspaceMembers.setAll([{ id: address, members, invitations }])
 window.moi.workspaceMembers.set(address, { members, invitations })
 window.moi.workspaceMembers.remove(address)
 window.moi.workspaceMembers.clear()
-window.moi.workspaceMembers.sharedWorkspaces // true: shared workspaces belong in setAll()
 ```
 
 A workspace is named by its address: `workspaceId` on the account's own machine, and `ownerId:workspaceId` for a workspace someone shared with the account.
