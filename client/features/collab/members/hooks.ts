@@ -89,9 +89,8 @@ export function useMembershipAction(workspaceId: string) {
     // The optimistic overlay ends here, so keep its result until the host's next snapshot.
     onSuccess: (_response, action) => {
       if (accountGeneration !== getAccountGeneration()) return
-      updateWorkspaceMembers(
-        workspaceId,
-        current => applyPendingMembership(current, [{ id: Date.now(), action }])!
+      updateWorkspaceMembers(workspaceId, current =>
+        applyPendingMembership(current, [{ id: Date.now(), action }])
       )
     }
   })

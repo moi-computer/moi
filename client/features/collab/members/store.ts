@@ -1,4 +1,4 @@
-import { memberKeys } from './keys'
+import { replaceEqualDeep } from '@tanstack/react-query'
 import { queryClient } from '@/client/api/query-client'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { getWorkspaceAddress } from '@/client/features/workspace/remote'
@@ -10,36 +10,42 @@ import type { UserProfile } from '@/lib/collab/types'
 import { parseWorkspaceMembers, validWorkspaceAddress } from './types'
 import type { WorkspaceMembers, WorkspaceMembersSnapshot } from './types'
 
-// The cloud host publishes every member list; Moi never fetches one. Lists stay
-// until replaced or cleared, including for workspaces with no mounted observer.
-queryClient.setQueryDefaults(memberKeys.all, { gcTime: Infinity })
+// The cloud host publishes every member list; Moi never fetches one. Lists are
+// keyed by workspace address: `workspaceId` on the account's own machine,
+// `ownerId:workspaceId` for a workspace someone shared with it.
+type Published = {
+  accountGeneration: number
+  lists: Map<string, WorkspaceMembers>
+  // The host has sent a full snapshot, so a missing list has a meaning.
+  complete: boolean
+}
+let published: Published | undefined
+// Lists belong to one account; a switch starts over.
+function current(): Published {
+  const accountGeneration = getAccountGeneration()
+  if (published?.accountGeneration !== accountGeneration)
+    published = { accountGeneration, lists: new Map(), complete: false }
+  return published
+}
 
 // Revisions track membership writes so older cloud snapshots cannot replace them.
 let membersRevision = 0
-let membersLoadedForAccountGeneration: number | undefined
-const collectionListeners = new Set<() => void>()
+const listeners = new Set<() => void>()
+function changed() {
+  membersRevision++
+  listeners.forEach(listener => listener())
+}
+export const getWorkspaceMembersRevision = () => membersRevision
+
 const ownerSnapshots = new WeakMap<Identity, WorkspaceMembers>()
 const NO_ACCESS: WorkspaceMembers = { members: [], invitations: [] }
-queryClient.getQueryCache().subscribe(event => {
-  if (event.query.queryKey[0] !== memberKeys.all[0]) return
-  if (event.type === 'removed' || (event.type === 'updated' && event.action.type === 'success')) {
-    membersRevision++
-  }
-})
-export const getWorkspaceMembersRevision = () => membersRevision
 const directoryCache = new WeakMap<WorkspaceMembers, readonly UserProfile[]>()
-
-// Lists are keyed by workspace address: `workspaceId` on the account's own
-// machine, `ownerId:workspaceId` for a workspace someone shared with it.
-const accountKey = () => {
-  const identity = getIdentity()
-  return identity ? identityKey(identity) : undefined
-}
-const addressKey = (address: string) => memberKeys.workspace(accountKey(), address)
 
 // No sharing record means owner-only on the account's own machine, and no
 // access to someone else's. Unknown until the host has published its first snapshot.
-function ownerOnlyWorkspaceMembers(): WorkspaceMembers | undefined {
+function unlistedWorkspaceMembers(address: string): WorkspaceMembers | undefined {
+  if (!current().complete) return undefined
+  if (address.includes(':')) return NO_ACCESS
   const owner = getIdentity()
   if (owner?.type !== 'user' || owner.isAnonymous) return undefined
   let snapshot = ownerSnapshots.get(owner)
@@ -49,86 +55,67 @@ function ownerOnlyWorkspaceMembers(): WorkspaceMembers | undefined {
   }
   return snapshot
 }
-function unlistedWorkspaceMembers(address: string): WorkspaceMembers | undefined {
-  if (membersLoadedForAccountGeneration !== getAccountGeneration()) return undefined
-  return address.includes(':') ? NO_ACCESS : ownerOnlyWorkspaceMembers()
+// An unchanged list keeps its identity, so a repeated snapshot re-renders nothing.
+function store(address: string, data: WorkspaceMembers) {
+  const { lists } = current()
+  lists.set(address, replaceEqualDeep(lists.get(address), data))
 }
 export function setWorkspaceMembers(address: string, value: WorkspaceMembers): void {
-  queryClient.setQueryData(addressKey(validWorkspaceAddress(address)), parseWorkspaceMembers(value))
+  store(validWorkspaceAddress(address), parseWorkspaceMembers(value))
+  changed()
 }
 export function setAllWorkspaceMembers(value: WorkspaceMembersSnapshot[]): void {
   if (!Array.isArray(value)) throw new Error('Invalid workspace members')
-  const snapshots = value.map(workspace => ({
-    address: validWorkspaceAddress(workspace.id),
-    data: parseWorkspaceMembers(workspace)
-  }))
-  const addresses = new Set(snapshots.map(workspace => workspace.address))
+  const snapshots = value.map(
+    workspace => [validWorkspaceAddress(workspace.id), parseWorkspaceMembers(workspace)] as const
+  )
+  const addresses = new Set(snapshots.map(([address]) => address))
   if (addresses.size !== snapshots.length) throw new Error('Duplicate workspace id')
-  membersLoadedForAccountGeneration = getAccountGeneration()
-  for (const query of queryClient
-    .getQueryCache()
-    .findAll({ queryKey: memberKeys.account(accountKey()) })) {
-    if (!addresses.has(query.queryKey[2] as string)) forgetWorkspaceMembers(query.queryKey)
-  }
-  for (const workspace of snapshots)
-    queryClient.setQueryData(addressKey(workspace.address), workspace.data)
-  membersRevision++
-  collectionListeners.forEach(listener => listener())
+  const { lists } = current()
+  for (const address of lists.keys()) if (!addresses.has(address)) lists.delete(address)
+  for (const [address, data] of snapshots) store(address, data)
+  current().complete = true
+  changed()
 }
 export function removeWorkspaceMembers(address: string) {
-  forgetWorkspaceMembers(addressKey(validWorkspaceAddress(address)))
+  current().lists.delete(validWorkspaceAddress(address))
+  changed()
 }
 export function clearWorkspaceMembers() {
-  for (const query of queryClient.getQueryCache().findAll({ queryKey: memberKeys.all }))
-    forgetWorkspaceMembers(query.queryKey)
-}
-function forgetWorkspaceMembers(queryKey: readonly unknown[]) {
-  // Removing an observed query leaves its current UI snapshot intact. Publish
-  // the replacement so mounted views and the presence engine update together.
-  queryClient.setQueryData<WorkspaceMembers>(
-    queryKey,
-    unlistedWorkspaceMembers(queryKey[2] as string) ?? NO_ACCESS
-  )
+  current().lists.clear()
+  changed()
 }
 
 // A confirmed change shows at once; the host's next snapshot replaces it.
 export function updateWorkspaceMembers(
   workspaceId: string,
-  update: (current: WorkspaceMembers) => WorkspaceMembers
+  update: (current: WorkspaceMembers) => WorkspaceMembers | undefined
 ): void {
   const address = getWorkspaceAddress(workspaceId)
-  queryClient.setQueryData<WorkspaceMembers>(addressKey(address), stored => {
-    const current = stored ?? unlistedWorkspaceMembers(address)
-    return current && update(current)
-  })
+  const before = current().lists.get(address) ?? unlistedWorkspaceMembers(address)
+  const after = before && update(before)
+  if (!after) return
+  store(address, after)
+  changed()
 }
 // A saved profile reaches the member lists it appears in before the host's event does.
 export function refreshMemberProfile(identity: Identity): void {
   const key = identityKey(identity)
-  for (const query of queryClient
-    .getQueryCache()
-    .findAll({ queryKey: memberKeys.account(accountKey()) })) {
-    queryClient.setQueryData<WorkspaceMembers>(
-      query.queryKey,
-      current =>
-        current && {
-          ...current,
-          members: current.members.map(member =>
-            identityKey(member) === key
-              ? { ...identity, ...(member.membershipId && { membershipId: member.membershipId }) }
-              : member
-          )
-        }
-    )
-  }
+  for (const [address, list] of current().lists)
+    store(address, {
+      ...list,
+      members: list.members.map(member =>
+        identityKey(member) === key
+          ? { ...identity, ...(member.membershipId && { membershipId: member.membershipId }) }
+          : member
+      )
+    })
+  changed()
 }
 // What the host last published for this workspace; undefined until it has published anything.
 export function getWorkspaceMembers(workspaceId: string): WorkspaceMembers | undefined {
   const address = getWorkspaceAddress(workspaceId)
-  return (
-    queryClient.getQueryData<WorkspaceMembers>(addressKey(address)) ??
-    unlistedWorkspaceMembers(address)
-  )
+  return current().lists.get(address) ?? unlistedWorkspaceMembers(address)
 }
 export function getWorkspaceDirectory(workspaceId: string): readonly UserProfile[] | undefined {
   const data = getWorkspaceMembers(workspaceId)
@@ -148,15 +135,14 @@ export function getWorkspaceDirectory(workspaceId: string): readonly UserProfile
   return profiles
 }
 export function subscribeWorkspaceDirectory(listener: () => void) {
-  collectionListeners.add(listener)
+  listeners.add(listener)
+  // Workspace info decides which address a workspace's list is published under.
   const unsubscribe = queryClient.getQueryCache().subscribe(event => {
     const [scope, kind] = event.query.queryKey
-    // Workspace info decides which address a workspace's list is published under.
-    if (scope === memberKeys.all[0] || (scope === workspaceKeys.all[0] && kind === 'layout'))
-      listener()
+    if (scope === workspaceKeys.all[0] && kind === 'layout') listener()
   })
   return () => {
-    collectionListeners.delete(listener)
+    listeners.delete(listener)
     unsubscribe()
   }
 }

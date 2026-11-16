@@ -1,5 +1,3 @@
-import { queryClient } from '@/client/api/query-client'
-import { memberKeys } from '../collab/members/keys'
 import { identityKey, parseIdentity } from './types'
 import type { Identity } from './types'
 
@@ -21,10 +19,7 @@ export function subscribeIdentity(listener: () => void) {
 export function setIdentity(value: Identity | null): void {
   const next = value === null ? null : parseIdentity(value)
   const changedAccount = (current && identityKey(current)) !== (next && identityKey(next))
-  if (changedAccount) {
-    accountGeneration++
-    queryClient.removeQueries({ queryKey: memberKeys.all })
-  }
+  if (changedAccount) accountGeneration++
   identityRevision++
   current = next
   listeners.forEach(listener => listener())

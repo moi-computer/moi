@@ -80,7 +80,7 @@ Test artwork: [Croodles](https://www.dicebear.com/styles/croodles/) by [Vijay Ve
 Moi keeps two separate things in the browser:
 
 - **Identity store:** who is using this tab.
-- **Workspace members cache:** members and pending invitations for each workspace, published by the cloud and held in the React Query cache. Moi never requests a member list.
+- **Workspace members store:** members and pending invitations for each workspace, published by the cloud and held in a plain in-memory store. Moi never requests a member list.
 
 Both live in memory. They are not saved to localStorage, SQLite, or workspace files. The cloud supplies fresh data after a reload.
 
@@ -137,7 +137,7 @@ action.mutate({ type: 'remove', membershipId })
 action.mutate({ type: 'revoke', invitationId })
 ```
 
-`useWorkspaceMembers` reads what the cloud last published and is pending until the first `setAll()`. Actions call the cloud URLs above. Moi shows pending changes immediately and undoes them if the request fails. A confirmed change is written into the cache at once, and the cloud's next snapshot replaces it. Switching accounts clears the previous account's data. The cloud checks permission for every action.
+`useWorkspaceMembers` reads what the cloud last published and is pending until the first `setAll()`. Actions call the cloud URLs above. Moi shows pending changes immediately and undoes them if the request fails. A confirmed change is written into the store at once, and the cloud's next snapshot replaces it. Switching accounts clears the previous account's data. The cloud checks permission for every action.
 
 ### Collaboration
 
