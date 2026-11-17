@@ -1,4 +1,4 @@
-import '../api/index'
+import { api } from '../api/index'
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 import { mkdtemp, readlink, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import * as executable from '../harness/executable'
 import { claudeCodeHarness } from '../harness/claude-code'
 import { changeWorkspaceHarness } from './change-harness'
-import { reserveWorkspaceOperation } from './harness-transition'
+import { reserveWorkspaceOperation, withHarnessTransition } from './harness-transition'
 import {
   DEFAULT_REGISTRY_PATH,
   getWorkspace,
@@ -167,3 +167,37 @@ for (const harness of ['claude-code', 'codex'] as const) {
     )
   })
 }
+
+test('the harness route uses its own lock and still refuses an active operation', async () => {
+  const ws = await registerWorkspace(root, { harness: 'claude-code' })
+  const change = () =>
+    api.request(`/api/workspaces/${ws.id}/harness`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ harness: 'codex' })
+    })
+  const release = reserveWorkspaceOperation(ws.id)
+  try {
+    expect((await change()).status).toBe(409)
+  } finally {
+    release()
+  }
+  expect((await change()).status).toBe(200)
+  expect((await getWorkspace(ws.id))?.harness).toBe('codex')
+})
+
+test('a view named harness cannot bypass the operation lock', async () => {
+  const ws = await registerWorkspace(root, { harness: 'claude-code' })
+  await updateWorkspaceState(ws, state => {
+    state.pendingViews.harness = { status: 'draft', requirements: '' }
+  })
+  await withHarnessTransition(ws, async () => {
+    const response = await api.request(`/api/workspaces/${ws.id}/views/harness`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Changed' })
+    })
+    expect(response.status).toBe(409)
+  })
+  expect((await readWorkspaceState(ws)).pendingViews.harness?.title).toBeUndefined()
+})

@@ -117,7 +117,7 @@ import {
   updateInProgress
 } from '../update'
 
-// The resolved workspace is stashed on the context by `withWorkspace`, so every
+// The resolved workspace is stashed on the context by the workspace middleware, so every
 // `/api/workspaces/:id/*` handler can read it without re-querying the registry.
 type ApiEnv = { Variables: { ws: WorkspaceEntry } }
 
@@ -165,53 +165,42 @@ async function handleFunctionCall(
   }
 }
 
-// Routes that describe the person using a workspace, not the workspace itself:
-// their chats, their agent and what that agent runs with. A visitor's Moi answers
-// them from its own folder; an owner never serves them to visitors.
-const PERSONAL_ROUTE_RE = /^\/(?:sessions|state|harness|skills|env|mcp|uploads|preview)(?:\/|$)/
-// A view being built belongs to the chat building it, so its lifecycle is
-// personal too. Compiled views stay with the owner.
-const PENDING_VIEW_ROUTE_RE = /^\/views(?:\/[^/]+(?:\/submit)?)?$/
+// Resolve the workspace and enforce the route's storage boundary. Personal
+// routes use this Moi's chats, agent and pending views, including for a remote
+// reference. Shared content must be requested at the owner's workspace address.
+function workspaceAccess(
+  scope: 'personal' | 'owner',
+  { reserveOperation = true }: { reserveOperation?: boolean } = {}
+) {
+  return createMiddleware<ApiEnv>(async (c, next) => {
+    const id = c.req.param('id')
+    if (!id) return c.text('Workspace not found', 404)
+    let release: (() => void) | undefined
+    try {
+      if (reserveOperation && c.req.method !== 'GET') release = reserveWorkspaceOperation(id)
+      const ws = await getWorkspace(id)
+      if (!ws) return c.text('Workspace not found', 404)
+      if (ws.remote && getAppConfig().environment !== 'cloud')
+        return c.text('Remote workspaces require Cloud mode', 403)
+      if (ws.remote && scope === 'owner') return c.text('Use the owner workspace address', 404)
+      c.set('ws', ws)
+      await next()
+    } catch (error) {
+      if (error instanceof HarnessTransitionError) return c.text(error.message, 409)
+      throw error
+    } finally {
+      release?.()
+    }
+  })
+}
 
-// Resolve `:id` to a registered workspace once, 404 if unknown, and stash it on
-// the context. Mounted on the single-workspace sub-app so every nested route
-// shares the lookup instead of repeating `getWorkspace(...) ?? 404`.
-const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
-  const id = c.req.param('id')
-  if (!id) return c.text('Workspace not found', 404)
-  let release: (() => void) | undefined
-  try {
-    if (c.req.method !== 'GET' && !c.req.path.endsWith('/harness'))
-      release = reserveWorkspaceOperation(id)
-    const ws = await getWorkspace(id)
-    if (!ws) return c.text('Workspace not found', 404)
-    const suffix = (c.req.path.split(`/workspaces/${encodeURIComponent(id)}`)[1] ?? '').replace(
-      /\/$/,
-      ''
-    )
-    const personal =
-      PERSONAL_ROUTE_RE.test(suffix) ||
-      (c.req.method !== 'GET' && PENDING_VIEW_ROUTE_RE.test(suffix))
-    if (ws.remote && suffix === '' && c.req.method === 'DELETE')
-      return c.text('Leaving remote workspaces is not available yet', 403)
-    if (ws.remote && getAppConfig().environment !== 'cloud')
-      return c.text('Remote workspaces require Cloud mode', 403)
-    if (ws.remote && suffix !== '' && !personal)
-      return c.text('Use the owner workspace address', 404)
-    c.set('ws', ws)
-    await next()
-  } catch (error) {
-    if (error instanceof HarnessTransitionError) return c.text(error.message, 409)
-    throw error
-  } finally {
-    release?.()
-  }
-})
+const personalWorkspace = workspaceAccess('personal')
+const ownerWorkspace = workspaceAccess('owner')
 
 // ---- single workspace: /api/workspaces/:id/* --------------------------------
 const one = new Hono<ApiEnv>()
-one.use('*', withWorkspace)
-one.patch('/harness', async c => {
+// Switching agents takes its own exclusive lock.
+one.patch('/harness', workspaceAccess('personal', { reserveOperation: false }), async c => {
   if (getAppConfig().demo) return c.text('Changing agents is unavailable in the demo', 403)
   const body = await c.req.json().catch(() => null)
   if (!body || !['claude-code', 'codex'].includes(body.harness))
@@ -224,13 +213,13 @@ one.patch('/harness', async c => {
   }
 })
 
-one.get('/widgets', c => listWidgets(c.get('ws').path))
+one.get('/widgets', ownerWorkspace, c => listWidgets(c.get('ws').path))
 
 // Widget bundle: the compiled ESM for one widget, dynamically imported by the
 // client (useWidget). Sits beside the GET .../widgets list above — the exact
 // path lists, `/*` serves a file from the bundle dir (`<name>/<file>`:
 // index.js, a chunk, or a hashed asset).
-one.get('/widgets/*', c => {
+one.get('/widgets/*', ownerWorkspace, c => {
   const ws = c.get('ws')
   const { name, file } = parseAppletTail(c.req.url, ws.id, 'widgets')
   if (!name) return c.text('Not found', 404)
@@ -239,7 +228,7 @@ one.get('/widgets/*', c => {
 
 // Views — full-screen agent apps. Mirrors the widget pair above: the exact path
 // lists (in manifest/nav order), `/*` serves one bundle file.
-one.get('/views', async c =>
+one.get('/views', ownerWorkspace, async c =>
   c.req.query('includePending') === 'true'
     ? c.json({ views: await getWorkspaceViews(c.get('ws')) })
     : listViews(c.get('ws').path)
@@ -247,7 +236,8 @@ one.get('/views', async c =>
 
 const OWNER_VIEW = 'Use the owner workspace address for compiled views'
 
-one.patch('/views/:viewId', async c => {
+// Pending views are personal; these handlers also accept compiled views on the owner.
+one.patch('/views/:viewId', personalWorkspace, async c => {
   const ws = c.get('ws')
   const body = await c.req.json().catch(() => null)
   if (await getPendingView(ws, c.req.param('viewId'))) {
@@ -283,7 +273,7 @@ one.patch('/views/:viewId', async c => {
   }
 })
 
-one.delete('/views/:viewId', async c => {
+one.delete('/views/:viewId', personalWorkspace, async c => {
   const ws = c.get('ws')
   try {
     const viewId = c.req.param('viewId')
@@ -305,19 +295,19 @@ one.delete('/views/:viewId', async c => {
   }
 })
 
-one.get('/views/*', c => {
+one.get('/views/*', ownerWorkspace, c => {
   const ws = c.get('ws')
   const { name, file } = parseAppletTail(c.req.url, ws.id, 'views')
   if (!name) return c.text('Not found', 404)
   return serveView(name, file, ws.path, workspaceApiBase(ws.id), c.req.header('if-none-match'))
 })
 
-one.post('/views', async c => {
+one.post('/views', personalWorkspace, async c => {
   const ws = c.get('ws')
   return c.json(await createPendingView(ws), 201)
 })
 
-one.post('/views/:viewId/submit', async c => {
+one.post('/views/:viewId/submit', personalWorkspace, async c => {
   const ws = c.get('ws')
   const body = await c.req.json<{
     requirements?: string
@@ -356,7 +346,7 @@ one.post('/views/:viewId/submit', async c => {
       speedMode: isSpeedMode(body.speedMode) ? body.speedMode : undefined,
       stream: body.stream === true ? true : undefined
     })
-    return c.json(result)
+    return c.json({ ...result, state: await getWorkspaceState(ws) })
   } catch (err) {
     if (err instanceof PendingViewError) return c.text(err.message, err.status)
     if (err instanceof ViewStartupError)
@@ -370,7 +360,7 @@ one.post('/views/:viewId/submit', async c => {
 // dotfiles (`.env`, `.moi`, `.git`) are rejected and only media/asset extensions
 // are allowed — the workspace holds secrets, and this route is unauthenticated.
 // localhost binding is NOT the guard.
-one.get('/files/*', c => {
+one.get('/files/*', ownerWorkspace, c => {
   const ws = c.get('ws')
   const tail = new URL(c.req.url).pathname.split(`${workspaceApiBase(ws.id)}/files/`)[1] ?? ''
   return serveWorkspaceFile(ws.path, tail, c.req.header('range'), c.req.header('if-none-match'))
@@ -379,7 +369,7 @@ one.get('/files/*', c => {
 // Applet RPC — the home for server-function calls from a bundle. The bundle's
 // sentinel base resolves to `/api/workspaces/<id>`, so it POSTs to
 // `…/rpc/<module>/<fn>`.
-one.post('/rpc/*', c => {
+one.post('/rpc/*', ownerWorkspace, c => {
   const ws = c.get('ws')
   const tail = new URL(c.req.url).pathname.split(`${workspaceApiBase(ws.id)}/rpc/`)[1] ?? ''
   return handleFunctionCall(c.req.raw, tail, ws.path)
@@ -392,7 +382,7 @@ one.post('/rpc/*', c => {
 // sources (`build`/`rpc` are server-recorded and can't be spoofed by a tab),
 // pattern-check the applet name, cap the batch size; applets/log.ts caps string
 // lengths.
-one.post('/applet-log', async c => {
+one.post('/applet-log', ownerWorkspace, async c => {
   let body: { events?: unknown }
   try {
     body = await c.req.json()
@@ -435,7 +425,7 @@ one.post('/applet-log', async c => {
 // Downscaled image preview of a workspace file. The chat's expanded tool rows
 // use this to show the picture an agent `Read` — same guards as /files/ above,
 // images only, resized server-side (see server/workspaces/preview.ts).
-one.get('/preview/*', c => {
+one.get('/preview/*', personalWorkspace, c => {
   const ws = c.get('ws')
   const tail = new URL(c.req.url).pathname.split(`${workspaceApiBase(ws.id)}/preview/`)[1] ?? ''
   return serveWorkspaceImagePreview(ws.path, tail, c.req.header('if-none-match'))
@@ -446,7 +436,7 @@ one.get('/preview/*', c => {
 // upload ids the chat WS frame references. Images are downscaled and inlined as
 // vision blocks at send time; other files are referenced by a temp path. See
 // server/uploads.ts and dev/file-uploads.md.
-one.post('/uploads', async c => {
+one.post('/uploads', personalWorkspace, async c => {
   const ws = c.get('ws')
   let form: FormData
   try {
@@ -481,7 +471,7 @@ one.post('/uploads', async c => {
 })
 
 // Existing workspace documents enter the same upload pipeline without a browser round trip.
-one.post('/uploads/from-path', async c => {
+one.post('/uploads/from-path', personalWorkspace, async c => {
   const body: unknown = await c.req.json().catch(() => null)
   if (!body || typeof body !== 'object' || !('path' in body) || typeof body.path !== 'string') {
     return c.text('Choose a file from this workspace', 400)
@@ -507,7 +497,7 @@ one.post('/uploads/from-path', async c => {
 // base64 data URL so the transcript broadcast / client cache stay small. The id
 // is content-addressed (sha256), so the response is immutable while it lives —
 // let the browser cache it for the store's TTL.
-one.get('/uploads/:uploadId', c => {
+one.get('/uploads/:uploadId', personalWorkspace, c => {
   const u = getUpload(c.get('ws').id, c.req.param('uploadId'))
   if (!u) return c.text('Not found or expired', 404)
   const body = u.data ? new Uint8Array(u.data) : u.path ? Bun.file(u.path) : null
@@ -524,15 +514,15 @@ one.get('/uploads/:uploadId', c => {
 // Per-user chat state: pin, the chat each tab shows, per-chat settings and
 // fork history, and views being built. Every write below answers with the new
 // state; other clients get it as `state:changed`.
-one.get('/state', async c => c.json(await getWorkspaceState(c.get('ws'))))
+one.get('/state', personalWorkspace, async c => c.json(await getWorkspaceState(c.get('ws'))))
 
 // The agent's chats. Tab ownership and settings come from `/state`.
-one.get('/sessions', async c => {
+one.get('/sessions', personalWorkspace, async c => {
   const ws = c.get('ws')
   return c.json(await harnessFor(ws).listSessions(ws))
 })
 
-one.put('/sessions/:sessionId/pin', async c => {
+one.put('/sessions/:sessionId/pin', personalWorkspace, async c => {
   const ws = c.get('ws')
   const sessionId = c.req.param('sessionId')
   const harness = harnessFor(ws)
@@ -545,7 +535,7 @@ one.put('/sessions/:sessionId/pin', async c => {
   return c.json(await getWorkspaceState(ws))
 })
 
-one.delete('/sessions/:sessionId/pin', async c => {
+one.delete('/sessions/:sessionId/pin', personalWorkspace, async c => {
   const ws = c.get('ws')
   await unpinSession(ws, c.req.param('sessionId'))
   return c.json(await getWorkspaceState(ws))
@@ -553,7 +543,7 @@ one.delete('/sessions/:sessionId/pin', async c => {
 
 // Show the chat in a tab. `ifMatch` (a chat id, or null for none) applies the
 // change only while the tab still shows that chat.
-one.put('/sessions/:sessionId/selection', async c => {
+one.put('/sessions/:sessionId/selection', personalWorkspace, async c => {
   const ws = c.get('ws')
   const body: unknown = await c.req.json().catch(() => null)
   if (!body || typeof body !== 'object') return c.text('Bad request', 400)
@@ -574,7 +564,7 @@ one.put('/sessions/:sessionId/selection', async c => {
 
 // Stop showing the chat in a tab, which then opens a new chat. A tab showing
 // another chat is left alone.
-one.delete('/sessions/:sessionId/selection', async c => {
+one.delete('/sessions/:sessionId/selection', personalWorkspace, async c => {
   const ws = c.get('ws')
   const body: unknown = await c.req.json().catch(() => null)
   const tabId = (body as { tabId?: unknown } | null)?.tabId
@@ -584,34 +574,39 @@ one.delete('/sessions/:sessionId/selection', async c => {
 })
 
 // Change run settings. Omitted fields stay; null clears one.
-one.on('PATCH', ['/sessions/:sessionId/config', '/state/chat-defaults'], async c => {
-  const body = await c.req.json().catch(() => null)
-  if (typeof body !== 'object' || body === null) {
-    return c.text('Expected a JSON object', 400)
-  }
-  const patch: SessionConfigPatch = {}
-  const record = body as Record<string, unknown>
-  for (const key of ['model', 'effort'] as const) {
-    if (!(key in record)) continue
-    const value = record[key]
-    if (value !== null && typeof value !== 'string') {
-      return c.text(`${key} must be a string or null`, 400)
+one.on(
+  'PATCH',
+  ['/sessions/:sessionId/config', '/state/chat-defaults'],
+  personalWorkspace,
+  async c => {
+    const body = await c.req.json().catch(() => null)
+    if (typeof body !== 'object' || body === null) {
+      return c.text('Expected a JSON object', 400)
     }
-    patch[key] = value
-  }
-  if ('speedMode' in record) {
-    const value = record.speedMode
-    if (value !== null && !isSpeedMode(value)) {
-      return c.text('speedMode must be "normal", "fast", "ultrafast", or null', 400)
+    const patch: SessionConfigPatch = {}
+    const record = body as Record<string, unknown>
+    for (const key of ['model', 'effort'] as const) {
+      if (!(key in record)) continue
+      const value = record[key]
+      if (value !== null && typeof value !== 'string') {
+        return c.text(`${key} must be a string or null`, 400)
+      }
+      patch[key] = value
     }
-    patch.speedMode = value
+    if ('speedMode' in record) {
+      const value = record.speedMode
+      if (value !== null && !isSpeedMode(value)) {
+        return c.text('speedMode must be "normal", "fast", "ultrafast", or null', 400)
+      }
+      patch.speedMode = value
+    }
+    const ws = c.get('ws')
+    await saveSessionConfig(ws, c.req.param('sessionId'), patch)
+    return c.json(await getWorkspaceState(ws))
   }
-  const ws = c.get('ws')
-  await saveSessionConfig(ws, c.req.param('sessionId'), patch)
-  return c.json(await getWorkspaceState(ws))
-})
+)
 
-one.post('/sessions/:sessionId/archive', async c => {
+one.post('/sessions/:sessionId/archive', personalWorkspace, async c => {
   const ws = c.get('ws')
   const harness = harnessFor(ws)
   const sessionId = c.req.param('sessionId')
@@ -630,13 +625,13 @@ one.post('/sessions/:sessionId/archive', async c => {
   }
 })
 
-one.get('/sessions/:sessionId/events', async c => {
+one.get('/sessions/:sessionId/events', personalWorkspace, async c => {
   const ws = c.get('ws')
   const sessionId = c.req.param('sessionId')
   return c.json(await harnessFor(ws).sessionEvents(ws, sessionId))
 })
 
-one.get('/mcp', async c => {
+one.get('/mcp', personalWorkspace, async c => {
   const ws = c.get('ws')
   const harness = harnessFor(ws)
   if (c.req.query('stream') !== 'true') return c.json((await harness.mcpStatus?.(ws)) ?? [])
@@ -670,7 +665,7 @@ one.get('/mcp', async c => {
 // (Codex: app-server JSON-RPC, both directions; Claude Code: raw SDK messages
 // + enqueued inputs) and the exact frames the server pushed to chat clients.
 // `sinceWire`/`sinceBroadcast` are seq cursors so the page can poll deltas.
-one.get('/harness/debug', async c => {
+one.get('/harness/debug', personalWorkspace, async c => {
   const ws = c.get('ws')
   const harness = harnessFor(ws)
   const sinceWire = Number(c.req.query('sinceWire') ?? 0) || 0
@@ -685,7 +680,7 @@ one.get('/harness/debug', async c => {
 
 // Per-workspace env vars. GET returns the effective view (discovered `.env` + UI
 // custom secrets + scopes + declared-required keys; values masked).
-one.get('/env', async c => {
+one.get('/env', personalWorkspace, async c => {
   const ws = c.get('ws')
   // Unawaited on purpose: getWorkspaceEnvView loads it in parallel with the
   // env stores (manifest reads and env reads are independent).
@@ -696,7 +691,7 @@ one.get('/env', async c => {
 // then reaps the workspace's function worker and idle agent sessions so the next
 // call/message picks up the change (env is frozen at spawn — a hard restart is
 // the only way).
-one.put('/env', async c => {
+one.put('/env', personalWorkspace, async c => {
   const ws = c.get('ws')
   const patch = parseEnvUpdate(await c.req.json().catch(() => null))
   if (typeof patch === 'string') return c.text(patch, 400)
@@ -714,12 +709,12 @@ one.put('/env', async c => {
   return c.json(await getWorkspaceEnvView(ws.path, requiredEnvFor(ws.path)))
 })
 
-one.get('/skills', async c => {
+one.get('/skills', personalWorkspace, async c => {
   const ws = c.get('ws')
   return c.json(await getWorkspaceSkillsStatus(ws.path, ws.harness))
 })
 
-one.post('/skills/update', async c => {
+one.post('/skills/update', personalWorkspace, async c => {
   const ws = c.get('ws')
   const result = await updateWorkspaceSkills(ws.path, ws.harness ?? 'claude-code')
   return c.json(result.status)
@@ -727,7 +722,7 @@ one.post('/skills/update', async c => {
 
 // Workspace configuration and models. Shared account status is served by
 // /harnesses/status; only workspace overrides and gateways are probed here.
-one.get('/harness', async c => {
+one.get('/harness', personalWorkspace, async c => {
   const ws = c.get('ws')
   const harness = harnessFor(ws)
   const capabilities = {
@@ -781,11 +776,11 @@ one.get('/harness', async c => {
 })
 
 // Workspace identity. Uploads use the image route below.
-one.get('/config', async c => {
+one.get('/config', ownerWorkspace, async c => {
   return c.json(await getWorkspaceConfig(c.get('ws').path))
 })
 
-one.put('/config', async c => {
+one.put('/config', ownerWorkspace, async c => {
   const ws = c.get('ws')
   const parsed: unknown = await c.req.json().catch(() => null)
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -814,7 +809,7 @@ one.put('/config', async c => {
 // `origin` is the writing tab's id — echoed in the broadcast so that tab can
 // ignore its own save. This is the browser's write path; the agent's draws are
 // written server-side (see server/scratchpad/executor.ts). See docs/moi-scratchpad.md.
-one.post('/scratchpad/ops', async c => {
+one.post('/scratchpad/ops', ownerWorkspace, async c => {
   try {
     const form = await c.req.formData()
     const op = JSON.parse(String(form.get('op'))) as ScratchOp | null
@@ -832,11 +827,11 @@ one.post('/scratchpad/ops', async c => {
   }
 })
 
-one.get('/scratchpad', async c => {
+one.get('/scratchpad', ownerWorkspace, async c => {
   return c.json(await loadScratchpadDoc(c.get('ws').path))
 })
 
-one.put('/scratchpad', async c => {
+one.put('/scratchpad', ownerWorkspace, async c => {
   const ws = c.get('ws')
   const body = await c.req.json().catch(() => null)
   if (!body || typeof body !== 'object' || !body.document) {
@@ -856,7 +851,7 @@ one.put('/scratchpad', async c => {
 // never inlined as base64 in the JSON (see server/scratchpad/assets.ts). The
 // browser's TLAssetStore POSTs the raw file here on paste and resolves `asset:`
 // srcs back through the GET when rendering.
-one.post('/scratchpad/assets', async c => {
+one.post('/scratchpad/assets', ownerWorkspace, async c => {
   const length = Number(c.req.header('content-length') ?? 0)
   if (length > MAX_ASSET_BYTES) {
     return c.text(`Asset too large (max ${MAX_ASSET_BYTES / (1024 * 1024)} MB)`, 413)
@@ -872,7 +867,7 @@ one.post('/scratchpad/assets', async c => {
 
 // The file name is content-addressed (sha256 of the bytes), so a hit is
 // immutable — let the browser cache it indefinitely.
-one.get('/scratchpad/assets/:file', async c => {
+one.get('/scratchpad/assets/:file', ownerWorkspace, async c => {
   const resolved = scratchpadAssetFile(c.get('ws').path, c.req.param('file'))
   if (!resolved || !(await resolved.file.exists())) return c.text('Not found', 404)
   return new Response(resolved.file, {
@@ -890,7 +885,7 @@ one.get('/scratchpad/assets/:file', async c => {
 
 // Workspace upload. PUT resizes an image to a 128×128 WebP. DELETE resets any
 // custom icon to the provider default. Both broadcast for a live refresh.
-one.put('/icon', async c => {
+one.put('/icon', ownerWorkspace, async c => {
   const ws = c.get('ws')
   const bytes = new Uint8Array(await c.req.arrayBuffer())
   if (bytes.length === 0) return c.text('Empty image body', 400)
@@ -907,7 +902,7 @@ one.put('/icon', async c => {
   return c.json({ icon: workspaceIcon })
 })
 
-one.delete('/icon', async c => {
+one.delete('/icon', ownerWorkspace, async c => {
   await setWorkspaceConfig(c.get('ws').path, { icon: null })
   publishEvent({ type: 'workspace:updated', workspaceId: c.get('ws').id })
   return c.body(null, 204)
@@ -916,7 +911,7 @@ one.delete('/icon', async c => {
 // All info about a single workspace: its persisted layout (widget grid, layout
 // mode, theme) plus server-resolved metadata. GET reads, PUT writes the layout,
 // DELETE unregisters.
-one.get('/', async c => {
+one.get('/', personalWorkspace, async c => {
   const ws = c.get('ws')
   const config = await loadWorkspaceFileConfig(ws.path)
   if (config.remote) {
@@ -947,11 +942,11 @@ one.get('/', async c => {
 
 // Thumbnail freshness records, without image bytes — the capture hook compares
 // these against live bundle revisions. Images are served per-applet below.
-one.get('/applet-thumbnails', async c =>
+one.get('/applet-thumbnails', ownerWorkspace, async c =>
   c.json({ thumbnails: await getAppletThumbnailRecords(c.get('ws').path) })
 )
 
-one.get('/applet-thumbnails/:kind/:name', c => {
+one.get('/applet-thumbnails/:kind/:name', ownerWorkspace, c => {
   const kind = c.req.param('kind')
   if (kind !== 'widget' && kind !== 'view') return c.text('Not found', 404)
   // `<id>` or `<id>:<version>`. Applet ids never contain `:`, and the version
@@ -967,7 +962,7 @@ one.get('/applet-thumbnails/:kind/:name', c => {
 })
 
 // Settled widget and view visits share one batch endpoint and storage path.
-one.put('/applet-thumbnails', async c => {
+one.put('/applet-thumbnails', ownerWorkspace, async c => {
   const body: unknown = await c.req.json().catch(() => null)
   if (!body || typeof body !== 'object' || Array.isArray(body)) return c.text('Bad request', 400)
   const input = body as AppletThumbnailBatch
@@ -992,7 +987,7 @@ one.put('/applet-thumbnails', async c => {
   return c.body(null, 204)
 })
 
-one.put('/', async c => {
+one.put('/', personalWorkspace, async c => {
   const ws = c.get('ws')
   if (ws.remote) {
     return c.text(
@@ -1018,8 +1013,9 @@ one.put('/', async c => {
   return c.body(null, 204)
 })
 
-one.delete('/', async c => {
+one.delete('/', personalWorkspace, async c => {
   const ws = c.get('ws')
+  if (ws.remote) return c.text('Leaving remote workspaces is not available yet', 403)
   const ok = await removeWorkspace(ws.id)
   if (!ok) return c.text('Workspace not found', 404)
   harnessFor(ws).stopWorkspace?.(ws.path)

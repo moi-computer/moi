@@ -170,6 +170,35 @@ test('remote reference serves no shared content and keeps personal state local',
   expect(previews[visitorId]).toEqual({ thumbnails: [] })
 })
 
+test('shared routes reject a remote reference before reading request data', async () => {
+  const routes = [
+    ['GET', '/widgets/card/module'],
+    ['GET', '/views/board/module'],
+    ['GET', '/files/private.txt'],
+    ['POST', '/rpc/board/read'],
+    ['POST', '/applet-log'],
+    ['PUT', '/config'],
+    ['POST', '/scratchpad/ops'],
+    ['PUT', '/scratchpad'],
+    ['POST', '/scratchpad/assets'],
+    ['GET', '/scratchpad/assets/photo.png'],
+    ['PUT', '/icon'],
+    ['DELETE', '/icon'],
+    ['GET', '/applet-thumbnails'],
+    ['GET', '/applet-thumbnails/view/board'],
+    ['PUT', '/applet-thumbnails']
+  ] as const
+  for (const [method, path] of routes) {
+    const response = await api.request(local + path, { method })
+    expect([method, path, response.status, await response.text()]).toEqual([
+      method,
+      path,
+      404,
+      'Use the owner workspace address'
+    ])
+  }
+})
+
 test('a view being built stays with the visitor until the owner lists it as compiled', async () => {
   const pendingIds = async () =>
     Object.keys((await (await api.request(`${local}/state`)).json()).pendingViews)
@@ -283,7 +312,8 @@ test('standalone hides remote registrations and refuses remote opening', async (
     environment: 'local'
   })
   try {
-    expect((await api.request(local)).status).toBe(403)
+    for (const path of ['', '/state', '/widgets'])
+      expect((await api.request(local + path)).status).toBe(403)
     expect(
       (await (await api.request('/api/workspaces')).json()).some(
         (entry: { id: string }) => entry.id === visitorId

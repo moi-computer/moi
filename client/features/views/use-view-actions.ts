@@ -12,13 +12,9 @@ import {
 } from '@/client/features/chat/chat-send'
 import {
   renameSelectedSessionInCache,
-  setSelectedSessionInCache,
   usePinnedSession
 } from '@/client/features/chat/sessions/use-selected-session'
-import {
-  changeWorkspaceStateCache,
-  getCachedWorkspaceState
-} from '@/client/features/workspace/workspace-state'
+import { getCachedWorkspaceState } from '@/client/features/workspace/workspace-state'
 import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import {
@@ -55,17 +51,13 @@ export function useViewActions() {
 
     if (!pinnedSessionId)
       startOptimisticSession({
-        tabId: viewTabId(pendingView.id),
         queryClient,
         workspaceId,
         sessionId,
         text,
         filenames: attachments.map(attachment => attachment.label)
       })
-    if (!pinnedSessionId) {
-      moveChatDraft(workspaceId, draftId, sessionId)
-      setSelectedSessionInCache(queryClient, workspaceId, sessionId, viewTabId(pendingView.id))
-    }
+    if (!pinnedSessionId) moveChatDraft(workspaceId, draftId, sessionId)
     const prepared = prepareOptimisticSend(
       { queryClient, workspaceId, sessionId, text },
       attachments
@@ -80,12 +72,6 @@ export function useViewActions() {
       config?.effort ?? defaults?.effort,
       config?.speedMode ?? defaults?.speedMode
     )
-
-    changeWorkspaceStateCache(queryClient, workspaceId, draft => {
-      const view = draft.pendingViews[pendingView.id]
-      if (view?.status === 'draft')
-        Object.assign(view, { status: 'starting', requirements: text, buildSessionId: sessionId })
-    })
 
     try {
       const result = await submitMutation.mutateAsync({
@@ -105,13 +91,6 @@ export function useViewActions() {
       })
       moveChatDraft(workspaceId, sessionId, result.sessionId)
       renameSelectedSessionInCache(queryClient, workspaceId, sessionId, result.sessionId)
-      if (!pinnedSessionId)
-        setSelectedSessionInCache(
-          queryClient,
-          workspaceId,
-          result.sessionId,
-          viewTabId(pendingView.id)
-        )
       finishComposerSend(workspaceId, attachments)
       const draftKey = composerDraftKey(workspaceId, result.sessionId)
       const ui = useUiStore.getState()
