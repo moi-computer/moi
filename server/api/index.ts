@@ -168,14 +168,16 @@ async function handleFunctionCall(
 // Resolve the workspace and enforce the route's storage boundary. Personal
 // routes use this Moi's chats, agent and pending views, including for a remote
 // reference. Shared content must be requested at the owner's workspace address.
-function workspaceAccess(scope: 'personal' | 'owner') {
+function workspaceAccess(
+  scope: 'personal' | 'owner',
+  { reserveOperation = true }: { reserveOperation?: boolean } = {}
+) {
   return createMiddleware<ApiEnv>(async (c, next) => {
     const id = c.req.param('id')
     if (!id) return c.text('Workspace not found', 404)
     let release: (() => void) | undefined
     try {
-      if (c.req.method !== 'GET' && !c.req.path.endsWith('/harness'))
-        release = reserveWorkspaceOperation(id)
+      if (reserveOperation && c.req.method !== 'GET') release = reserveWorkspaceOperation(id)
       const ws = await getWorkspace(id)
       if (!ws) return c.text('Workspace not found', 404)
       if (ws.remote && getAppConfig().environment !== 'cloud')
@@ -197,7 +199,8 @@ const ownerWorkspace = workspaceAccess('owner')
 
 // ---- single workspace: /api/workspaces/:id/* --------------------------------
 const one = new Hono<ApiEnv>()
-one.patch('/harness', personalWorkspace, async c => {
+// Switching agents takes its own exclusive lock.
+one.patch('/harness', workspaceAccess('personal', { reserveOperation: false }), async c => {
   if (getAppConfig().demo) return c.text('Changing agents is unavailable in the demo', 403)
   const body = await c.req.json().catch(() => null)
   if (!body || !['claude-code', 'codex'].includes(body.harness))
