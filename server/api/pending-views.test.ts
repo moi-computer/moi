@@ -77,6 +77,10 @@ describe('pending view sketch submission', () => {
 
     if (!response.ok) throw new Error(await response.text())
     expect(response.status).toBe(200)
+    const result = await response.json()
+    expect(result.state.selected[viewTabId(draft.id)]).toBe(result.sessionId)
+    expect(result.state.pendingViews[draft.id].buildSessionId).toBe(result.sessionId)
+    expect(result.state.revision).toBeGreaterThan(0)
     expect(sent[0]?.attachments).toEqual([{ type: 'upload', uploadId: upload.id }])
     expect(sent[0]?.content).toBe('')
     expect(sent[0]?.context?.directives).toContain(

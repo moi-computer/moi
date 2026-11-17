@@ -24,6 +24,15 @@ function writesInFlight(queryClient: QueryClient, workspaceId: string): number {
   return queryClient.isMutating({ mutationKey: writeKey(workspaceId) })
 }
 
+// The newest server update received while an optimistic write is visible.
+const deferredStates = new WeakMap<QueryClient, Map<string, WorkspaceState>>()
+
+function deferWorkspaceState(client: QueryClient, workspaceId: string, state: WorkspaceState) {
+  let states = deferredStates.get(client)
+  if (!states) deferredStates.set(client, (states = new Map()))
+  states.set(workspaceId, newer(states.get(workspaceId), state))
+}
+
 // Keep the newer copy. A reply or event can arrive after a newer one.
 function newer(current: WorkspaceState | undefined, next: WorkspaceState): WorkspaceState {
   return current && current.revision > next.revision ? current : next
@@ -40,7 +49,10 @@ export function workspaceStateOptions(queryClient: QueryClient, workspaceId: str
       const current = queryClient.getQueryData<WorkspaceState>(queryKey)
       // A write in flight already shows its change; its reply brings the
       // server's copy.
-      if (current && writesInFlight(queryClient, workspaceId) > 0) return current
+      if (current && writesInFlight(queryClient, workspaceId) > 0) {
+        deferWorkspaceState(queryClient, workspaceId, next)
+        return current
+      }
       return newer(current, next)
     },
     // Events keep the cache current, so new observers never refetch. A focus
@@ -87,27 +99,33 @@ export function receiveWorkspaceState(
   workspaceId: string,
   next: WorkspaceState
 ): void {
+  if (writesInFlight(queryClient, workspaceId) > 0) {
+    deferWorkspaceState(queryClient, workspaceId, next)
+    return
+  }
   queryClient.setQueryData<WorkspaceState>(workspaceStateKey(workspaceId), current =>
     newer(current, next)
   )
 }
 
-type WorkspaceStateWriteOptions<Input> = {
-  request: (input: Input) => Promise<WorkspaceState>
+type StateReply = WorkspaceState | { state: WorkspaceState }
+
+type WorkspaceStateWriteOptions<Input, Result extends StateReply> = {
+  request: (input: Input) => Promise<Result>
   optimistic?: (draft: WorkspaceState, input: Input) => void
-  onSuccess?: (state: WorkspaceState, input: Input) => void
+  onSuccess?: (state: Result, input: Input) => void
   errorTitle: string
 }
 
 // A write that answers with the new state. Writes to one workspace run in
-// order; the last reply becomes the cache, and a failure refetches it.
-export function useWorkspaceStateWrite<Input>(
+// order; the newest reply or event becomes the cache, and a failure refetches it.
+export function useWorkspaceStateWrite<Input, Result extends StateReply = WorkspaceState>(
   workspaceId: string,
-  { request, optimistic, onSuccess, errorTitle }: WorkspaceStateWriteOptions<Input>
+  { request, optimistic, onSuccess, errorTitle }: WorkspaceStateWriteOptions<Input, Result>
 ) {
   const queryClient = useQueryClient()
   const queryKey = workspaceStateKey(workspaceId)
-  return useMutation<WorkspaceState, Error, Input>({
+  return useMutation<Result, Error, Input>({
     mutationKey: writeKey(workspaceId),
     scope: { id: `workspace-state:${workspaceId}` },
     mutationFn: request,
@@ -116,15 +134,23 @@ export function useWorkspaceStateWrite<Input>(
       await queryClient.cancelQueries({ queryKey, exact: true })
       changeWorkspaceStateCache(queryClient, workspaceId, draft => optimistic(draft, input))
     },
-    onSuccess: (state, input) => {
-      // This write still counts as in flight; a later one owns the cache.
-      if (writesInFlight(queryClient, workspaceId) === 1)
-        receiveWorkspaceState(queryClient, workspaceId, state)
-      onSuccess?.(state, input)
+    onSuccess: (result, input) => {
+      receiveWorkspaceState(queryClient, workspaceId, 'state' in result ? result.state : result)
+      onSuccess?.(result, input)
     },
     onError: error => {
       toast.add({ title: errorTitle, description: error.message, type: 'error' })
-      void queryClient.invalidateQueries({ queryKey, exact: true })
+    },
+    onSettled: (_result, error) => {
+      // This mutation still counts as pending until onSettled returns.
+      if (writesInFlight(queryClient, workspaceId) === 1) {
+        const states = deferredStates.get(queryClient)
+        const latest = states?.get(workspaceId)
+        states?.delete(workspaceId)
+        if (latest)
+          queryClient.setQueryData<WorkspaceState>(queryKey, current => newer(current, latest))
+      }
+      if (error) void queryClient.invalidateQueries({ queryKey, exact: true })
     }
   })
 }
@@ -136,7 +162,6 @@ export function useWorkspaceStateSync(): void {
   useWorkspaceEvent(event => {
     if (event.type !== 'state:changed') return
     if (!getCachedWorkspaceState(queryClient, event.workspaceId)) return
-    if (writesInFlight(queryClient, event.workspaceId) > 0) return
     receiveWorkspaceState(queryClient, event.workspaceId, event.state)
   })
 }

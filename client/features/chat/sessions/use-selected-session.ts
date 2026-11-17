@@ -70,19 +70,6 @@ function selectionChange(
   return { sessionId, tabId, show: true, ifMatch: current }
 }
 
-// Show a chat in a tab before the server confirms it, without a request: for
-// flows whose own request makes the server select it (view submission).
-export function setSelectedSessionInCache(
-  queryClient: QueryClient,
-  workspaceId: string,
-  sessionId: string,
-  tabId: WorkspaceTabId
-): void {
-  changeWorkspaceStateCache(queryClient, workspaceId, draft => {
-    draft.selected[tabId] = sessionId
-  })
-}
-
 // A harness replaced a temporary chat id with its real one.
 export function renameSelectedSessionInCache(
   queryClient: QueryClient,

@@ -4,8 +4,7 @@ import { describe, expect, test } from 'bun:test'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import {
   renameSelectedSessionInCache,
-  selectedSessionForTab,
-  setSelectedSessionInCache
+  selectedSessionForTab
 } from '@/client/features/chat/sessions/use-selected-session'
 import type { WorkspaceState } from '@/lib/types'
 
@@ -32,20 +31,6 @@ describe('selected session', () => {
   test('is unknown until the workspace state loads', () => {
     expect(selectedSessionForTab(undefined, 'overview')).toBeUndefined()
     expect(selectedSessionForTab(workspaceState(), 'overview')).toBeNull()
-  })
-
-  test('showing a chat in one tab keeps other tabs and the workspace pin', () => {
-    const queryClient = new QueryClient()
-    queryClient.setQueryData(
-      workspaceKeys.state(WORKSPACE_ID),
-      workspaceState({ selected: { overview: 'old' }, pinnedSessionId: 'pin' })
-    )
-    setSelectedSessionInCache(queryClient, WORKSPACE_ID, 'next', 'overview')
-    setSelectedSessionInCache(queryClient, WORKSPACE_ID, 'notes', 'scratchpad')
-    expect(cachedState(queryClient)).toMatchObject({
-      selected: { overview: 'next', scratchpad: 'notes' },
-      pinnedSessionId: 'pin'
-    })
   })
 
   test('a renamed chat keeps its tabs, pin, settings, fork children, and build', () => {

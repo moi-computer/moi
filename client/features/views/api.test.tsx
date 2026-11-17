@@ -50,6 +50,8 @@ async function mount(isRemote: boolean, pending: string[], compiled: string[]) {
         if (method === 'GET')
           return Response.json(url.endsWith('/state') ? state : { views: structuredClone(views) })
         writes.push(`${method} ${url}`)
+        if (url.endsWith('/submit'))
+          return Response.json({ viewId: 'draft', sessionId: 'chat', state })
         return Response.json({})
       },
       { preconnect: fetch.preconnect }

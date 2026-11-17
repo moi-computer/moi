@@ -12,6 +12,7 @@ import {
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import type { WorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type { CompiledView, WorkspaceState } from '@/lib/types'
+import { useViewActions } from '@/client/features/views/use-view-actions'
 import { useViews } from '@/client/features/views/api'
 import { Workspace } from './workspace-context'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
@@ -36,10 +37,7 @@ afterEach(() => cleanup())
 
 // Mounts `children` with a query client seeded with `initial`, a fake events
 // socket, and a fake server that answers every request with `respond`.
-function mount(
-  initial: WorkspaceState,
-  respond: (request: Request) => Promise<WorkspaceState | { views: CompiledView[] }>
-) {
+function mount(initial: WorkspaceState, respond: (request: Request) => Promise<unknown>) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = { window, document, IS_REACT_ACT_ENVIRONMENT: true }
   const descriptors = new Map(
@@ -354,4 +352,97 @@ describe('selection and pin requests', () => {
       }
     ])
   })
+})
+
+test('a view submission keeps its chat through delayed snapshots and a native session rename', async () => {
+  const reply = deferred<{ viewId: string; sessionId: string; state: WorkspaceState }>()
+  const initial = workspaceState({
+    pendingViews: { board: { status: 'draft', requirements: '' } }
+  })
+  let server = initial
+  const fixture = mount(initial, async request => {
+    if (request.url.endsWith('/submit')) return reply.promise
+    if (request.url.endsWith('/state')) return server
+    if (request.url.endsWith('/harness')) return { models: [] }
+    throw new Error(`Unexpected request: ${request.url}`)
+  })
+  let actions!: ReturnType<typeof useViewActions>
+  function Probe() {
+    const current = useViewActions()
+    useLayoutEffect(() => {
+      actions = current
+    })
+    useWorkspaceStateSync()
+    return null
+  }
+  await fixture.render(
+    <WorkspaceLayoutContext
+      value={{
+        layout: createDefaultWorkspaceLayout(),
+        setLayout: () => {},
+        name: null,
+        cwd: null,
+        harness: 'claude-code',
+        workspaceId: WORKSPACE_ID,
+        apiBase: `/api/workspaces/${WORKSPACE_ID}`,
+        isRemote: false,
+        isLoading: false
+      }}
+    >
+      <Probe />
+    </WorkspaceLayoutContext>
+  )
+  let submission!: Promise<void>
+  await act(async () => {
+    submission = actions.submit({ id: 'board', status: 'draft', requirements: '' }, 'Build cards')
+  })
+  const selected = fixture.cached()?.selected['views/board']
+  expect(selected).toBeString()
+  fixture.emit({ type: 'state:changed', workspaceId: WORKSPACE_ID, state: initial })
+  await fixture.queryClient.refetchQueries({ queryKey: workspaceKeys.state(WORKSPACE_ID) })
+  expect(fixture.cached()?.selected['views/board']).toBe(selected)
+
+  server = workspaceState({
+    revision: 3,
+    selected: { 'views/board': 'native' },
+    sessions: { native: { tabId: 'views/board' } },
+    pendingViews: {
+      board: { status: 'submitted', requirements: 'Build cards', buildSessionId: 'native' }
+    }
+  })
+  fixture.emit({ type: 'state:changed', workspaceId: WORKSPACE_ID, state: server })
+  await act(async () => {
+    reply.resolve({ viewId: 'board', sessionId: 'native', state: server })
+    await submission
+  })
+  expect(fixture.cached()).toEqual(server)
+  expect(fixture.requests.filter(request => request.url.endsWith('/state'))).toHaveLength(1)
+  fixture.emit({ type: 'state:changed', workspaceId: WORKSPACE_ID, state: initial })
+  expect(fixture.cached()?.selected['views/board']).toBe('native')
+})
+
+test('a newer socket snapshot survives an older write reply', async () => {
+  const reply = deferred<WorkspaceState>()
+  const fixture = mount(workspaceState(), () => reply.promise)
+  let pin!: (sessionId: string) => void
+  function Probe() {
+    const current = usePinnedSession().pin
+    useLayoutEffect(() => {
+      pin = current
+    })
+    useWorkspaceStateSync()
+    return null
+  }
+  await fixture.render(<Probe />)
+  await act(async () => pin('mine'))
+  const latest = workspaceState({
+    revision: 3,
+    pinnedSessionId: 'mine',
+    selected: { 'views/board': 'native' }
+  })
+  fixture.emit({ type: 'state:changed', workspaceId: WORKSPACE_ID, state: latest })
+  expect(fixture.cached()?.pinnedSessionId).toBe('mine')
+  reply.resolve(workspaceState({ revision: 2, pinnedSessionId: 'mine' }))
+  await fixture.settle()
+  expect(fixture.cached()).toEqual(latest)
 })

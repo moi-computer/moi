@@ -356,7 +356,7 @@ one.post('/views/:viewId/submit', async c => {
       speedMode: isSpeedMode(body.speedMode) ? body.speedMode : undefined,
       stream: body.stream === true ? true : undefined
     })
-    return c.json(result)
+    return c.json({ ...result, state: await getWorkspaceState(ws) })
   } catch (err) {
     if (err instanceof PendingViewError) return c.text(err.message, err.status)
     if (err instanceof ViewStartupError)

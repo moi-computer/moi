@@ -1,3 +1,4 @@
+import { viewTabId } from '@/lib/workspace-tabs'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import type { SpeedMode } from '@/lib/types'
 import type {
@@ -13,7 +14,8 @@ import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import {
   getCachedWorkspaceState,
-  useWorkspaceState
+  useWorkspaceState,
+  useWorkspaceStateWrite
 } from '@/client/features/workspace/workspace-state'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 
@@ -153,12 +155,35 @@ export type SubmitViewInput = {
 }
 export function useSubmitView(workspaceId: string) {
   const { local } = useViewBase(workspaceId)
-  return useViewMutation(workspaceId, ({ viewId, ...input }: SubmitViewInput) =>
-    requestJson<{ viewId: string; sessionId: string }>(
-      `${local}/views/${viewId}/submit`,
-      jsonRequest('POST', input),
-      'Couldn’t start view chat'
-    )
-  )
+  return useWorkspaceStateWrite<
+    SubmitViewInput,
+    {
+      viewId: string
+      sessionId: string
+      state: WorkspaceState
+    }
+  >(workspaceId, {
+    request: ({ viewId, ...input }) =>
+      requestJson(
+        `${local}/views/${viewId}/submit`,
+        jsonRequest('POST', input),
+        'Couldn’t start view chat'
+      ),
+    optimistic: (draft, { viewId, sessionId, requirements }) => {
+      const tabId = viewTabId(viewId)
+      if (!draft.pinnedSessionId) {
+        draft.selected[tabId] = sessionId
+        draft.sessions[sessionId] = { ...draft.sessions[sessionId], tabId }
+      }
+      const view = draft.pendingViews[viewId]
+      if (view?.status === 'draft')
+        Object.assign(view, {
+          status: 'starting',
+          requirements,
+          buildSessionId: draft.pinnedSessionId ?? sessionId
+        })
+    },
+    errorTitle: 'Couldn’t start view chat'
+  })
 }
 export const useDiscardView = useDeleteView
