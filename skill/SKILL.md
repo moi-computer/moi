@@ -10,9 +10,10 @@ description: The Moi workspace — the web UI the user chats from, extended with
 "Workspace" or "Moi Workspace" — the web UI that the user works in, talks/collaborates with you,
 sees and interacts with "Applets".
 
-"Project" - the primary working folder _you_ (as an agent) work in. Managed by your harness; Moi
-does not have a clear definition, but assumes this is the root folder in which it stores its state
-files.
+"Workspace dir" — the primary working folder _you_ (as an agent) work in. Workspace files are stored here;
+it also contains `.moi/`, which holds configuration, applets, applet, dependencies and other workspace extensions.
+
+"Remote workspace" - Moi Workspace running on a different machine that someone else shared with the user and you.
 
 "Chat" — a conversation between the user and an agent in the workspace.
 
@@ -50,25 +51,38 @@ User can switch between these, but can access the chat (this conversation and ot
 
 ## Working in the workspace
 
-### Local or remote workspace
+### Local or Remote workspaces
 
-Before working, read `remote` in `.moi/.workspace.json` (read only; never edit the file). A missing
-file or absent `remote` means local, and the rest of this section does not apply.
+Workspace can be either:
 
-`remote: { user_id, workspace_id }` means the workspace lives on its owner's machine. This folder
-holds only the reference and skills.
+**Local** workspace dir is stored on this computer. You have full control over it. You
+interact with it using filesystem operations and by calling moi cli.
 
-- Edit shared files with `moi remote read`, `write`, `patch`, `file-upload`, and `file-download`;
-  paths are relative to the owner's workspace root. `moi remote exec '<command>'` runs there.
-- Use the ordinary commands from this folder as usual. `moi check`, `bundle`, `views`, `theme`,
-  `config`, `tabs`, `call-server-fn`, `debug logs`, and scratchpad reads/edits act on the owner.
-- `moi refresh`, `navigate`, and `scratch view` act on your user's running Moi and browser. Refresh
-  after remote changes.
-- Image input and output paths refer to the machine running the CLI. `config icon` and
-  `scratch add image` upload local files to the owner; `scratch read-image` saves the owner's
-  image locally, and `scratch view --out` saves the visitor browser's canvas screenshot locally.
-- Never create local applet copies or fall back to local content when the owner is unavailable.
-  Remote chat and the settings UI are unavailable.
+**Remote**. Workspace is running on someone else's ("owner") computer and it is shared with the user.
+In this case, there are two dirs and two computers:
+
+_Owner dir_ for the owner, looks like a regular local workspace. Has the file structure described in
+"Files and Folders" section. Owner's agent runs there and it interact with it by using regular file ops.
+Source of truth for shared workspace files and content, including applets, extensions, and shared data.
+Everything in the dir is shared with all members. Each visitor’s chats, pending views, and agent settings
+remain personal and are managed by their own Moi instance.
+
+_Linked dir_ is on this computer. It's your local working folder, no other user sees it. `.moi` folder is
+stripped down, only contains meta that this folder is linked to remote workspace. All files here are for
+private and intermediate work. You can also interact with the remote workspace and owner dir using
+subset of regular `moi` commands and also `moi remote` commands. Do not create local applet copies and
+prefer not to store workspace state here (it gets out of sync quickly). Full command reference is in
+"Using the Moi CLI"
+
+Q: What's in the linked dir?
+A: a skill (this one), `.moi` folder with link meta, your private/intermediate files and work.
+
+Q: How do I know if I am in local or remote workspaсe?
+A: You are instructed in `<moi-context>`. Check by calling `moi remote` if not explicitly told which
+workspace it is.
+
+Q: What to store in owner dir vs linked dir
+A: Owner - source of truth, shared state, applets etc. Linked - just local work visible to you and the user.
 
 ### Boundaries
 
@@ -79,11 +93,11 @@ holds only the reference and skills.
 
 ### Files and folders
 
-For local workspaces, the source of truth is the `.moi` folder in the root of "Project" folder. Contains source code of all
+For local workspaces, the source of truth is the `.moi` folder inside the workspace dir. Contains source code of all
 Applets, bundled code, settings, etc. Can be committed to version control. Folder is partially
 initialised when Workspace starts, you have full ownership of it.
 
-You _do have_ access to the files in the root of Project — you can reference and load them from the
+You _do have_ access to the files in the workspace dir — you can reference and load them from the
 "Applets" and elsewhere.
 
 Folder structure:
@@ -103,17 +117,17 @@ my-agent-folder/
       users-api.server.ts     <- Server-side async functions the view can call (optional)
       ...
     package.json              <- Applet dependencies that you manage
-    .workspace.json           <- Internal config. Only read `remote` for the check above; do not edit.
+    .workspace.json           <- Internal config. Do not edit.
     .scratchpad.json          <- Scratchpad canvas snapshot. Internal — inspect only via `moi scratch read`, never open it.
     .scratchpad/              <- Scratchpad image files. Internal — pull pixels via `moi scratch read-image`, never open it.
 ```
 
 Every dot-prefixed file or folder inside `.moi/` (`.build/`, `.cache/`, `.workspace.json`,
 `.scratchpad*`, `.gitignore`, …) is a Moi internal: auto-generated and liable to change format
-without notice. Except for the read-only `remote` check above, do not read, edit, or delete them, and never point
+without notice. Do not read, edit, or delete them, and never point
 tooling at them; go through the `moi` CLI instead. Version control needs no special handling: the
-scaffolded `.moi/.gitignore` already excludes the machine-local entries (`.build/`, `.cache/`,
-`node_modules/`), while `.workspace.json` and `.scratchpad.json` are workspace state that ships
+scaffolded `.moi/.gitignore` already excludes the machine-local entries (e.g. `.build/`), while
+`.workspace.json` and `.scratchpad.json` are workspace state that ships
 with the repo — commit them as-is, just never hand-edit them. Your surface is the non-dot files:
 `widgets/`, `views/`, `package.json`, and code you place under `.moi/` yourself.
 
@@ -121,7 +135,7 @@ with the repo — commit them as-is, just never hand-edit them. Your surface is 
 
 Treat `moi` as an external command — you cannot inspect or modify its sources. Use only the
 documented subcommands (`moi bundle`, `moi bundle --force`, etc.). Call `moi --help` for
-documentation. Run all `moi` commands from the **project root** — the folder that contains `.moi/`,
+documentation. Run all `moi` commands from the **workspace dir** — the folder that contains `.moi/`,
 never from inside `.moi/` itself. You don't pass paths; Moi resolves the workspace from where it's run.
 
 Use the task-specific sections below for workflow guidance. The CLI will grow over time, so run
@@ -134,6 +148,32 @@ Use the task-specific sections below for workflow guidance. The CLI will grow ov
 - **Customize the workspace:** `moi theme` and `moi config` (see Appearance and settings).
 - **Use workspace env:** `moi env` and `moi env exec` (see Environment and secrets).
 - **Maintain workspace guidance:** `moi skill` (see Keeping this skill current).
+
+#### How CLI works in a linked to remote workspace dir
+
+These commands only work in linked dir of the Remote workspace. They allow you to manage the host
+workspace, write applets, work with files etc. Remote file paths are relative to the owner dir.
+Upload sources, download destinations, and `--patch-file` paths refer to your machine.
+For full reference, run `moi remote --help`
+
+```sh
+moi remote                                   # Show identity, link, help
+moi remote exec 'ls .moi/views'              # List files on the host
+moi remote read .moi/views/dashboard.tsx     # Read a host file
+moi remote write .moi/notes.txt "Hello"      # Create or overwrite a host file
+moi remote patch .moi/views/dashboard.tsx --patch-file ./change.diff  # Apply a local diff
+moi remote file-upload ./chart.png .moi/chart.png    # local → host
+moi remote file-download .moi/chart.png ./chart.png  # host → local
+```
+
+These regular commands work and get forwared to remote: `check`, `bundle`, `call-server-fn`, `debug`,
+`theme`, `ui-components`, `config`, `tabs`, `scratch`. Scratchpad reads and writes on owner's behalf,
+except for `moi scratch view`.
+
+These commands run on **your local Moi**: `refresh`, `navigate`, `views create`, `views set`, `env`.
+`moi tabs` lists the remote workspace’s tabs and views. E.g. `navigate` switches the tab ONLY for current user.
+
+Managing env vars on the remote machine is not yet supported. Tell the user to ask the workspace owner.
 
 ### Workspace navigation
 
@@ -192,7 +232,11 @@ use `moi theme --help` if its options change.
 
 ### Environment and secrets
 
-Each workspace has an effective env: keys from the project's `.env` / `.env.local` (when
+In remote workspaces, `moi env` commands manage your local environment, and `moi env exec`
+runs locally. Applet server functions use the owner's environment; setting a key locally does
+not make it available to the owner's applets.
+
+Each workspace has an effective env: keys from `.env` / `.env.local` in the workspace dir (when
 inheritance is enabled in settings) plus **custom secrets** the user manages in the workspace env
 settings. Moi injects this env into:
 
@@ -371,8 +415,8 @@ replaces the pending screen in the same tab.
 - Use `style={{}}` only for computed data such as chart geometry, progress, per-item delays, or
   per-frame transforms.
 - Use icons from `@tabler/icons-react`. Do not add raw SVG icons or another icon pack. When the
-  project provides `.agents/rules/icons.md`, follow its size and stroke policy.
-- Applets cannot import the host project's `cn`. If `.moi/ui/utils.ts` exists, import `cn` from
+  workspace dir contains `.agents/rules/icons.md`, follow its size and stroke policy.
+- Applets cannot import the Moi host application's `cn`. If `.moi/ui/utils.ts` exists, import `cn` from
   `../ui/utils`; otherwise use a local `cx()` when classes are conditional. Never build class
   names with template-literal ternaries.
 
@@ -507,11 +551,15 @@ surfaces on its own.
 ## Chats and messages
 
 A workspace is driven through agent conversations (this chat is one). Depending on your
-harness (Claude Code, openclaw, others differ in the details) there can be **multiple chats**, but
-they all share **one** workspace **and one Project folder** — the same filesystem, the same `.moi`
-folder, applets, config, and theme. Anything you build is visible to every chat, and another chat
-may have changed the workspace or the Project files since you last looked. Treat `.moi` and the
-Project folder as shared state, not yours alone. Internally, "chats" are sometimes aliased as
+harness (Claude Code, openclaw, others differ in the details) there can be **multiple chats**,
+all working with the same shared applets, config, and theme.
+
+You always run on your local machine, not on the remote owner's machine; other visitors have
+their own agents running in their own linked dirs, while the owner's agents run in the owner dir.
+
+Anything you build in the shared workspace is visible to other members, and another agent may
+have changed its files since you last looked. Treat shared workspace files as shared state,
+not yours alone. Internally, "chats" are sometimes aliased as
 "threads" — "chat" is product language, while "thread" is reserved for internal SDK, session, and
 persistence concepts.
 

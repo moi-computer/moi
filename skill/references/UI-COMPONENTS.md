@@ -5,7 +5,7 @@ theme tokens. Follow [DESIGN.md](DESIGN.md) for visual decisions.
 
 ## Workflow
 
-Run commands from the project root. Check what's available and installed, read the docs
+Run commands from the workspace dir. Check what's available and installed, read the docs
 before using or changing a component, then add all missing components in one call.
 
 ```sh
