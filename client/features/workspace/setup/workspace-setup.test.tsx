@@ -11,7 +11,7 @@ import * as config from '@/client/api/app-config'
 import { SidebarLayout } from '@/client/app/shell/sidebar-layout'
 import { AccountProvider } from '@/client/features/account/account-provider'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import * as events from '@/client/runtime/use-workspace-events'
+import * as events from '@/client/runtime/use-client-events'
 import type { WorkspaceHarness, HarnessAvailability } from '@/lib/types'
 import { createUiStore } from '@/client/store/ui'
 import { attachmentKey, liveStore, useLive } from '@/client/features/chat/chat-store'
@@ -84,7 +84,7 @@ async function mount(
       destinations.push(path)
     }
   ])
-  const eventsSpy = spyOn(events, 'useWorkspaceEvent').mockImplementation(() => {})
+  const eventsSpy = spyOn(events, 'useClientEvent').mockImplementation(() => {})
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const key = workspaceKeys.harness('test')
   let data: WorkspaceHarness = {

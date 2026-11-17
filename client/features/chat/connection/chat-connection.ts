@@ -20,7 +20,6 @@ let socket: WebSocket | null = null
 let generation = 0
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 const queue: ClientMessage[] = []
-let onWorkspaceSwitch: ((workspaceId: string) => void) | null = null
 let sweepTimer: ReturnType<typeof setInterval> | null = null
 
 // TTL backstop for live previews. Every clear path (turn arrival, run end,
@@ -89,16 +88,12 @@ function connect() {
 }
 
 export function handleFrame(data: Record<string, unknown>) {
-  reduceChatFrame(data, { queryClient: qc, sendMessage, onWorkspaceSwitch })
+  reduceChatFrame(data, { queryClient: qc })
 }
 
 export function sendMessage(msg: ClientMessage) {
   if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg))
   else queue.push(msg)
-}
-
-export function setWorkspaceSwitchHandler(fn: ((workspaceId: string) => void) | null) {
-  onWorkspaceSwitch = fn
 }
 
 // Test seam: inject the QueryClient the frame handler reads, without opening a

@@ -5,21 +5,21 @@ WebSocket handlers, and CLI commands call the same feature modules.
 
 ## Where code belongs
 
-| Location           | Owns                                                                                                                                                                                                 |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api/`             | Hono HTTP routes, request validation, workspace lookup middleware, and API tests. `index.ts` assembles and defines the main routes; `harnesses.ts` defines login routes.                             |
-| `cli/commands/`    | One module per top-level CLI command, with its subcommands and private helpers.                                                                                                                      |
-| `cli/`             | Command registration, help, CLI access gates, terminal formatting, control requests, and server launching.                                                                                           |
-| `workspaces/`      | Workspace discovery and registration, creation/import, `.moi/` scaffolding, shared layout, theme, icons, file previews, and environment settings.                                                    |
-| `sessions/`        | Moi's session metadata, selection and pin state, archiving, ID renames, message attachments, and pending-view chat handoffs. Provider-owned history stays in the harnesses.                          |
-| `workspace-state/` | Per-workspace `state.json` storage: one writer per workspace, transactions, atomic writes, lock timeout, a revision and a `state:changed` event per change, re-adoption of a removed workspace's id. |
-| `applets/`         | View/widget manifests, source analysis, builds, CSS scoping, typechecking, bundle serving, server-function workers, thumbnails, UI component installation, and the error journal.                    |
-| `scratchpad/`      | Canvas documents, assets, headless drawing, and browser screenshot requests.                                                                                                                         |
-| `skills/`          | Bundled workspace skill installation, version checks, and updates. These modules manage the copies shipped under `workspace/`.                                                                       |
-| `harness/`         | Provider adapters, transports, sessions, discovery, authentication, and readiness. See [the harness guide](harness/README.md).                                                                       |
-| `collab/`          | Cloud collaboration workers, presence, proxy identity, and the optional collaboration skill.                                                                                                         |
-| `onboarding/`      | Idea discovery, its prompt and output validation, and workspace creation jobs. HTTP handlers live in [api/onboarding.ts](api/onboarding.ts).                                                         |
-| `test/`            | Integration tests and existing tests that share fixtures. Other unit tests live beside their modules.                                                                                                |
+| Location           | Owns                                                                                                                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api/`             | Hono HTTP routes, request validation, workspace lookup middleware, and API tests. `index.ts` assembles and defines the main routes; `harnesses.ts` defines login routes.                                      |
+| `cli/commands/`    | One module per top-level CLI command, with its subcommands and private helpers.                                                                                                                               |
+| `cli/`             | Command registration, help, CLI access gates, terminal formatting, control requests, and server launching.                                                                                                    |
+| `workspaces/`      | Workspace discovery and registration, creation/import, `.moi/` scaffolding, shared layout, theme, icons, file previews, and environment settings.                                                             |
+| `sessions/`        | Moi's session metadata, selection and pin state, archiving, ID renames, message attachments, and pending-view chat handoffs. Provider-owned history stays in the harnesses.                                   |
+| `workspace-state/` | Per-workspace `state.json` storage: one writer per workspace, transactions, atomic writes, lock timeout, a revision and a `personal-state:changed` event per change, re-adoption of a removed workspace's id. |
+| `applets/`         | View/widget manifests, source analysis, builds, CSS scoping, typechecking, bundle serving, server-function workers, thumbnails, UI component installation, and the error journal.                             |
+| `scratchpad/`      | Canvas documents, assets, headless drawing, and browser screenshot requests.                                                                                                                                  |
+| `skills/`          | Bundled workspace skill installation, version checks, and updates. These modules manage the copies shipped under `workspace/`.                                                                                |
+| `harness/`         | Provider adapters, transports, sessions, discovery, authentication, and readiness. See [the harness guide](harness/README.md).                                                                                |
+| `collab/`          | Cloud collaboration workers, presence, proxy identity, and the optional collaboration skill.                                                                                                                  |
+| `onboarding/`      | Idea discovery, its prompt and output validation, and workspace creation jobs. HTTP handlers live in [api/onboarding.ts](api/onboarding.ts).                                                                  |
+| `test/`            | Integration tests and existing tests that share fixtures. Other unit tests live beside their modules.                                                                                                         |
 
 Use direct module imports such as `workspaces/registry` or `sessions/store`.
 Keep shared helpers in the feature that owns them. A folder does not imply a
@@ -56,12 +56,12 @@ corresponding directory above.
 
 ## Live connections
 
-| Socket                       | Source and scope                                                                        |
-| ---------------------------- | --------------------------------------------------------------------------------------- |
-| `/cloud/api/events`          | Cloud account and membership changes (owned by Batiok)                                  |
-| `/api/events`                | This machine's workspace list, app settings, personal state, environment and navigation |
-| `/api/harness/events`        | This machine's chats, run activity and harness readiness across workspaces              |
-| `/api/workspaces/:id/events` | Shared workspace updates and presence, served by the owner                              |
+| Socket                       | Source and scope                                                                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `/cloud/api/events`          | Cloud account and membership changes (owned by Batiok)                                                   |
+| `/api/events`                | This machine's workspace list, app settings, personal state, environment, navigation and canvas commands |
+| `/api/harness/events`        | This machine's chats, run activity and harness readiness across workspaces                               |
+| `/api/workspaces/:id/events` | Shared workspace updates and presence, served by the owner                                               |
 
 Remote shared connections use `ownerId:workspaceId`, just like owner HTTP requests.
 The URL supplies workspace scope; shared event payloads omit `workspaceId`. The

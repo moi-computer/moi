@@ -9,7 +9,7 @@ import { Link, Route, Router } from 'wouter'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceSessionStore } from '@/client/store/workspace-session'
-import * as workspaceEvents from '@/client/runtime/use-workspace-events'
+import * as workspaceEvents from '@/client/runtime/use-client-events'
 import { resolveUrl } from '@/lib/navigation'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import type {
@@ -152,7 +152,7 @@ function mountNavigation(
       navigate = callback
     }
   )
-  const eventsSpy = spyOn(workspaceEvents, 'useWorkspaceEvent').mockImplementation(() => {})
+  const eventsSpy = spyOn(workspaceEvents, 'useClientEvent').mockImplementation(() => {})
 
   function Probe() {
     const [revealed, setRevealed] = useState(false)

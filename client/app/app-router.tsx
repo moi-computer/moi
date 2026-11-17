@@ -1,10 +1,10 @@
 import { OnboardingRoute } from './routes/onboarding-route'
-import { Suspense, lazy, useEffect } from 'react'
+import { Suspense, lazy } from 'react'
 
 import { Redirect, Route, Switch, useLocation } from 'wouter'
 
 import { homePath } from '@/client/api/app-config'
-import { setWorkspaceSwitchHandler } from '@/client/features/chat/connection/chat-connection'
+import { useClientEvent } from '@/client/runtime/use-client-events'
 import { useWorkspaceStateSync } from '@/client/features/workspace/workspace-state'
 
 import { SettingsRoute } from './routes/settings-route'
@@ -35,12 +35,9 @@ export function AppRouter() {
   const [, navigate] = useLocation()
   useWorkspaceStateSync()
 
-  // When the server broadcasts a workspace:switch (e.g. from `moi start`),
-  // navigate to that workspace
-  useEffect(() => {
-    setWorkspaceSwitchHandler(id => navigate(`/workspace/${id}`))
-    return () => setWorkspaceSwitchHandler(null)
-  }, [navigate])
+  useClientEvent(event => {
+    if (event.type === 'workspace:open-requested') navigate(`/workspace/${event.workspaceId}`)
+  })
 
   return (
     <Switch>

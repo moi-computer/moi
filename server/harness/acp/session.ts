@@ -12,7 +12,7 @@ import type { MessageAttachment } from '@/lib/types'
 //
 // Lifecycle notes:
 //   - A brand-new session is created under the client's temporary uuid, then
-//     renamed to the agent's real session id (`session_renamed`) — same flow
+//     renamed to the agent's real session id (`session:renamed`) — same flow
 //     as the Claude Code, OpenClaw and Codex paths.
 //   - ACP has no steer: a send that lands mid-turn is queued and flushed when
 //     the running turn resolves.
@@ -159,7 +159,7 @@ function setProcessing(rec: SessionRecord, processing: boolean) {
   if (rec.processing === processing) return
   rec.processing = processing
   broadcast(rec.workspaceId, {
-    type: 'status',
+    type: 'session:status',
     sessionId: rec.sessionId,
     activity: processing ? 'running' : 'idle'
   })
@@ -184,7 +184,7 @@ function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
 function forwardPreview(rec: SessionRecord) {
   if (!rec.stream || rec.replaying) return
   broadcast(rec.workspaceId, {
-    type: 'preview',
+    type: 'session:preview',
     sessionId: rec.sessionId,
     messageId: rec.acc.currentId,
     parentToolUseId: null,
@@ -323,7 +323,7 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
     case 'session_info_update': {
       // The backend generated or refreshed a session title.
       if (!rec.replaying) {
-        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+        broadcast(rec.workspaceId, { type: 'sessions:changed', sessionId: rec.sessionId })
       }
       return
     }
@@ -641,7 +641,11 @@ export async function sendAcpMessage(
       }
     }
   } catch (err) {
-    broadcast(input.workspaceId, { type: 'status', sessionId: input.sessionId, activity: 'idle' })
+    broadcast(input.workspaceId, {
+      type: 'session:status',
+      sessionId: input.sessionId,
+      activity: 'idle'
+    })
     broadcast(input.workspaceId, {
       kind: 'error',
       sessionId: input.sessionId,

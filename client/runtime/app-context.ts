@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-import type { WorkspaceEventsClient } from './workspace-events'
+import type { AppEventsClient } from './app-events'
 
 // App-wide state that lives exactly as long as the app: created by
 // `AppProvider` (app/app-provider.tsx) when the app mounts and shut down when
@@ -8,7 +8,7 @@ import type { WorkspaceEventsClient } from './workspace-events'
 // app itself.
 export type AppContextValue = {
   // The page's workspace events socket.
-  events: WorkspaceEventsClient
+  events: AppEventsClient
 }
 
 export const AppContext = createContext<AppContextValue | undefined>(undefined)

@@ -1,10 +1,10 @@
 import type { ScratchOp, ScratchOpResult } from '@/lib/types'
 
-import { broadcastAll } from '../state'
+import { publishEvent } from '../events'
 
 // Bridges `moi scratch` (control port) to a live tldraw editor in a browser tab.
 // The control server runs in the same process as the app server, so it calls
-// `relayScratchOp` directly: we broadcast the op over the app chat socket tagged
+// `relayScratchOp` directly: we broadcast the op over the machine events socket tagged
 // with `workspaceId`, the tab showing that workspace's canvas runs it against
 // tldraw, and replies with a `scratchpad:op-result` that settles our promise.
 
@@ -28,7 +28,7 @@ export function relayScratchOp(workspaceId: string, op: ScratchOp): Promise<Scra
       reject(new Error('No live canvas — open the Scratchpad tab for this workspace.'))
     }, RELAY_TIMEOUT_MS)
     pendingOps.set(opId, { resolve, reject, timer })
-    broadcastAll({ type: 'scratchpad:op', workspaceId, opId, op })
+    publishEvent({ type: 'scratchpad:op', workspaceId, opId, op })
   })
 }
 

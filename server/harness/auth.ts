@@ -1,3 +1,4 @@
+import type { HarnessEvent } from '@/lib/events'
 import { pathHarnessAvailability } from './executable'
 // Login is global per harness. Workspace readiness is checked independently
 // using each workspace’s environment.
@@ -7,11 +8,10 @@ import { publishEvent } from '../events'
 import { harnessFor } from './registry'
 import type { HarnessWorkspace, HarnessLoginAttempt } from './types'
 
-export type HarnessUpdatedEvent = {
-  type: 'harness:updated'
-  workspaceId: string
-  availability: HarnessAvailability
-}
+export type WorkspaceHarnessAvailabilityEvent = Extract<
+  HarnessEvent,
+  { type: 'workspace-harness-availability:changed' }
+>
 
 // Readiness can target a harness account or an individual workspace.
 type HarnessTarget = HarnessType | HarnessWorkspace
@@ -23,7 +23,7 @@ function entryKey(context: HarnessTarget): string {
 export type HarnessStoreOptions = {
   probe: (ws: HarnessTarget) => Promise<HarnessAvailability>
   startLogin: (harness: HarnessType) => Promise<HarnessLoginAttempt>
-  publish: (event: HarnessUpdatedEvent) => void
+  publish: (event: WorkspaceHarnessAvailabilityEvent) => void
   onAuthChanged?: (harness: HarnessType, availability: HarnessAvailability) => Promise<void>
   availabilityTtlMs?: number
   loginPollMs?: number
@@ -80,7 +80,7 @@ export function createHarnessStore(options: HarnessStoreOptions) {
   async function publish(context: HarnessTarget, availability: HarnessAvailability) {
     if (typeof context === 'string') return options.onAuthChanged?.(context, availability)
     options.publish({
-      type: 'harness:updated',
+      type: 'workspace-harness-availability:changed',
       workspaceId: context.id,
       availability
     })

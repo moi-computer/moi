@@ -35,7 +35,7 @@ Those operations work without an open browser. `shape-defaults.ts` supplies the
 shape defaults, checked against tldraw by the executor tests.
 
 `moi scratch view` needs a live Scratchpad tab to render an image. `relay.ts`
-sends the request over the chat WebSocket and waits for a browser response.
+sends the request over the machine `/api/events` WebSocket and waits for a browser response.
 Run `moi scratch --help` and the relevant subcommand's `--help` for current flags.
 
 ## Version skew

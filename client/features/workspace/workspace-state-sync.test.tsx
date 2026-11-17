@@ -9,8 +9,8 @@ import {
   usePinnedSession,
   useSelectedSession
 } from '@/client/features/chat/sessions/use-selected-session'
-import * as workspaceEvents from '@/client/runtime/use-workspace-events'
-import type { WorkspaceEvent } from '@/client/runtime/use-workspace-events'
+import * as workspaceEvents from '@/client/runtime/use-client-events'
+import type { ClientEvent } from '@/client/runtime/use-client-events'
 import type { CompiledView, WorkspaceState } from '@/lib/types'
 import { useViewActions } from '@/client/features/views/use-view-actions'
 import { useViews } from '@/client/features/views/api'
@@ -66,8 +66,8 @@ function mount(initial: WorkspaceState, respond: (request: Request) => Promise<u
       { preconnect: fetch.preconnect }
     )
   )
-  let handleEvent: (event: WorkspaceEvent) => void = () => {}
-  const eventsSpy = spyOn(workspaceEvents, 'useWorkspaceEvent').mockImplementation(handler => {
+  let handleEvent: (event: ClientEvent) => void = () => {}
+  const eventsSpy = spyOn(workspaceEvents, 'useClientEvent').mockImplementation(handler => {
     handleEvent = handler
   })
 
@@ -99,7 +99,7 @@ function mount(initial: WorkspaceState, respond: (request: Request) => Promise<u
     requests,
     render,
     cached: () => queryClient.getQueryData<WorkspaceState>(workspaceKeys.state(WORKSPACE_ID)),
-    emit: (event: WorkspaceEvent) => act(() => handleEvent(event)),
+    emit: (event: ClientEvent) => act(() => handleEvent(event)),
     settle: () =>
       act(async () => {
         await Bun.sleep(10)
@@ -152,12 +152,12 @@ test('a finished view stays visible through pending cleanup and a stale list rep
 
   const request = fixture.queryClient.refetchQueries({ queryKey })
   await fixture.settle()
-  fixture.emit({ type: 'view-layout:updated', workspaceId: 'other', views: [] })
+  fixture.emit({ type: 'views-list:changed', workspaceId: 'other', views: [] })
   await fixture.settle()
   expect(rendered.at(-1)).toEqual(['board:submitted'])
 
   const compiled: CompiledView = { id: 'board', status: 'compiled', title: 'Board' }
-  fixture.emit({ type: 'view-layout:updated', workspaceId: WORKSPACE_ID, views: [compiled] })
+  fixture.emit({ type: 'views-list:changed', workspaceId: WORKSPACE_ID, views: [compiled] })
   await fixture.settle()
   expect(rendered.at(-1)).toEqual(['board:compiled'])
   act(() =>
@@ -220,7 +220,7 @@ describe('workspace state writes', () => {
     )
   })
 
-  test('state:changed waits for writes in flight and never brings back an older copy', async () => {
+  test('personal-state:changed waits for writes in flight and never brings back an older copy', async () => {
     const reply = deferred<WorkspaceState>()
     const fixture = mount(workspaceState(), () => reply.promise)
     const handles: { pin?: (sessionId: string) => void } = {}
@@ -236,7 +236,7 @@ describe('workspace state writes', () => {
 
     await act(async () => handles.pin!('mine'))
     fixture.emit({
-      type: 'state:changed',
+      type: 'personal-state:changed',
       workspaceId: WORKSPACE_ID,
       state: workspaceState({ revision: 4, pinnedSessionId: 'theirs' })
     })
@@ -247,27 +247,27 @@ describe('workspace state writes', () => {
     expect(fixture.cached()?.revision).toBe(5)
 
     fixture.emit({
-      type: 'state:changed',
+      type: 'personal-state:changed',
       workspaceId: WORKSPACE_ID,
       state: workspaceState({ revision: 4, pinnedSessionId: 'theirs' })
     })
     expect(fixture.cached()?.pinnedSessionId).toBe('mine')
     fixture.emit({
-      type: 'state:changed',
+      type: 'personal-state:changed',
       workspaceId: WORKSPACE_ID,
       state: workspaceState({ revision: 6 })
     })
     expect(fixture.cached()).toEqual(workspaceState({ revision: 6 }))
   })
 
-  test('state:changed for a workspace this tab never loaded stays out of the cache', async () => {
+  test('personal-state:changed for a workspace this tab never loaded stays out of the cache', async () => {
     const fixture = mount(workspaceState(), async () => workspaceState())
     function Probe() {
       useWorkspaceStateSync()
       return null
     }
     await fixture.render(<Probe />)
-    fixture.emit({ type: 'state:changed', workspaceId: 'other', state: workspaceState() })
+    fixture.emit({ type: 'personal-state:changed', workspaceId: 'other', state: workspaceState() })
     expect(fixture.queryClient.getQueryData(workspaceKeys.state('other'))).toBeUndefined()
   })
 })
@@ -398,7 +398,7 @@ test('a view submission keeps its chat through delayed snapshots and a native se
   })
   const selected = fixture.cached()?.selected['views/board']
   expect(selected).toBeString()
-  fixture.emit({ type: 'state:changed', workspaceId: WORKSPACE_ID, state: initial })
+  fixture.emit({ type: 'personal-state:changed', workspaceId: WORKSPACE_ID, state: initial })
   await fixture.queryClient.refetchQueries({ queryKey: workspaceKeys.state(WORKSPACE_ID) })
   expect(fixture.cached()?.selected['views/board']).toBe(selected)
 
@@ -410,14 +410,14 @@ test('a view submission keeps its chat through delayed snapshots and a native se
       board: { status: 'submitted', requirements: 'Build cards', buildSessionId: 'native' }
     }
   })
-  fixture.emit({ type: 'state:changed', workspaceId: WORKSPACE_ID, state: server })
+  fixture.emit({ type: 'personal-state:changed', workspaceId: WORKSPACE_ID, state: server })
   await act(async () => {
     reply.resolve({ viewId: 'board', sessionId: 'native', state: server })
     await submission
   })
   expect(fixture.cached()).toEqual(server)
   expect(fixture.requests.filter(request => request.url.endsWith('/state'))).toHaveLength(1)
-  fixture.emit({ type: 'state:changed', workspaceId: WORKSPACE_ID, state: initial })
+  fixture.emit({ type: 'personal-state:changed', workspaceId: WORKSPACE_ID, state: initial })
   expect(fixture.cached()?.selected['views/board']).toBe('native')
 })
 
@@ -440,7 +440,7 @@ test('a newer socket snapshot survives an older write reply', async () => {
     pinnedSessionId: 'mine',
     selected: { 'views/board': 'native' }
   })
-  fixture.emit({ type: 'state:changed', workspaceId: WORKSPACE_ID, state: latest })
+  fixture.emit({ type: 'personal-state:changed', workspaceId: WORKSPACE_ID, state: latest })
   expect(fixture.cached()?.pinnedSessionId).toBe('mine')
   reply.resolve(workspaceState({ revision: 2, pinnedSessionId: 'mine' }))
   await fixture.settle()

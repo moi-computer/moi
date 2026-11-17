@@ -24,7 +24,7 @@ import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import { setScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
 import { persistScratchSession } from '@/client/features/scratchpad/scratch-session'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
-import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
+import { type ClientEvent, useClientEvent } from '@/client/runtime/use-client-events'
 import type { ScratchOp, ScratchOpResult } from '@/lib/types'
 import {
   type ScratchpadFetch,
@@ -230,9 +230,9 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
   // swapped for a newer Moi mid-session, `loadSnapshot` here would throw — flip
   // the skew notice instead (unmounting the editor, which also stops the
   // autosave timer) so this stale tab can't save over the newer file.
-  useWorkspaceEvent((e: WorkspaceEvent) => {
+  useClientEvent((e: ClientEvent) => {
     if (
-      (e.type !== 'scratchpad:updated' && e.type !== 'workspace:connected') ||
+      (e.type !== 'scratchpad:changed' && e.type !== 'workspace:connected') ||
       e.workspaceId !== workspaceId
     )
       return

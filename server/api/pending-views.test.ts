@@ -227,7 +227,7 @@ describe('pending view chat selection', () => {
         result.sessionId
       )
       // Other browser tabs hear the selection through the published state.
-      const published = events.filter(event => event.type === 'state:changed').at(-1) as
+      const published = events.filter(event => event.type === 'personal-state:changed').at(-1) as
         | { state: WorkspaceState }
         | undefined
       expect(published?.state.selected[viewTabId(draft.id)]).toBe(result.sessionId)

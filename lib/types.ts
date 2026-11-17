@@ -267,9 +267,6 @@ export type ClientMessage =
       context?: MoiContext
     }
   | { type: 'stop'; workspaceId: string; sessionId: string }
-  // Reply to a relayed Scratchpad op (see ScratchpadOpMessage). Carries the
-  // op's correlation id so the server settles the right pending CLI request.
-  | { type: 'scratchpad:op-result'; opId: string; result?: ScratchOpResult; error?: string }
 
 // Session details supplied by the agent backend.
 export type SessionSummary = {
@@ -313,7 +310,7 @@ export type WorkspaceSessionState = {
 }
 
 // Personal state on this Moi installation, shared across its browser windows.
-// GET /api/workspaces/:id/state; writes publish `state:changed`.
+// GET /api/workspaces/:id/state; writes publish `personal-state:changed`.
 export type WorkspaceState = {
   // Personal tab list/order, excluding the always-open Overview.
   // Missing opens all available tabs; an empty list opens only Overview.
@@ -399,11 +396,9 @@ export type ServerMessage =
   | SessionRenamedMessage
   | SessionsChangedMessage
   | SessionArchivedMessage
-  | WorkspaceSwitchMessage
   | ErrorFrame
   | StoppedFrame
   | StatusSnapshotMessage
-  | ScratchpadOpMessage
 
 // A live token-by-token snapshot of an assistant message still being generated.
 // Ephemeral: it is NOT a StreamEvent, never persisted, and never folded into the
@@ -412,7 +407,7 @@ export type ServerMessage =
 // lands. `blocks[].text` is CUMULATIVE, so a lost/reordered/duplicated frame is
 // simply overwritten by the next one — it can never corrupt the transcript.
 export type PreviewFrame = {
-  type: 'preview'
+  type: 'session:preview'
   workspaceId: string
   sessionId: string
   // API message id (`msg_...`), globally unique — the accumulator key, so
@@ -453,12 +448,12 @@ export type BroadcastFrame =
 // clears a spinner whose terminal `status` frame was lost (disconnect window,
 // dropped frame, harness gap).
 export type StatusSnapshotMessage = {
-  type: 'status_snapshot'
+  type: 'sessions:status-snapshot'
   sessions: { workspaceId: string; sessionId: string; activity: SessionActivity }[]
 }
 
-export type WorkspaceSwitchMessage = {
-  type: 'workspace:switch'
+export type WorkspaceOpenRequestMessage = {
+  type: 'workspace:open-requested'
   workspaceId: string
 }
 
@@ -557,20 +552,20 @@ export type DiscoveredWorkspace = {
 }
 
 export type SessionRenamedMessage = {
-  type: 'session_renamed'
+  type: 'session:renamed'
   workspaceId: string
   from: string
   to: string
 }
 
 export type SessionsChangedMessage = {
-  type: 'sessions_changed'
+  type: 'sessions:changed'
   workspaceId: string
   sessionId: string
 }
 
 export type SessionArchivedMessage = {
-  type: 'session_archived'
+  type: 'session:archived'
   workspaceId: string
   sessionId: string
 }
@@ -601,7 +596,7 @@ export type StoppedFrame = {
 export type SessionActivity = 'idle' | 'running' | 'requires-action'
 
 export type StatusMessage = {
-  type: 'status'
+  type: 'session:status'
   workspaceId: string
   sessionId: string
   activity: SessionActivity
@@ -760,7 +755,7 @@ export type Model = {
 }
 
 // GET /api/workspaces/:id/harness. Model changes arrive on refetch;
-// `harness:updated` events refresh availability.
+// `workspace-harness-availability:changed` events refresh availability.
 export type WorkspaceHarness = {
   /** Credential overrides require workspace readiness instead of shared account status. */
   hasAuthOverrides?: boolean

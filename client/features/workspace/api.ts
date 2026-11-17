@@ -7,7 +7,7 @@ import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
-import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
+import { useClientEvent } from '@/client/runtime/use-client-events'
 import type {
   WorkspaceEntry,
   WorkspaceHarness,
@@ -63,9 +63,9 @@ export function useWorkspaceLayout(workspaceId: string) {
 // Workspace models, capabilities, and readiness for credential overrides or gateways.
 export function useWorkspaceHarness(workspaceId: string) {
   const queryClient = useQueryClient()
-  useWorkspaceEvent(event => {
+  useClientEvent(event => {
     // Env can swap credentials; the server dropped its cache — refetch.
-    if (event.type === 'env:updated' && event.workspaceId === workspaceId) {
+    if (event.type === 'env:changed' && event.workspaceId === workspaceId) {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.harness(workspaceId) })
     }
   })

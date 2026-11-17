@@ -6,7 +6,7 @@ import { parseHTML } from 'linkedom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { AppContext } from '@/client/runtime/app-context'
-import type { WorkspaceEvent, WorkspaceEventsClient } from '@/client/runtime/workspace-events'
+import type { ClientEvent, AppEventsClient } from '@/client/runtime/app-events'
 import { useAppletCacheInvalidation, useView } from './use-applet'
 import * as cache from './applet-cache'
 import * as journal from './applet-log'
@@ -99,14 +99,14 @@ test.each([true, false])(
     )
     const lists = [workspaceKeys.views('visitor'), workspaceKeys.widgets('visitor')]
     for (const key of lists) client.setQueryData(key, [])
-    let emit: (event: WorkspaceEvent) => void = () => {}
+    let emit: (event: ClientEvent) => void = () => {}
     // Only `subscribe` is reached by the hook under test.
     const events = {
-      subscribe: (handler: (event: WorkspaceEvent) => void) => {
+      subscribe: (handler: (event: ClientEvent) => void) => {
         emit = handler
         return () => {}
       }
-    } as unknown as WorkspaceEventsClient
+    } as unknown as AppEventsClient
     function Probe() {
       useAppletCacheInvalidation()
       return null

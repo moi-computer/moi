@@ -6,50 +6,57 @@ import type {
   HarnessStatus,
   HarnessType,
   WidgetInfo,
+  ScratchpadOpMessage,
+  WorkspaceOpenRequestMessage,
   WorkspaceState
 } from './types'
 
 // The workspace URL supplies scope on the wire; the browser adds its local ID.
 export type SharedWorkspaceEvent =
-  | { type: 'widget:updated'; name: string }
-  | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
+  | { type: 'widget:changed'; name: string }
+  | { type: 'widgets-list:changed'; widgets: WidgetInfo[] }
   | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
-  | { type: 'view:updated'; name: string }
-  | { type: 'view-layout:updated'; views: CompiledView[] }
+  | { type: 'view:changed'; name: string }
+  | { type: 'views-list:changed'; views: CompiledView[] }
   | { type: 'view:deleted'; name: string }
-  | { type: 'theme:updated'; origin?: string }
-  | { type: 'workspace:updated'; origin?: string }
-  | { type: 'scratchpad:updated'; origin?: string }
+  | { type: 'workspace-config:changed'; origin?: string }
+  | { type: 'scratchpad:changed'; origin?: string }
 
 export type HarnessEvent =
   | { type: 'harness-status:changed'; harness: HarnessType; status: HarnessStatus }
-  | { type: 'harness:updated'; workspaceId: string; availability: HarnessAvailability }
+  | {
+      type: 'workspace-harness-availability:changed'
+      workspaceId: string
+      availability: HarnessAvailability
+    }
   | { type: 'workspace-harness:switched'; workspaceId: string; harness: HarnessType }
 
-export type WorkspaceEvent =
-  | (SharedWorkspaceEvent & { workspaceId?: string })
-  | HarnessEvent
-  // The machine's app socket opened or reopened.
-  | { type: 'connection:opened' }
-  // The shown workspace's owner socket opened or reopened.
+export type AppEvent =
+  | WorkspaceOpenRequestMessage
+  | ScratchpadOpMessage
+  | { type: 'personal-state:changed'; workspaceId: string; state: WorkspaceState }
+  | { type: 'env:changed'; workspaceId: string }
+  | { type: 'workspaces-list:changed'; origin?: string }
+  | { type: 'app-settings:changed'; settings: AppSettings }
+
+export type ServerEvent = (SharedWorkspaceEvent & { workspaceId: string }) | HarnessEvent | AppEvent
+
+export type ClientEvent =
+  | ServerEvent
+  | { type: 'app:connected' }
   | { type: 'workspace:connected'; workspaceId: string }
-  | { type: 'state:changed'; workspaceId: string; state: WorkspaceState }
-  | { type: 'env:updated'; workspaceId: string }
-  | { type: 'workspaces-list:updated'; origin?: string }
-  | { type: 'settings:updated'; settings: AppSettings }
   | NavigationRequest
 
 export function isSharedWorkspaceEvent(event: { type?: unknown }): event is SharedWorkspaceEvent {
   switch (event.type) {
-    case 'widget:updated':
-    case 'widget-layout:updated':
+    case 'widget:changed':
+    case 'widgets-list:changed':
     case 'applets:refresh':
-    case 'view:updated':
-    case 'view-layout:updated':
+    case 'view:changed':
+    case 'views-list:changed':
     case 'view:deleted':
-    case 'theme:updated':
-    case 'workspace:updated':
-    case 'scratchpad:updated':
+    case 'workspace-config:changed':
+    case 'scratchpad:changed':
       return true
     default:
       return false

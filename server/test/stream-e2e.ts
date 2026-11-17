@@ -52,7 +52,7 @@ const server = Bun.serve({
   websocket: {
     open(ws) {
       addClient(ws)
-      ws.send(JSON.stringify({ type: 'status_snapshot', sessions: getCCActiveSessions() }))
+      ws.send(JSON.stringify({ type: 'sessions:status-snapshot', sessions: getCCActiveSessions() }))
     },
     async message(ws, message) {
       const data = JSON.parse(String(message)) as ClientMessage
@@ -147,11 +147,11 @@ function check(name: string, ok: boolean, detail = '') {
   console.log(`${ok ? '✅' : '❌'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
-const isPreview = (f: Frame) => f.type === 'preview'
+const isPreview = (f: Frame) => f.type === 'session:preview'
 const isAssistantTurn = (f: Frame) =>
   f.kind === 'turn' && (f.turn as { role?: string } | undefined)?.role === 'assistant'
-const isStatusFalse = (f: Frame) => f.type === 'status' && f.activity === 'idle'
-const isStatusTrue = (f: Frame) => f.type === 'status' && f.activity === 'running'
+const isStatusFalse = (f: Frame) => f.type === 'session:status' && f.activity === 'idle'
+const isStatusTrue = (f: Frame) => f.type === 'session:status' && f.activity === 'running'
 
 function previewText(f: Frame): string {
   const blocks = (f.blocks ?? []) as { text?: string }[]
@@ -268,7 +268,7 @@ async function scenarioReconnectMidStream() {
   // new client still receives the tail — no crash, delivery continues.
   const c2 = new Client(URL)
   await c2.open()
-  const snapshot = c2.frames.find(f => f.type === 'status_snapshot')
+  const snapshot = c2.frames.find(f => f.type === 'sessions:status-snapshot')
   const runningNow = (snapshot?.sessions as unknown[] | undefined) ?? []
   if (runningNow.length >= 1) {
     // The common case: the long run is still going. The new client must receive

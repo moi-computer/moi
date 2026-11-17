@@ -46,7 +46,7 @@ export async function openSharedWorkspace(remote: RemoteWorkspaceTarget, harness
         await rm(path, { recursive: true, force: true })
       throw error
     }
-    publishEvent({ type: 'workspaces-list:updated' })
+    publishEvent({ type: 'workspaces-list:changed' })
     return entry
   })
 }

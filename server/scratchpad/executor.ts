@@ -36,7 +36,7 @@ import { SHAPE_DEFAULTS } from './shape-defaults'
 
 // Server-side Scratchpad writer. The browser is no longer required to draw: we run
 // the same ops against a *headless* tldraw store here, persist the snapshot, and
-// broadcast `scratchpad:updated` so any open tab reloads from disk. Only `view`
+// broadcast `scratchpad:changed` so any open tab reloads from disk. Only `view`
 // (rendering pixels) still needs a live tab; `read` is served straight off disk.
 // See docs/moi-scratchpad.md.
 //
@@ -493,7 +493,7 @@ export function executeScratchOp(
         : applyOp(store, op)
     const next = store.getStoreSnapshot() as unknown as ScratchpadDoc
     await saveScratchpadDoc(next, workspacePath)
-    publishEvent({ type: 'scratchpad:updated', workspaceId })
+    publishEvent({ type: 'scratchpad:changed', workspaceId })
     return result
   })
 }

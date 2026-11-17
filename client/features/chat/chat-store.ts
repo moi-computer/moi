@@ -91,7 +91,7 @@ export type LiveStore = {
   attachments: Record<string, StagedAttachment[]>
 
   setActivity: (workspaceId: string, sessionId: string, value: SessionActivity) => void
-  // Authoritative reconcile from a server `status_snapshot`: exactly the listed
+  // Authoritative reconcile from a server `sessions:status-snapshot`: exactly the listed
   // sessions are active; everything else is cleared to idle (fixes a spinner
   // whose terminal status frame was lost while we were disconnected).
   reconcileActivity: (

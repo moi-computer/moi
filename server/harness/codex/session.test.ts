@@ -4,7 +4,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import type { BroadcastFrame, StreamEvent } from '@/lib/types'
 
 import { getClientFrameLog } from '../debug'
-import { createHarnessStore, harnessStore, type HarnessUpdatedEvent } from '../auth'
+import { createHarnessStore, harnessStore, type WorkspaceHarnessAvailabilityEvent } from '../auth'
 import { getCodexAuthReadiness } from './auth'
 import { addUpload } from '../../uploads'
 import * as clients from './client'
@@ -104,7 +104,7 @@ describe('Codex live session lifecycle', () => {
     '%s auth failure publishes login-required despite cached account metadata',
     async method => {
       const f = fixture()
-      const published = deferred<HarnessUpdatedEvent>()
+      const published = deferred<WorkspaceHarnessAvailabilityEvent>()
       const store = createHarnessStore({
         probe: () => getCodexAuthReadiness(f.input.workspacePath),
         startLogin: async () => ({ id: 'attempt', url: 'https://example.com/login' }),
@@ -133,7 +133,7 @@ describe('Codex live session lifecycle', () => {
           : { turn: { id: 'turn-1', status: 'failed', error, items: [] } }
       )
       expect(await published.promise).toMatchObject({
-        type: 'harness:updated',
+        type: 'workspace-harness-availability:changed',
         workspaceId: workspace.id,
         availability: { status: 'login-required' }
       })
@@ -173,14 +173,14 @@ describe('Codex live session lifecycle', () => {
       getCodexActiveSessions().find(row => row.workspaceId === f.input.workspaceId)?.activity
     ).toBe('requires-action')
     f.emit('thread/status/changed', { status: { type: 'active', activeFlags: [] } })
-    expect(f.frames().at(-1)).toMatchObject({ type: 'status', activity: 'running' })
+    expect(f.frames().at(-1)).toMatchObject({ type: 'session:status', activity: 'running' })
     f.emit('thread/status/changed', {
       status: { type: 'active', activeFlags: ['waitingOnUserInput'] }
     })
-    expect(f.frames().at(-1)).toMatchObject({ type: 'status', activity: 'requires-action' })
+    expect(f.frames().at(-1)).toMatchObject({ type: 'session:status', activity: 'requires-action' })
     f.emit('turn/completed', { turn: { id: 'busy', status: 'completed', items: [] } })
     expect(f.active()).toBe(false)
-    expect(f.frames().at(-1)).toMatchObject({ type: 'status', activity: 'idle' })
+    expect(f.frames().at(-1)).toMatchObject({ type: 'session:status', activity: 'idle' })
   })
 
   test('unloaded or closed chats release their subscriptions and resume on the next send', async () => {
@@ -558,11 +558,15 @@ describe('Codex live session lifecycle', () => {
     await f.send('stream', { stream: true })
     for (let i = 0; i < 100; i++) f.emit('item/agentMessage/delta', { itemId: 'a', delta: 'x' })
     await Bun.sleep(50)
-    expect(f.frames().filter(frame => 'type' in frame && frame.type === 'preview')).toHaveLength(1)
+    expect(
+      f.frames().filter(frame => 'type' in frame && frame.type === 'session:preview')
+    ).toHaveLength(1)
     f.emit('item/agentMessage/delta', { itemId: 'a', delta: 'y' })
     f.emit('item/completed', { item: { type: 'agentMessage', id: 'a', text: 'final' } })
     await Bun.sleep(50)
-    expect(f.frames().filter(frame => 'type' in frame && frame.type === 'preview')).toHaveLength(1)
+    expect(
+      f.frames().filter(frame => 'type' in frame && frame.type === 'session:preview')
+    ).toHaveLength(1)
   })
 
   test('process exit clears active state, unsubscribes, and allows a fresh resume', async () => {

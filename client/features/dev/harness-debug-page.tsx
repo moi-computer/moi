@@ -282,7 +282,7 @@ export function HarnessDebugPage() {
       try {
         const frame = JSON.parse(String(e.data)) as Record<string, unknown>
         if (frame.workspaceId && frame.workspaceId !== workspaceId) return
-        if (frame.type === 'session_renamed' && frame.from === sessionRef.current) {
+        if (frame.type === 'session:renamed' && frame.from === sessionRef.current) {
           setSessionId(frame.to as string)
           setIsNew(false)
         }

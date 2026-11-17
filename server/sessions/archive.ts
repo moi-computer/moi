@@ -11,7 +11,7 @@ export async function archiveWorkspaceSession(ws: WorkspaceEntry, sessionId: str
   await harness.interrupt(ws.id, sessionId)
   await harness.archiveSession(ws, sessionId)
   await clearSelectedSession(ws, sessionId)
-  broadcast(ws.id, { type: 'session_archived', sessionId })
+  broadcast(ws.id, { type: 'session:archived', sessionId })
 }
 
 export async function archiveViewSessions(ws: WorkspaceEntry, viewId: string) {

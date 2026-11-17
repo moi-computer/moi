@@ -17,13 +17,7 @@ import { PORT } from './constants'
 import { control } from './control'
 import { proxyUserState } from './collab/cloudflare-access'
 import { collabManager } from './collab/manager'
-import {
-  EVENTS_TOPIC,
-  HARNESS_EVENTS_TOPIC,
-  WORKSPACE_REFRESH_TOPIC,
-  workspaceEventsTopic,
-  setEventServer
-} from './events'
+import { EVENTS_TOPIC, HARNESS_EVENTS_TOPIC, workspaceEventsTopic, setEventServer } from './events'
 import { killBuildWorkers } from './applets/build-worker'
 import { killAllWorkers } from './applets/functions'
 import { startScratchpadSweeper } from './scratchpad/document'
@@ -87,7 +81,6 @@ function isClientMessage(value: unknown): value is ClientMessage {
       (v.attachments === undefined || isMessageAttachments(v.attachments))
     )
   if (v.type === 'stop') return typeof v.workspaceId === 'string' && typeof v.sessionId === 'string'
-  if (v.type === 'scratchpad:op-result') return typeof v.opId === 'string'
   return false
 }
 
@@ -100,7 +93,10 @@ const shell = prebuilt ? distShell : index
 // connect and re-broadcast periodically (below) so a spinner whose terminal
 // status frame was lost self-heals without a reconnect.
 function statusSnapshot(): StatusSnapshotMessage {
-  return { type: 'status_snapshot', sessions: allHarnesses().flatMap(h => h.activeSessions()) }
+  return {
+    type: 'sessions:status-snapshot',
+    sessions: allHarnesses().flatMap(h => h.activeSessions())
+  }
 }
 
 type Upgradable = { upgrade(req: Request, opts: { data: WsData }): boolean }
@@ -215,7 +211,6 @@ export const app = Bun.serve<WsData>({
     open(ws) {
       if (ws.data.channel === 'workspace') {
         ws.subscribe(workspaceEventsTopic(ws.data.workspaceId))
-        ws.subscribe(WORKSPACE_REFRESH_TOPIC)
       } else if (ws.data.channel === 'chat') {
         ws.subscribe(HARNESS_EVENTS_TOPIC)
         addClient(ws)
@@ -242,7 +237,12 @@ export const app = Bun.serve<WsData>({
       }
       if (ws.data.channel === 'events') {
         try {
-          navigationRelay.receive(ws, JSON.parse(String(message)))
+          const data = JSON.parse(String(message))
+          if (data?.type === 'scratchpad:op-result' && typeof data.opId === 'string') {
+            resolveScratchOp(data.opId, data.result, data.error)
+          } else {
+            navigationRelay.receive(ws, data)
+          }
         } catch {}
         return
       }
@@ -284,18 +284,12 @@ export const app = Bun.serve<WsData>({
             .interrupt(data.workspaceId, data.sessionId)
             .catch(() => {})
         }
-        // A tab's reply to a relayed Scratchpad op — settle the pending CLI
-        // request (first reply wins; later/duplicate replies are ignored).
-        if (data.type === 'scratchpad:op-result') {
-          resolveScratchOp(data.opId, data.result, data.error)
-        }
       } catch {}
     },
     close(ws) {
       if (ws.data.channel === 'workspace') {
         collabManager.close(ws)
         ws.unsubscribe(workspaceEventsTopic(ws.data.workspaceId))
-        ws.unsubscribe(WORKSPACE_REFRESH_TOPIC)
       } else if (ws.data.channel === 'chat') {
         removeClient(ws)
         ws.unsubscribe(HARNESS_EVENTS_TOPIC)

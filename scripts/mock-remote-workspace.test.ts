@@ -103,7 +103,7 @@ describe('owner startup', () => {
       const message = JSON.parse(String(event.data))
       received.push(message)
       if (message.type === 'welcome') welcome.resolve()
-      if (message.type === 'workspace:updated') changed.resolve()
+      if (message.type === 'workspace-config:changed') changed.resolve()
     }
     try {
       await new Promise<void>((resolve, reject) => {
@@ -131,11 +131,11 @@ describe('owner startup', () => {
       })
       expect(config.status).toBe(200)
       await changed.promise
-      expect(received.find(message => message.type === 'workspace:updated')).toEqual({
-        type: 'workspace:updated',
+      expect(received.find(message => message.type === 'workspace-config:changed')).toEqual({
+        type: 'workspace-config:changed',
         origin: 'other-tab'
       })
-      expect(received.some(message => message.type === 'state:changed')).toBe(false)
+      expect(received.some(message => message.type === 'personal-state:changed')).toBe(false)
     } finally {
       socket.close()
     }

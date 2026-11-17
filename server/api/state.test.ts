@@ -128,7 +128,7 @@ describe('workspace state API', () => {
     try {
       const saved = await state(call('/sessions/existing/pin', 'PUT'))
       expect(publish).toHaveBeenCalledWith({
-        type: 'state:changed',
+        type: 'personal-state:changed',
         workspaceId: workspace.id,
         state: saved
       })

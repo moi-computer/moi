@@ -1,3 +1,4 @@
+import type { ServerEvent } from '@/lib/events'
 import { expect, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -50,6 +51,7 @@ test('real socket routes isolate shared workspaces, personal state, harness even
   )
   const ready = Promise.withResolvers<void>()
   const navigation = Promise.withResolvers<void>()
+  const scratch = Promise.withResolvers<unknown>()
   const child = Bun.spawn(
     [
       process.execPath,
@@ -58,7 +60,12 @@ test('real socket routes isolate shared workspaces, personal state, harness even
     await import('./server/web.ts');
     const { publishEvent } = await import('./server/events.ts');
     const { navigationRelay } = await import('./server/navigation-relay.ts');
+    const { relayScratchOp } = await import('./server/scratchpad/relay.ts');
     process.on('message', async message => {
+      if (message.type === 'scratch') {
+        const result = await relayScratchOp('one', { kind: 'view' });
+        process.send({ type: 'scratch-result', result });
+      }
       if (message.type === 'publish') publishEvent(message.event);
       if (message.type === 'navigate') {
         await navigationRelay.navigate('one', 'moi:/overview');
@@ -83,6 +90,7 @@ test('real socket routes isolate shared workspaces, personal state, harness even
       ipc(message) {
         if (message.type === 'ready') ready.resolve()
         if (message.type === 'navigated') navigation.resolve()
+        if (message.type === 'scratch-result') scratch.resolve(message.result)
       }
     }
   )
@@ -112,22 +120,96 @@ test('real socket routes isolate shared workspaces, personal state, harness even
     const [machine, harness, one, two] = connections
     one!.socket.send(JSON.stringify({ type: 'ping' }))
     await until(() => one!.messages.some(message => message.type === 'pong'))
-    expect(harness!.messages).toContainEqual({ type: 'status_snapshot', sessions: [] })
+    expect(harness!.messages).toContainEqual({ type: 'sessions:status-snapshot', sessions: [] })
     for (const connection of connections) connection.messages.length = 0
-    const send = (event: object) => child.send({ type: 'publish', event })
-    send({ type: 'state:changed', workspaceId: 'visitor', state: { revision: 4 } })
-    send({ type: 'harness:updated', workspaceId: 'visitor', availability: { status: 'available' } })
-    send({ type: 'view:updated', workspaceId: 'one', name: 'plan' })
-    send({ type: 'view:updated', workspaceId: 'two', name: 'other' })
+    const send = (event: ServerEvent) => child.send({ type: 'publish', event })
+    send({
+      type: 'personal-state:changed',
+      workspaceId: 'visitor',
+      state: { revision: 4, selected: {}, sessions: {}, pendingViews: {} }
+    })
+    send({
+      type: 'workspace-harness-availability:changed',
+      workspaceId: 'visitor',
+      availability: { status: 'available' }
+    })
+    send({ type: 'view:changed', workspaceId: 'one', name: 'plan' })
+    send({ type: 'view:changed', workspaceId: 'two', name: 'other' })
     await until(() => connections.every(connection => connection.messages.length > 0))
     expect(machine!.messages).toEqual([
-      { type: 'state:changed', workspaceId: 'visitor', state: { revision: 4 } }
+      {
+        type: 'personal-state:changed',
+        workspaceId: 'visitor',
+        state: { revision: 4, selected: {}, sessions: {}, pendingViews: {} }
+      }
     ])
     expect(harness!.messages).toEqual([
-      { type: 'harness:updated', workspaceId: 'visitor', availability: { status: 'available' } }
+      {
+        type: 'workspace-harness-availability:changed',
+        workspaceId: 'visitor',
+        availability: { status: 'available' }
+      }
     ])
-    expect(one!.messages).toEqual([{ type: 'view:updated', name: 'plan' }])
-    expect(two!.messages).toEqual([{ type: 'view:updated', name: 'other' }])
+    expect(one!.messages).toEqual([{ type: 'view:changed', name: 'plan' }])
+    expect(two!.messages).toEqual([{ type: 'view:changed', name: 'other' }])
+
+    for (const connection of connections) connection.messages.length = 0
+    const control = await connect(`ws://127.0.0.1:${controlPort}`)
+    sockets.push(control.socket)
+    control.socket.send(JSON.stringify({ type: 'applets:refresh', only: 'views' }))
+    await until(
+      () =>
+        control.messages.some(message => message.ok === true) &&
+        one!.messages.length > 0 &&
+        two!.messages.length > 0
+    )
+    expect(one!.messages).toEqual([{ type: 'applets:refresh', only: 'views' }])
+    expect(two!.messages).toEqual([{ type: 'applets:refresh', only: 'views' }])
+    expect(machine!.messages).toEqual([])
+    expect(harness!.messages).toEqual([])
+
+    for (const connection of connections) connection.messages.length = 0
+    const moved = await fetch(`http://127.0.0.1:${port}/api/workspaces/one`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        version: 2,
+        widgetGrid: [{ i: '_moi_views', x: 2, y: 3 }],
+        origin: 'editing-tab'
+      })
+    })
+    expect(moved.status).toBe(204)
+    await until(() => one!.messages.length > 0 && machine!.messages.length > 0)
+    expect(one!.messages).toEqual([{ type: 'workspace-config:changed', origin: 'editing-tab' }])
+    expect(machine!.messages).toEqual([{ type: 'workspaces-list:changed' }])
+    expect(two!.messages).toEqual([])
+    expect(harness!.messages).toEqual([])
+
+    for (const connection of connections) connection.messages.length = 0
+    send({ type: 'workspace:open-requested', workspaceId: 'one' })
+    child.send({ type: 'scratch' })
+    await until(() => machine!.messages.some(message => message.type === 'scratchpad:op'))
+    expect(machine!.messages).toContainEqual({
+      type: 'workspace:open-requested',
+      workspaceId: 'one'
+    })
+    const op = machine!.messages.find(message => message.type === 'scratchpad:op')!
+    // Replies on owner and harness sockets must not settle the machine's request.
+    const wrongReply = JSON.stringify({
+      type: 'scratchpad:op-result',
+      opId: op.opId,
+      result: { wrong: true }
+    })
+    harness!.socket.send(wrongReply)
+    one!.socket.send(wrongReply)
+    await Bun.sleep(30)
+    machine!.socket.send(
+      JSON.stringify({ type: 'scratchpad:op-result', opId: op.opId, result: { ok: true } })
+    )
+    expect(await scratch.promise).toEqual({ ok: true })
+    expect(harness!.messages).toEqual([])
+    expect(one!.messages).toEqual([])
+    expect(two!.messages).toEqual([])
 
     // Register on both transports. Only the machine channel can become a navigation target.
     const presence = JSON.stringify({

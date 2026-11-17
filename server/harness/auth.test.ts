@@ -2,7 +2,7 @@ import { expect, spyOn, test } from 'bun:test'
 
 import type { HarnessAvailability, HarnessLogin, WorkspaceEntry } from '@/lib/types'
 
-import type { HarnessUpdatedEvent } from './auth'
+import type { WorkspaceHarnessAvailabilityEvent } from './auth'
 import { createHarnessStore as createStore, type HarnessStoreOptions } from './auth'
 
 function createHarnessStore(options: HarnessStoreOptions) {
@@ -54,7 +54,7 @@ test('serves the cached availability within the TTL and re-probes after invalida
 })
 
 test('refresh bypasses the TTL and publishes even when nothing else asked', async () => {
-  const events: HarnessUpdatedEvent[] = []
+  const events: WorkspaceHarnessAvailabilityEvent[] = []
   let probes = 0
   let available = true
   const store = createHarnessStore({
@@ -184,7 +184,7 @@ test('startup has no instructions until the shared provider call resolves', asyn
 })
 
 test('publishes the completed login and clears the ceremony', async () => {
-  const events: HarnessUpdatedEvent[] = []
+  const events: WorkspaceHarnessAvailabilityEvent[] = []
   let loggedIn = false
   const store = createHarnessStore({
     probe: async () => (loggedIn ? { status: 'available' } : signedOut),
@@ -207,7 +207,7 @@ test('publishes the completed login and clears the ceremony', async () => {
 })
 
 test('publishes one unavailable transition during login and keeps watching for recovery', async () => {
-  const events: HarnessUpdatedEvent[] = []
+  const events: WorkspaceHarnessAvailabilityEvent[] = []
   let probes = 0
   let availability: HarnessAvailability = signedOut
   const store = createHarnessStore({
@@ -241,7 +241,7 @@ test('publishes one unavailable transition during login and keeps watching for r
 })
 
 test('a ceremony that never lands fails at the deadline', async () => {
-  const events: HarnessUpdatedEvent[] = []
+  const events: WorkspaceHarnessAvailabilityEvent[] = []
   const store = createHarnessStore({
     probe: async () => signedOut,
     startLogin: async () => instructions,
@@ -337,7 +337,7 @@ test('invalidating a context during login startup prevents a stale watcher', asy
 test('one global login updates multiple workspaces without sharing their readiness', async () => {
   const first = { ...ws, harness: 'codex' as const }
   const second = { ...first, id: 'w2', path: '/tmp/w2' }
-  const events: HarnessUpdatedEvent[] = []
+  const events: WorkspaceHarnessAvailabilityEvent[] = []
   let loggedIn = false
   let starts = 0
   const store = createStore({

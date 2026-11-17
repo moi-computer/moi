@@ -263,7 +263,7 @@ export function ChatStatesPage() {
   const [showError, setShowError] = useState(false)
 
   // The running selector row's spinner reads the live activity store. Seed it,
-  // and re-seed after any server status_snapshot reconcile (which rebuilds the
+  // and re-seed after any server sessions:status-snapshot reconcile (which rebuilds the
   // activity map and would drop this fixture entry).
   useEffect(() => {
     const seed = () => {

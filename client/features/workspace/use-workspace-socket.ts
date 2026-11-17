@@ -41,8 +41,7 @@ export function useWorkspaceSocket(workspaceId: string): WorkspaceSocket {
       },
       message: message => {
         if (!isSharedWorkspaceEvent(message)) return
-        if (message.type === 'workspace:updated' || message.type === 'theme:updated')
-          refreshOwnerInfo()
+        if (message.type === 'workspace-config:changed') refreshOwnerInfo()
         events.emit({ ...message, workspaceId })
       }
     })

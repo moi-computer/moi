@@ -71,7 +71,7 @@ describe('app settings API', () => {
 
     // Other open clients learn about the change over the live-event channel.
     expect(published).toEqual([
-      { type: 'settings:updated', settings: { autoUpdateSkills: true, showOnboarding: false } }
+      { type: 'app-settings:changed', settings: { autoUpdateSkills: true, showOnboarding: false } }
     ])
   })
 

@@ -25,7 +25,7 @@ import type {
 } from '@/lib/types'
 
 // The agent's chat list. Reading it makes the harness scan transcripts, so
-// mounts within 30 s reuse it; harness `sessions_changed` frames refetch it,
+// mounts within 30 s reuse it; harness `sessions:changed` frames refetch it,
 // and focus picks up chats made outside Moi.
 export function workspaceSessionsOptions(workspaceId: string) {
   return {
@@ -113,7 +113,7 @@ export function removeArchivedSession<T extends SessionSummary>(
 }
 
 // Drop an archived chat everywhere this browser keeps it. The server's state
-// arrives with the archive reply or a `state:changed` event.
+// arrives with the archive reply or a `personal-state:changed` event.
 export function applyArchivedSession(
   queryClient: QueryClient,
   workspaceId: string,

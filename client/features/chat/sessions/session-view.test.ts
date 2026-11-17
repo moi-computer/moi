@@ -35,10 +35,7 @@ function turn(id: string, text = id): StreamEvent {
 }
 
 function receive(event: StreamEvent, sid = sessionId) {
-  reduceChatFrame(
-    { ...event, workspaceId, sessionId: sid },
-    { queryClient: client, sendMessage: () => {}, onWorkspaceSwitch: null }
-  )
+  reduceChatFrame({ ...event, workspaceId, sessionId: sid }, { queryClient: client })
 }
 
 test('first load retains socket events received before the cache exists', async () => {

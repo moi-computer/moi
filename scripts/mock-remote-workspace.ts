@@ -514,8 +514,7 @@ if (import.meta.main) {
   process.env.MOI_SECRET_BACKEND = 'file'
   process.env.MOI_ENVIRONMENT = 'cloud'
   const { collabManager } = await import('../server/collab/manager')
-  const { setEventServer, workspaceEventsTopic, WORKSPACE_REFRESH_TOPIC } =
-    await import('../server/events')
+  const { setEventServer, workspaceEventsTopic } = await import('../server/events')
   const { api } = await import('../server/api')
   const { registerWorkspace } = await import('../server/workspaces/registry')
   const { saveLayout, loadLayout } = await import('../server/workspaces/layout')
@@ -626,7 +625,6 @@ export default function LaunchPlan() {
     websocket: {
       open: socket => {
         socket.subscribe(workspaceEventsTopic('owner-board'))
-        socket.subscribe(WORKSPACE_REFRESH_TOPIC)
       },
       // Same rule as server/web.ts: presence starts with the first presence message.
       message: (socket, message) => {

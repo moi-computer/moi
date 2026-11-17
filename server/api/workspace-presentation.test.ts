@@ -70,8 +70,8 @@ test('glyphs and uploads keep their complete presentation in one icon object', a
 
   expect((await putIcon()).status).toBe(200)
   expect(published.map(event => JSON.parse(event))).toEqual([
-    { type: 'workspace:updated' },
-    { type: 'workspace:updated' }
+    { type: 'workspace-config:changed' },
+    { type: 'workspace-config:changed' }
   ])
   const plain = await loadLayout(workspaceDir)
   expect(plain.icon?.type).toBe('upload')
@@ -129,7 +129,7 @@ test('theme saves broadcast changes and expose the theme in workspace lists', as
   const list = (await (await api.request('/api/workspaces')).json()) as WorkspaceEntry[]
 
   expect(response.status).toBe(204)
-  expect(published).toContain(JSON.stringify({ type: 'theme:updated' }))
+  expect(published).toContain(JSON.stringify({ type: 'workspace-config:changed' }))
   expect(list[0]?.theme).toEqual(theme)
 })
 
@@ -152,3 +152,34 @@ test('layout saves leave personal chat defaults unchanged', async () => {
     (await (await api.request(`/api/workspaces/${workspaceId}/state`)).json()).chatDefaults
   ).toEqual({ model: 'chosen-model' })
 })
+
+test.each([
+  { widgetGrid: [{ i: '_moi_views', x: 2, y: 3 }] },
+  { widgetGrid: [] },
+  {
+    widgetGrid: [
+      { i: '_moi_views', x: 0, y: 0 },
+      { i: 'counter', x: 1, y: 1 }
+    ]
+  }
+])(
+  'widget placement changes notify other viewers without a theme change: %j',
+  async ({ widgetGrid }) => {
+    const initial = await loadLayout(workspaceDir)
+    const body = { ...initial, widgetGrid, origin: 'editing-tab' }
+    const save = () =>
+      api.request(`/api/workspaces/${workspaceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+    expect((await save()).status).toBe(204)
+    expect(await loadLayout(workspaceDir)).toEqual({ ...initial, widgetGrid: [...widgetGrid] })
+    expect(published.map(event => JSON.parse(event))).toEqual([
+      { type: 'workspace-config:changed', origin: 'editing-tab' }
+    ])
+    published.length = 0
+    expect((await save()).status).toBe(204)
+    expect(published).toEqual([])
+  }
+)

@@ -42,7 +42,7 @@ function previewFrame(
   parentToolUseId: string | null = null,
   sessionId = SID
 ) {
-  return { type: 'preview', workspaceId: WS, sessionId, messageId, parentToolUseId, blocks }
+  return { type: 'session:preview', workspaceId: WS, sessionId, messageId, parentToolUseId, blocks }
 }
 function textBlocks(text: string): PreviewBlock[] {
   return [{ index: 0, kind: 'text', text }]
@@ -60,7 +60,12 @@ function assistantTurn(id: string, apiMessageId: string, text: string): Turn {
   }
 }
 function statusFrame(processing: boolean, sessionId = SID) {
-  return { type: 'status', workspaceId: WS, sessionId, activity: processing ? 'running' : 'idle' }
+  return {
+    type: 'session:status',
+    workspaceId: WS,
+    sessionId,
+    activity: processing ? 'running' : 'idle'
+  }
 }
 
 // Prime a thread's transcript so patchView/preview-guard treat it as loaded.

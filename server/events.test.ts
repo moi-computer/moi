@@ -1,3 +1,4 @@
+import type { ServerEvent } from '@/lib/events'
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { publishEvent, setEventServer } from './events'
 
@@ -11,48 +12,59 @@ afterEach(() => {
 })
 
 test('shared updates are scoped to their owner workspace without repeating its ID', () => {
-  publishEvent({ type: 'view:updated', workspaceId: 'owner-board', name: 'plan' })
-  publishEvent({ type: 'scratchpad:updated', workspaceId: 'another-board', origin: 'tab' })
+  publishEvent({ type: 'view:changed', workspaceId: 'owner-board', name: 'plan' })
+  publishEvent({ type: 'scratchpad:changed', workspaceId: 'another-board', origin: 'tab' })
   expect(sent).toEqual([
-    { topic: 'workspace-events:owner-board', event: { type: 'view:updated', name: 'plan' } },
+    { topic: 'workspace-events:owner-board', event: { type: 'view:changed', name: 'plan' } },
     {
       topic: 'workspace-events:another-board',
-      event: { type: 'scratchpad:updated', origin: 'tab' }
+      event: { type: 'scratchpad:changed', origin: 'tab' }
     }
   ])
 })
 
 test('personal state, environment and settings stay on the machine event channel', () => {
-  const events = [
+  const events: ServerEvent[] = [
     {
-      type: 'state:changed',
+      type: 'personal-state:changed',
       workspaceId: 'visitor-board',
-      state: { selected: { overview: 'private-chat' } }
+      state: { revision: 1, selected: { overview: 'private-chat' }, sessions: {}, pendingViews: {} }
     },
-    { type: 'env:updated', workspaceId: 'visitor-board' },
-    { type: 'settings:updated', settings: { showOnboarding: false } },
-    { type: 'workspaces-list:updated' }
+    { type: 'env:changed', workspaceId: 'visitor-board' },
+    { type: 'app-settings:changed', settings: { showOnboarding: false, autoUpdateSkills: true } },
+    { type: 'workspaces-list:changed' }
   ]
   for (const event of events) publishEvent(event)
   expect(sent).toEqual(events.map(event => ({ topic: 'events', event })))
 })
 
 test('harness changes reach the app-wide harness connection', () => {
-  const events = [
-    { type: 'harness-status:changed', harness: 'codex', status: {} },
-    { type: 'harness:updated', workspaceId: 'visitor-board', availability: {} },
+  const events: ServerEvent[] = [
+    {
+      type: 'harness-status:changed',
+      harness: 'codex',
+      status: { availability: { status: 'available' } }
+    },
+    {
+      type: 'workspace-harness-availability:changed',
+      workspaceId: 'visitor-board',
+      availability: { status: 'available' }
+    },
     { type: 'workspace-harness:switched', workspaceId: 'visitor-board', harness: 'codex' }
   ]
   for (const event of events) publishEvent(event)
   expect(sent).toEqual(events.map(event => ({ topic: 'harness-events', event })))
 })
 
-test('an unscoped refresh reaches open owner workspaces; metadata also refreshes the local list', () => {
-  publishEvent({ type: 'applets:refresh', only: 'views' })
-  publishEvent({ type: 'theme:updated', workspaceId: 'owner-board', origin: 'tab' })
+test('refreshes stay workspace-scoped and configuration changes refresh the local list', () => {
+  publishEvent({ type: 'applets:refresh', workspaceId: 'owner-board', only: 'views' })
+  publishEvent({ type: 'workspace-config:changed', workspaceId: 'owner-board', origin: 'tab' })
   expect(sent).toEqual([
-    { topic: 'workspace-refresh', event: { type: 'applets:refresh', only: 'views' } },
-    { topic: 'workspace-events:owner-board', event: { type: 'theme:updated', origin: 'tab' } },
-    { topic: 'events', event: { type: 'workspaces-list:updated' } }
+    { topic: 'workspace-events:owner-board', event: { type: 'applets:refresh', only: 'views' } },
+    {
+      topic: 'workspace-events:owner-board',
+      event: { type: 'workspace-config:changed', origin: 'tab' }
+    },
+    { topic: 'events', event: { type: 'workspaces-list:changed' } }
   ])
 })

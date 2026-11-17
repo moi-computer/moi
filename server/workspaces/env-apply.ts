@@ -16,5 +16,5 @@ export function applyEnvChanged(workspace: { id: string; path: string }): void {
   // Env can carry credentials (ANTHROPIC_API_KEY, provider config) — drop the
   // cached availability so the next agent snapshot re-probes.
   harnessStore.invalidate(workspace)
-  publishEvent({ type: 'env:updated', workspaceId: workspace.id })
+  publishEvent({ type: 'env:changed', workspaceId: workspace.id })
 }

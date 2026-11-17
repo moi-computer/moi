@@ -71,14 +71,14 @@ test('editing a helper imported only by a .server.ts reaches a live worker', asy
   await handleBundle(event => events.push(event), 'test-workspace', WS)
   expect(events).toContainEqual(
     expect.objectContaining({
-      type: 'widget:updated',
+      type: 'widget:changed',
       workspaceId: 'test-workspace',
       name: 'clock'
     })
   )
   expect(events).toContainEqual(
     expect.objectContaining({
-      type: 'widget-layout:updated',
+      type: 'widgets-list:changed',
       workspaceId: 'test-workspace'
     })
   )

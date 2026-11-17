@@ -101,29 +101,34 @@ beforeEach(() => {
 
 describe('status frames', () => {
   test('status frames mirror activity into the store', () => {
-    handleFrame({ type: 'status', workspaceId: WS, sessionId: SID, activity: 'running' })
+    handleFrame({ type: 'session:status', workspaceId: WS, sessionId: SID, activity: 'running' })
     expect(activityOf()).toBe('running')
-    handleFrame({ type: 'status', workspaceId: WS, sessionId: SID, activity: 'requires-action' })
+    handleFrame({
+      type: 'session:status',
+      workspaceId: WS,
+      sessionId: SID,
+      activity: 'requires-action'
+    })
     expect(activityOf()).toBe('requires-action')
-    handleFrame({ type: 'status', workspaceId: WS, sessionId: SID, activity: 'idle' })
+    handleFrame({ type: 'session:status', workspaceId: WS, sessionId: SID, activity: 'idle' })
     expect(activityOf()).toBe('idle')
   })
 
   test('error frame is terminal: clears activity and records the error', () => {
-    handleFrame({ type: 'status', workspaceId: WS, sessionId: SID, activity: 'running' })
+    handleFrame({ type: 'session:status', workspaceId: WS, sessionId: SID, activity: 'running' })
     handleFrame({ kind: 'error', workspaceId: WS, sessionId: SID, content: 'boom' })
     expect(activityOf()).toBe('idle')
     expect(liveStore.getState().errors[`${WS}:${SID}`]).toBe('boom')
   })
 
   test('stopped frame clears activity', () => {
-    handleFrame({ type: 'status', workspaceId: WS, sessionId: SID, activity: 'running' })
+    handleFrame({ type: 'session:status', workspaceId: WS, sessionId: SID, activity: 'running' })
     handleFrame({ kind: 'stopped', workspaceId: WS, sessionId: SID })
     expect(activityOf()).toBe('idle')
   })
 
   test('a failed steer records the error while keeping the current run stoppable', () => {
-    handleFrame({ type: 'status', workspaceId: WS, sessionId: SID, activity: 'running' })
+    handleFrame({ type: 'session:status', workspaceId: WS, sessionId: SID, activity: 'running' })
     handleFrame({
       kind: 'error',
       workspaceId: WS,
@@ -136,12 +141,17 @@ describe('status frames', () => {
   })
 })
 
-describe('status_snapshot reconcile', () => {
+describe('sessions:status-snapshot reconcile', () => {
   test('sessions absent from the snapshot are cleared (lost terminal frame heals)', () => {
-    handleFrame({ type: 'status', workspaceId: WS, sessionId: SID, activity: 'running' })
-    handleFrame({ type: 'status', workspaceId: WS, sessionId: 'other', activity: 'running' })
+    handleFrame({ type: 'session:status', workspaceId: WS, sessionId: SID, activity: 'running' })
     handleFrame({
-      type: 'status_snapshot',
+      type: 'session:status',
+      workspaceId: WS,
+      sessionId: 'other',
+      activity: 'running'
+    })
+    handleFrame({
+      type: 'sessions:status-snapshot',
       sessions: [{ workspaceId: WS, sessionId: 'other', activity: 'running' }]
     })
     expect(activityOf()).toBeUndefined()
@@ -150,23 +160,28 @@ describe('status_snapshot reconcile', () => {
 
   test('snapshot carries non-running activity through', () => {
     handleFrame({
-      type: 'status_snapshot',
+      type: 'sessions:status-snapshot',
       sessions: [{ workspaceId: WS, sessionId: SID, activity: 'requires-action' }]
     })
     expect(activityOf()).toBe('requires-action')
   })
 
   test('empty snapshot clears everything', () => {
-    handleFrame({ type: 'status', workspaceId: WS, sessionId: SID, activity: 'running' })
-    handleFrame({ type: 'status_snapshot', sessions: [] })
+    handleFrame({ type: 'session:status', workspaceId: WS, sessionId: SID, activity: 'running' })
+    handleFrame({ type: 'sessions:status-snapshot', sessions: [] })
     expect(liveStore.getState().activity).toEqual({})
   })
 })
 
 describe('session rename', () => {
   test('activity migrates from the temp id to the real id', () => {
-    handleFrame({ type: 'status', workspaceId: WS, sessionId: 'temp-1', activity: 'running' })
-    handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
+    handleFrame({
+      type: 'session:status',
+      workspaceId: WS,
+      sessionId: 'temp-1',
+      activity: 'running'
+    })
+    handleFrame({ type: 'session:renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
     expect(activityOf('temp-1')).toBeUndefined()
     expect(activityOf('real-1')).toBe('running')
   })
@@ -179,7 +194,7 @@ describe('session rename', () => {
       { sessionId: 'temp-1', summary: 'Fix picker focus', lastModified: 1 }
     ])
 
-    handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
+    handleFrame({ type: 'session:renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
 
     expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]).toEqual({
       sessionId: 'real-1',
@@ -197,7 +212,7 @@ describe('session rename', () => {
       { sessionId: 'existing', summary: 'Existing chat', lastModified: 1 }
     ])
 
-    handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
+    handleFrame({ type: 'session:renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
 
     expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(true)
   })
@@ -210,7 +225,7 @@ describe('session rename', () => {
       { sessionId: 'temp-1', summary: 'brief.pdf', lastModified: 1 }
     ])
 
-    handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
+    handleFrame({ type: 'session:renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
 
     expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]?.summary).toBe('brief.pdf')
     expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(false)
@@ -232,7 +247,7 @@ describe('session rename', () => {
       pendingViews: {}
     })
 
-    handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
+    handleFrame({ type: 'session:renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
 
     expect(queryClient.getQueryData<WorkspaceState>(workspaceKeys.state(WS))).toEqual({
       revision: 1,
@@ -257,7 +272,7 @@ describe('session list changes', () => {
       }
     ])
 
-    handleFrame({ type: 'sessions_changed', workspaceId: WS, sessionId: SID })
+    handleFrame({ type: 'sessions:changed', workspaceId: WS, sessionId: SID })
 
     expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]).toEqual({
       sessionId: SID,
@@ -280,12 +295,12 @@ describe('session list changes', () => {
     ])
 
     handleFrame({
-      type: 'session_renamed',
+      type: 'session:renamed',
       workspaceId: WS,
       from: 'temp-1',
       to: 'real-1'
     })
-    handleFrame({ type: 'sessions_changed', workspaceId: WS, sessionId: 'real-1' })
+    handleFrame({ type: 'sessions:changed', workspaceId: WS, sessionId: 'real-1' })
 
     expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]?.summary).toBe(
       'The effort picker loses focus after opening'
@@ -299,7 +314,7 @@ describe('session list changes', () => {
     queryClient.setQueryData(workspaceKeys.sessions(WS), [])
     queryClient.setQueryData(workspaceKeys.previews, {})
 
-    handleFrame({ type: 'sessions_changed', workspaceId: WS, sessionId: SID })
+    handleFrame({ type: 'sessions:changed', workspaceId: WS, sessionId: SID })
 
     expect(queryClient.getQueryState(workspaceKeys.sessions(WS))?.isInvalidated).toBe(true)
     expect(queryClient.getQueryState(workspaceKeys.previews)?.isInvalidated).toBe(true)

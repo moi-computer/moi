@@ -222,7 +222,7 @@ function setProcessing(rec: SessionRecord, processing: boolean, runId: string | 
   else armIdleTimer(rec)
   if (existing?.processing === processing) return
   broadcast(rec.workspaceId, {
-    type: 'status',
+    type: 'session:status',
     sessionId: rec.sessionId,
     activity: processing ? 'running' : 'idle'
   })
@@ -286,7 +286,11 @@ export function teardownOpenClawSession(rec: SessionRecord): void {
   // If it was mid-run, mirror setProcessing(rec, false, null)'s client-visible
   // effect so no spinner is left hanging.
   if (wasProcessing) {
-    broadcast(rec.workspaceId, { type: 'status', sessionId: rec.sessionId, activity: 'idle' })
+    broadcast(rec.workspaceId, {
+      type: 'session:status',
+      sessionId: rec.sessionId,
+      activity: 'idle'
+    })
   }
 }
 
@@ -607,7 +611,7 @@ export function claimPreviewSource(
 
 function broadcastPreview(rec: SessionRecord, messageId: string, blocks: PreviewBlock[]): void {
   broadcast(rec.workspaceId, {
-    type: 'preview',
+    type: 'session:preview',
     sessionId: rec.sessionId,
     messageId,
     parentToolUseId: null,
@@ -906,7 +910,7 @@ function broadcastSessionsChanged(rec: SessionRecord): void {
       entry.trailing = setTimeout(
         () => {
           lastListRefresh.set(rec.workspaceId, { at: Date.now() })
-          broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+          broadcast(rec.workspaceId, { type: 'sessions:changed', sessionId: rec.sessionId })
         },
         LIST_REFRESH_MIN_MS - (now - entry.at)
       )
@@ -915,7 +919,7 @@ function broadcastSessionsChanged(rec: SessionRecord): void {
   }
   if (entry?.trailing) clearTimeout(entry.trailing)
   lastListRefresh.set(rec.workspaceId, { at: now })
-  broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+  broadcast(rec.workspaceId, { type: 'sessions:changed', sessionId: rec.sessionId })
 }
 
 // Exported for tests (the live subscription is the only production caller).

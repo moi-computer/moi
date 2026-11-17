@@ -22,7 +22,6 @@ import { requiredEnvFor } from './workspaces/required-env'
 import { executeScratchOp } from './scratchpad/executor'
 import { readScratchpadImage, readScratchpadShapes } from './scratchpad/document'
 import { relayScratchOp } from './scratchpad/relay'
-import { broadcastAll } from './state'
 import { assembleTabRows, assertNavigableTab } from './workspaces/tabs'
 import { applyThemeUpdate } from './workspaces/theme'
 import { handleBundle } from './applets/widgets'
@@ -101,7 +100,7 @@ export const control = Bun.serve({
         if (data.type === 'workspace:register') {
           const absPath = resolve(String(data.path))
           const entry = await registerWorkspace(absPath)
-          broadcastAll({ type: 'workspace:switch', workspaceId: entry.id })
+          publishEvent({ type: 'workspace:open-requested', workspaceId: entry.id })
           ws.send(JSON.stringify({ id: entry.id, path: entry.path }))
           return
         }
@@ -383,25 +382,28 @@ export const control = Bun.serve({
         if (data.type === 'applets:refresh' || data.type === 'widget:refresh') {
           const match = data.path ? await resolveWorkspace(ws, data.path) : undefined
           if (data.path && !match) return
-          const scope = match ? { workspaceId: match.id } : {}
           const only = typeof data.only === 'string' ? parseAppletSelector(data.only) : undefined
           if (data.only && !only) {
             ws.send(JSON.stringify({ error: `Invalid applet selector "${data.only}"` }))
             return
           }
-          // No `workspaceId`: `moi refresh` names no workspace, so every open one reloads.
-          if (only?.id) {
-            publishEvent({
-              type: only.segment === 'widgets' ? 'widget:updated' : 'view:updated',
-              ...scope,
-              name: only.id
-            })
-          } else {
-            publishEvent({
-              type: 'applets:refresh',
-              ...scope,
-              ...(data.only ? { only: data.only } : {})
-            })
+          const workspaces = match
+            ? [match]
+            : (await listWorkspaces()).filter(workspace => !workspace.remote)
+          for (const workspace of workspaces) {
+            if (only?.id) {
+              publishEvent({
+                type: only.segment === 'widgets' ? 'widget:changed' : 'view:changed',
+                workspaceId: workspace.id,
+                name: only.id
+              })
+            } else {
+              publishEvent({
+                type: 'applets:refresh',
+                workspaceId: workspace.id,
+                only: only?.segment
+              })
+            }
           }
           ws.send(JSON.stringify({ ok: true }))
           return
@@ -472,7 +474,7 @@ export const control = Bun.serve({
           }
 
           await saveLayout({ ...layout, theme: result.theme }, workspacePath)
-          publishEvent({ type: 'theme:updated', workspaceId: match.id })
+          publishEvent({ type: 'workspace-config:changed', workspaceId: match.id })
           ws.send(JSON.stringify({ ok: true, ...result.applied }))
           return
         }
@@ -515,7 +517,7 @@ export const control = Bun.serve({
           }
 
           await setWorkspaceConfig(workspacePath, patch)
-          publishEvent({ type: 'workspace:updated', workspaceId: match.id })
+          publishEvent({ type: 'workspace-config:changed', workspaceId: match.id })
           ws.send(
             JSON.stringify({
               ok: true,

@@ -18,7 +18,7 @@ import {
 import { attachAppletBridge } from '@/client/features/applets/applet-runtime'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
-import { type WorkspaceEvent, useWorkspaceScopedEvent } from '@/client/runtime/use-workspace-events'
+import { type ClientEvent, useWorkspaceScopedEvent } from '@/client/runtime/use-client-events'
 import type { AppletKind } from '@/lib/types'
 
 // Views receive URL query params. Widgets mount without params; applets must
@@ -40,14 +40,14 @@ type AppletKindSpec = {
   kind: AppletKind
   segment: AppletSegment
   // True when this MEI event means the named applet should cache-bust + reload.
-  shouldReload: (event: WorkspaceEvent, name: string) => boolean
+  shouldReload: (event: ClientEvent, name: string) => boolean
 }
 
 const WIDGET_KIND: AppletKindSpec = {
   kind: 'widget',
   segment: 'widgets',
   shouldReload: (e, name) =>
-    (e.type === 'widget:updated' && e.name === name) ||
+    (e.type === 'widget:changed' && e.name === name) ||
     (e.type === 'applets:refresh' && e.only !== 'views')
 }
 
@@ -55,7 +55,7 @@ const VIEW_KIND: AppletKindSpec = {
   kind: 'view',
   segment: 'views',
   shouldReload: (e, name) =>
-    (e.type === 'view:updated' && e.name === name) ||
+    (e.type === 'view:changed' && e.name === name) ||
     (e.type === 'applets:refresh' && e.only !== 'widgets')
 }
 
@@ -182,13 +182,12 @@ export function useAppletCacheInvalidation(): void {
   const workspaceId = useWorkspaceId()
   const queryClient = useQueryClient()
   useWorkspaceScopedEvent(workspaceId, event => {
-    // Owner build events don't reach visitors. `moi refresh` from the visitor's
-    // agent does, so it also re-reads the owner's lists for new or removed applets.
+    // Refresh the owner lists too, so new or removed applets become visible.
     if (
       isRemoteWorkspace(workspaceId, queryClient) &&
       (event.type === 'applets:refresh' ||
-        event.type === 'view:updated' ||
-        event.type === 'widget:updated')
+        event.type === 'view:changed' ||
+        event.type === 'widget:changed')
     ) {
       void queryClient.invalidateQueries({
         queryKey: workspaceKeys.views(workspaceId)
@@ -197,8 +196,8 @@ export function useAppletCacheInvalidation(): void {
         queryKey: workspaceKeys.widgets(workspaceId)
       })
     }
-    if (event.type === 'view:updated') invalidateApplet('views', workspaceId, event.name)
-    else if (event.type === 'widget:updated') invalidateApplet('widgets', workspaceId, event.name)
+    if (event.type === 'view:changed') invalidateApplet('views', workspaceId, event.name)
+    else if (event.type === 'widget:changed') invalidateApplet('widgets', workspaceId, event.name)
     else if (event.type === 'applets:refresh') {
       // Segment-wide: `moi refresh` names no applet, so every cached module in
       // the targeted kind(s) is stale — including ones whose tabs are

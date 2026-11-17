@@ -1,9 +1,11 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
+import { getScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
+
 import { wsUrl } from '@/client/lib/ws-url'
 import { AppContext, type AppContextValue } from '@/client/runtime/app-context'
-import { WorkspaceEventsClient } from '@/client/runtime/workspace-events'
+import { AppEventsClient } from '@/client/runtime/app-events'
 
 type AppProviderProps = {
   children: ReactNode
@@ -13,12 +15,25 @@ type AppProviderProps = {
 export function AppProvider({ children }: AppProviderProps) {
   const queryClient = useQueryClient()
   const [value] = useState<AppContextValue>(() => ({
-    events: new WorkspaceEventsClient(wsUrl('/api/events'))
+    events: new AppEventsClient(wsUrl('/api/events'))
   }))
 
   useEffect(() => {
     const unsubscribe = value.events.subscribe(event => {
-      if (event.type === 'connection:opened') {
+      if (event.type === 'scratchpad:op') {
+        const run = getScratchExecutor(event.workspaceId)
+        if (run)
+          void run(event.op).then(
+            result => value.events.send({ type: 'scratchpad:op-result', opId: event.opId, result }),
+            error =>
+              value.events.send({
+                type: 'scratchpad:op-result',
+                opId: event.opId,
+                error: error instanceof Error ? error.message : String(error)
+              })
+          )
+      }
+      if (event.type === 'app:connected') {
         for (const queryKey of [
           ['workspaces'],
           ['workspaces', 'state'],

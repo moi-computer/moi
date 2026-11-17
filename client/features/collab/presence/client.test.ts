@@ -449,8 +449,8 @@ test('presence joins a shared workspace socket and leaving keeps it for shared u
   stop = engine.start()
   expect(sockets).toHaveLength(1)
   expect(engine.getSnapshot().status).toBe('connected')
-  sockets[0]!.onmessage?.({ data: JSON.stringify({ type: 'widget:updated', name: 'counter' }) })
-  expect(updates).toContainEqual({ type: 'widget:updated', name: 'counter' })
+  sockets[0]!.onmessage?.({ data: JSON.stringify({ type: 'widget:changed', name: 'counter' }) })
+  expect(updates).toContainEqual({ type: 'widget:changed', name: 'counter' })
 
   // Leaving replaces the connection so the owner drops this viewer's presence.
   stop()

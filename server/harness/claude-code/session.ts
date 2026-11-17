@@ -287,7 +287,11 @@ function publishMessageActivity(messages: SessionMessages) {
   const activity = messageActivity(messages)
   if (messages.publishedActivity === activity) return
   messages.publishedActivity = activity
-  broadcast(messages.workspaceId, { type: 'status', sessionId: messages.sessionId, activity })
+  broadcast(messages.workspaceId, {
+    type: 'session:status',
+    sessionId: messages.sessionId,
+    activity
+  })
 }
 
 function clearIdle(s: LiveSession) {
@@ -372,7 +376,7 @@ function startClaudeSessionTitleJob(s: LiveSession) {
         isCurrent: () => isCurrentLiveSession(s, abort)
       })
       if (!renamed || !isCurrentLiveSession(s, abort)) return
-      broadcast(s.workspaceId, { type: 'sessions_changed', sessionId: s.sessionId })
+      broadcast(s.workspaceId, { type: 'sessions:changed', sessionId: s.sessionId })
       debug(
         `cc session title ws=${s.workspaceId} session=${s.sessionId} title=${JSON.stringify(title)}`
       )
@@ -443,7 +447,7 @@ async function consume(s: LiveSession) {
         if (ev.kind === 'preview') {
           // Token previews are transient and stay outside transcript history.
           broadcast(s.workspaceId, {
-            type: 'preview',
+            type: 'session:preview',
             sessionId: s.sessionId,
             messageId: ev.preview.messageId,
             parentToolUseId: ev.preview.parentToolUseId,
@@ -521,7 +525,7 @@ async function consume(s: LiveSession) {
         debug(`cc result ws=${s.workspaceId} session=${s.sessionId} subtype=${msg.subtype}`)
         if (s.refreshSessionsOnResult) {
           s.refreshSessionsOnResult = false
-          broadcast(s.workspaceId, { type: 'sessions_changed', sessionId: s.sessionId })
+          broadcast(s.workspaceId, { type: 'sessions:changed', sessionId: s.sessionId })
         }
         // Without state events, only a result that finishes the active prompt
         // (or an autonomous turn when none is active) can release the queue.

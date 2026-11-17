@@ -1,3 +1,4 @@
+import type { ServerEvent } from '@/lib/events'
 import { existsSync } from 'node:fs'
 
 import type { CompiledView, ViewConfig, ViewInfo, WorkspaceEntry } from '@/lib/types'
@@ -179,13 +180,13 @@ export async function getWorkspaceViews(ws: WorkspaceRef): Promise<ViewInfo[]> {
 }
 
 // The API lists compiled views only; clients read pending views from the
-// workspace state, which `state:changed` keeps current.
+// workspace state, which `personal-state:changed` keeps current.
 export async function listViews(workspacePath: string): Promise<Response> {
   return Response.json({ views: await listCompiledViews(workspacePath) })
 }
 
 export async function handleBundleViews(
-  publish: (msg: unknown) => void,
+  publish: (msg: ServerEvent) => void,
   workspaceId: string,
   workspacePath: string,
   force = false,
@@ -211,7 +212,7 @@ export async function handleBundleViews(
   // Otherwise tab cleanup can mistake the handoff for a deleted view.
   if (results.some(r => r.status === 'built') || orderChanged || membershipChanged) {
     publish({
-      type: 'view-layout:updated',
+      type: 'views-list:changed',
       workspaceId,
       views: await listCompiledViews(workspacePath)
     })
@@ -220,7 +221,7 @@ export async function handleBundleViews(
   const changedServerModules = new Set<string>()
   for (const r of results) {
     if (r.status === 'built') {
-      publish({ type: 'view:updated', workspaceId, name: r.name, config: r.config ?? null })
+      publish({ type: 'view:changed', workspaceId, name: r.name })
       await completeViewBuild({ id: workspaceId, path: workspacePath }, r.name)
       for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
@@ -234,7 +235,7 @@ export async function handleBundleViews(
 }
 
 export async function updateViewTitle(
-  publish: (msg: unknown) => void,
+  publish: (msg: ServerEvent) => void,
   workspaceId: string,
   workspacePath: string,
   viewId: string,
@@ -288,7 +289,7 @@ export async function updateViewTitle(
 }
 
 export async function deleteView(
-  publish: (msg: unknown) => void,
+  publish: (msg: ServerEvent) => void,
   ws: WorkspaceEntry,
   viewId: string
 ): Promise<void> {
@@ -306,7 +307,7 @@ export async function deleteView(
     reloadModules([`views/${viewId}`], workspacePath)
     await completeViewBuild(ws, viewId)
     publish({ type: 'view:deleted', workspaceId, name: viewId })
-    publish({ type: 'workspace:updated', workspaceId })
+    publish({ type: 'workspace-config:changed', workspaceId })
     await handleBundleViews(publish, workspaceId, workspacePath, false, viewId)
   })
 }

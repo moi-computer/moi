@@ -15,5 +15,5 @@ export async function renameSessionReferences(ws: WorkspaceRef, from: string, to
     renameSessionSelection(state, from, to)
     renameBuildSession(state, from, to)
   })
-  broadcast(ws.id, { type: 'session_renamed', from, to })
+  broadcast(ws.id, { type: 'session:renamed', from, to })
 }

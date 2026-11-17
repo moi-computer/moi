@@ -16,7 +16,7 @@ import {
   useUpdateControl
 } from '@/client/features/update/update-control'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
+import { useClientEvent } from '@/client/runtime/use-client-events'
 import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
 import { useAccount } from '@/client/features/account/account-provider'
 import { AccountMenu } from '@/client/features/account/account-menu'
@@ -61,15 +61,10 @@ export function SidebarLayout({ children, showWorkspaces = true }: SidebarLayout
   // prefix of every workspace query — a prefix invalidation would refetch
   // transcripts, widgets, and MCP probes in every connected client.
   const qc = useQueryClient()
-  useWorkspaceEvent(e => {
-    if (
-      e.type === 'workspace:updated' ||
-      e.type === 'theme:updated' ||
-      e.type === 'workspaces-list:updated'
-    ) {
-      // Our own icon and order changes are already in the list cache. Own theme
-      // saves still refetch: only the layout cache holds those optimistically.
-      if (e.type !== 'theme:updated' && e.origin === BROWSER_TAB_ID) return
+  useClientEvent(e => {
+    if (e.type === 'workspace-config:changed' || e.type === 'workspaces-list:changed') {
+      // Shared config saves update the layout cache; the sidebar list still needs a refetch.
+      if (e.type !== 'workspace-config:changed' && e.origin === BROWSER_TAB_ID) return
       qc.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
     }
   })

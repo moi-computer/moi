@@ -104,7 +104,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
 
       if (timer.current) clearTimeout(timer.current)
       // Persist the value captured at call time, NOT the cache at fire time: a
-      // `workspace:updated` broadcast can invalidate + refetch this query inside
+      // `workspace-config:changed` broadcast can invalidate + refetch this query inside
       // the debounce window, and reading the cache then would PUT the server's
       // pre-change layout back (reverting the user's edit on disk). Rapid calls
       // still coalesce — each call's `prev` already includes the previous

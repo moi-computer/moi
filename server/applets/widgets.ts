@@ -1,3 +1,4 @@
+import type { ServerEvent } from '@/lib/events'
 import { existsSync } from 'node:fs'
 
 import type { WidgetConfig, WidgetInfo } from '@/lib/types'
@@ -122,7 +123,7 @@ export async function listWidgets(workspacePath: string): Promise<Response> {
 }
 
 export async function handleBundle(
-  publish: (msg: unknown) => void,
+  publish: (msg: ServerEvent) => void,
   workspaceId: string,
   workspacePath: string,
   force = false,
@@ -152,7 +153,7 @@ export async function handleBundle(
   const changedServerModules = new Set<string>()
   for (const r of results) {
     if (r.status === 'built') {
-      publish({ type: 'widget:updated', workspaceId, name: r.name, config: r.config ?? null })
+      publish({ type: 'widget:changed', workspaceId, name: r.name })
       for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
   }
@@ -163,7 +164,7 @@ export async function handleBundle(
 
   if (layoutChanged) {
     const widgets = await getWidgetList(workspacePath)
-    publish({ type: 'widget-layout:updated', workspaceId, widgets })
+    publish({ type: 'widgets-list:changed', workspaceId, widgets })
   }
 
   return results

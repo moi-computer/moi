@@ -3,23 +3,22 @@ import { useEffect } from 'react'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 
 import { useAppContext } from './app-context'
-import type { WorkspaceEventHandler } from './workspace-events'
+import type { ClientEventHandler } from './app-events'
 
-export type { WorkspaceEvent, WorkspaceEventHandler } from './workspace-events'
+export type { ClientEvent, ClientEventHandler } from './app-events'
 
-// Listen to the app's workspace events. Subscribing never opens or closes the
+// Listen to every client event. Subscribing never opens or closes the
 // socket — `AppProvider` owns that — so a route switch that briefly leaves
 // nothing subscribed costs nothing. A no-op outside `AppProvider`.
-export function useWorkspaceEvent(handler: WorkspaceEventHandler) {
+export function useClientEvent(handler: ClientEventHandler) {
   const events = useAppContext()?.events
   const handlerRef = useLatestRef(handler)
   useEffect(() => events?.subscribe(event => handlerRef.current(event)), [events, handlerRef])
 }
 
-// Listen to events for one workspace. Events that name no workspace (such as
-// `moi refresh`) reach every open workspace.
-export function useWorkspaceScopedEvent(workspaceId: string, handler: WorkspaceEventHandler) {
-  useWorkspaceEvent(event => {
+// Listen to one workspace plus app-wide events.
+export function useWorkspaceScopedEvent(workspaceId: string, handler: ClientEventHandler) {
+  useClientEvent(event => {
     if (
       'workspaceId' in event &&
       event.workspaceId !== undefined &&
@@ -51,7 +50,7 @@ export function useNavigationClient(
     }
   }, [events, workspaceId])
 
-  useWorkspaceEvent(async event => {
+  useClientEvent(async event => {
     if (!events || event.type !== 'navigation:request' || event.workspaceId !== workspaceId) return
     try {
       if (events.navigationWorkspace !== workspaceId) {

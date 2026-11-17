@@ -211,7 +211,7 @@ rediscovered on the next snapshot instead of on every one.
 | `agent_thought_chunk`       | token deltas                                          | thinking parts                    |
 | `tool_call`                 | `toolCallId`, `title`, `kind`, `locations`, `content` | `ToolCall` start                  |
 | `tool_call_update`          | `status: completed\|failed`, `content`                | `ToolCall` result                 |
-| `session_info_update`       | generated `title`, `updatedAt`                        | `sessions_changed`                |
+| `session_info_update`       | generated `title`, `updatedAt`                        | `sessions:changed`                |
 | `available_commands_update` | slash commands                                        | init metadata                     |
 | `usage_update`              | context `size` / `used`                               | context meter                     |
 | `user_message_chunk`        | replayed user turns                                   | history only (§3.6)               |
@@ -807,14 +807,14 @@ returns `{}` but only drops the live session; the chat still lists. There is no
 `session/archive` at all.
 
 Hermes _does_ have the right primitive internally —
-`hermes_state.SessionDB.set_session_archived(session_id, archived)`, a soft hide
+`hermes_state.SessionDB.set_session:archived(session_id, archived)`, a soft hide
 that keeps every message and walks the whole compression chain (archiving only
 the visible tip lets the still-unarchived root resurrect it). Its `sessions`
 table has an `archived` column, and `list_sessions_rich` takes
 `include_archived: bool = False`, which the ACP adapter never overrides — so an
 archived session would drop out of `session/list` for free.
 
-The problem is reach: the only callers of `set_session_archived` are HTTP routes
+The problem is reach: the only callers of `set_session:archived` are HTTP routes
 on `hermes serve` and the gateway API server, daemons Moi deliberately does not
 run (§6). The `hermes sessions archive` CLI is filter-based (age, source, title,
 cwd — no session id), and `hermes sessions delete <id>` is a real delete.

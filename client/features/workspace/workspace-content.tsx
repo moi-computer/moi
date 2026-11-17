@@ -49,7 +49,7 @@ import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-lay
 import { WorkspaceMenu } from '@/client/features/workspace/workspace-menu'
 import { effectiveOpenTabs, tabAvailable } from '@/client/features/workspace/tab-resolution'
 import { useWorkspaceNavigation } from '@/client/features/workspace/use-workspace-navigation'
-import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
+import { useClientEvent } from '@/client/runtime/use-client-events'
 import { useUiStore } from '@/client/store/ui'
 import {
   type CreateWorkspaceTabItem,
@@ -263,7 +263,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     setFloatingChatOpen(false)
   }
 
-  useWorkspaceEvent(event => {
+  useClientEvent(event => {
     if (
       event.type === 'view:deleted' &&
       event.workspaceId === workspaceId &&

@@ -16,7 +16,7 @@ import type {
   WorkspaceTabsState
 } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
-import * as workspaceEvents from '@/client/runtime/use-workspace-events'
+import * as workspaceEvents from '@/client/runtime/use-client-events'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
 import { useWorkspaceNavigation } from './use-workspace-navigation'
 import { useWorkspaceSessionStore } from '@/client/store/workspace-session'

@@ -217,7 +217,7 @@ export function createOnboardingJobs(overrides: Partial<typeof defaults> = {}) {
     // Reconciliation must compare against the exact message originally submitted.
     const brief = job.stage ? await Bun.file(briefPath).text() : composeBuildBrief(idea)
     await Bun.write(briefPath, brief)
-    deps.publishEvent({ type: 'workspaces-list:updated' })
+    deps.publishEvent({ type: 'workspaces-list:changed' })
     const harness = deps.harnessFor(ws)
     if (job.stage === 'sending' || job.stage === 'accepted') {
       // The provider may have accepted before a response/save was lost. This

@@ -3,12 +3,12 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { requestJson } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { toast } from '@/client/components/ui/toast'
-import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
+import { useClientEvent } from '@/client/runtime/use-client-events'
 import type { WorkspaceState } from '@/lib/types'
 
 // Personal state for one workspace: tabs, pin, selected chats, chat
 // settings and fork history, and views being built. One cache, kept current by
-// write replies and `state:changed` events instead of refetches.
+// write replies and `personal-state:changed` events instead of refetches.
 
 export function workspaceStateKey(workspaceId: string) {
   return workspaceKeys.state(workspaceId)
@@ -159,8 +159,8 @@ export function useWorkspaceStateWrite<Input, Result extends StateReply = Worksp
 // changes, so cached states stay current even while their workspace is closed.
 export function useWorkspaceStateSync(): void {
   const queryClient = useQueryClient()
-  useWorkspaceEvent(event => {
-    if (event.type !== 'state:changed') return
+  useClientEvent(event => {
+    if (event.type !== 'personal-state:changed') return
     if (!getCachedWorkspaceState(queryClient, event.workspaceId)) return
     receiveWorkspaceState(queryClient, event.workspaceId, event.state)
   })

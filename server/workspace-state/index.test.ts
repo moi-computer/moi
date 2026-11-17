@@ -89,7 +89,7 @@ test('each saved change bumps the revision and is published without file bookkee
     expect((await readWorkspaceState(ws)).revision).toBe(2)
     expect(publish).toHaveBeenCalledTimes(2)
     expect(publish).toHaveBeenLastCalledWith({
-      type: 'state:changed',
+      type: 'personal-state:changed',
       workspaceId: 'ws-1',
       state: {
         revision: 2,

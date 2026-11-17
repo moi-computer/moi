@@ -43,5 +43,5 @@ test('reordering workspaces broadcasts a workspace update', async () => {
     first.id,
     second.id
   ])
-  expect(published).toEqual([JSON.stringify({ type: 'workspaces-list:updated' })])
+  expect(published).toEqual([JSON.stringify({ type: 'workspaces-list:changed' })])
 })

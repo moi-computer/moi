@@ -22,7 +22,7 @@ import {
 import { WorkspaceScreen } from '@/client/features/workspace/workspace-screen'
 import { useViews } from '@/client/features/views/api'
 import { useWidgets } from '@/client/features/overview/api'
-import { useWorkspaceScopedEvent } from '@/client/runtime/use-workspace-events'
+import { useWorkspaceScopedEvent } from '@/client/runtime/use-client-events'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 
 type WorkspaceRouteProps = {
@@ -81,17 +81,17 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
   useAppletCacheInvalidation()
 
   useWorkspaceScopedEvent(id, event => {
-    if (event.type === 'theme:updated' || event.type === 'workspace:updated') {
+    if (event.type === 'workspace-config:changed') {
       // Skip our own save: the cache already holds it, and the refetch could
       // land an older value over a newer optimistic change.
       if (event.origin === BROWSER_TAB_ID) return
       queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(id) })
-    } else if (event.type === 'widget-layout:updated' || event.type === 'widget:updated') {
-      // widget:updated too: a rebundle bumps the widget's content revision, and
+    } else if (event.type === 'widgets-list:changed' || event.type === 'widget:changed') {
+      // widget:changed too: a rebundle bumps the widget's content revision, and
       // the thumbnail invalidation hook reads it off this query.
       queryClient.invalidateQueries({ queryKey: workspaceKeys.widgets(id) })
-    } else if (event.type === 'view:updated') {
-      // view:updated also bumps the built bundle revision used by thumbnail
+    } else if (event.type === 'view:changed') {
+      // view:changed also bumps the built bundle revision used by thumbnail
       // freshness checks.
       queryClient.invalidateQueries({ queryKey: workspaceKeys.views(id) })
     }

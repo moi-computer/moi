@@ -9,7 +9,7 @@ import {
   QueryClientProvider
 } from '@tanstack/react-query'
 import { AppProvider } from '@/client/app/app-provider'
-import { WorkspaceEventsClient } from '@/client/runtime/workspace-events'
+import { AppEventsClient } from '@/client/runtime/app-events'
 import {
   __setQueryClientForTests,
   handleFrame
@@ -35,8 +35,8 @@ test('workspaces and onboarding share status; auth events and harness switches u
   for (const [key, value] of Object.entries(globals))
     Object.defineProperty(globalThis, key, { configurable: true, value })
   notifyManager.setNotifyFunction(callback => act(callback))
-  const connect = spyOn(WorkspaceEventsClient.prototype, 'connect').mockImplementation(() => {})
-  const close = spyOn(WorkspaceEventsClient.prototype, 'close').mockImplementation(() => {})
+  const connect = spyOn(AppEventsClient.prototype, 'connect').mockImplementation(() => {})
+  const close = spyOn(AppEventsClient.prototype, 'close').mockImplementation(() => {})
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   __setQueryClientForTests(client)
   const requests: string[] = []

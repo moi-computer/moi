@@ -14,7 +14,7 @@ test('a failed session refresh preserves the previously loaded chats', async () 
   try {
     await client.fetchQuery(options)
     request.mockResolvedValue(new Response('Codex unavailable', { status: 500 }))
-    // A refresh, as a `sessions_changed` frame or focus would trigger.
+    // A refresh, as a `sessions:changed` frame or focus would trigger.
     await expect(client.fetchQuery({ ...options, staleTime: 0 })).rejects.toThrow(
       'Codex unavailable'
     )

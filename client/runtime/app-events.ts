@@ -1,9 +1,9 @@
-import type { WorkspaceEvent } from '@/lib/events'
-export type { WorkspaceEvent } from '@/lib/events'
+import type { ClientEvent } from '@/lib/events'
+export type { ClientEvent } from '@/lib/events'
 
-export type WorkspaceEventHandler = (event: WorkspaceEvent) => void
+export type ClientEventHandler = (event: ClientEvent) => void
 
-export type WorkspaceEventsClientOptions = {
+export type AppEventsClientOptions = {
   // Delay before reopening after a drop. It doubles on repeated drops, up to
   // the max, so a downed server isn't hammered; it resets once a socket opens.
   reconnectBaseDelayMs?: number
@@ -14,8 +14,8 @@ export type WorkspaceEventsClientOptions = {
 // mounts and closes it when the app unmounts; subscribers come and go freely
 // in between without touching the connection. A dropped socket reopens on its
 // own. Framework-free, so the connection logic is testable without React.
-export class WorkspaceEventsClient {
-  private readonly listeners = new Set<WorkspaceEventHandler>()
+export class AppEventsClient {
+  private readonly listeners = new Set<ClientEventHandler>()
   private readonly baseDelayMs: number
   private readonly maxDelayMs: number
   // The socket being opened or open; undefined while disconnected.
@@ -27,7 +27,7 @@ export class WorkspaceEventsClient {
 
   constructor(
     private readonly url: string,
-    options: WorkspaceEventsClientOptions = {}
+    options: AppEventsClientOptions = {}
   ) {
     this.baseDelayMs = options.reconnectBaseDelayMs ?? 1000
     this.maxDelayMs = options.reconnectMaxDelayMs ?? 30_000
@@ -47,14 +47,14 @@ export class WorkspaceEventsClient {
     socket?.close()
   }
 
-  subscribe(handler: WorkspaceEventHandler): () => void {
+  subscribe(handler: ClientEventHandler): () => void {
     this.listeners.add(handler)
     return () => {
       this.listeners.delete(handler)
     }
   }
 
-  emit(event: WorkspaceEvent) {
+  emit(event: ClientEvent) {
     for (const handler of this.listeners) handler(event)
   }
 
@@ -91,12 +91,12 @@ export class WorkspaceEventsClient {
     socket.onopen = () => {
       this.reconnectAttempt = 0
       this.sendNavigationPresence()
-      this.emit({ type: 'connection:opened' })
+      this.emit({ type: 'app:connected' })
     }
 
     socket.onmessage = event => {
       try {
-        const data = JSON.parse(event.data) as WorkspaceEvent
+        const data = JSON.parse(event.data) as ClientEvent
         this.emit(data)
       } catch {}
     }

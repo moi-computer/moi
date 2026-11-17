@@ -43,24 +43,24 @@ mirrors upstream code verbatim and stays in `openclaw/strip.ts`.)
 
 Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
 
-- **`session_renamed`** — a new thread is created under the client's temporary
+- **`session:renamed`** — a new thread is created under the client's temporary
   uuid, then rekeyed to the backend's real session/thread id.
-- **`sessions_changed`** — a provider changed session-list metadata such as a
+- **`sessions:changed`** — a provider changed session-list metadata such as a
   generated session title; clients refresh that workspace's session list.
-- **`session_archived`** — a chat was archived; clients remove it from caches and
+- **`session:archived`** — a chat was archived; clients remove it from caches and
   clear its selections and pin, including browser-local Collab selections.
 - **Optimistic-id rendezvous** — the client sends `optimisticId` with each
   chat; the user's bubble must upsert under that id. Backends differ: Codex
   echoes it natively (`clientUserMessageId` → `clientId`), Claude Code never
   echoes (the server synthesizes the turn), OpenClaw echoes lagged (matched
   by text).
-- **`status` / `status_snapshot`** — per-session `activity`
+- **`session:status` / `sessions:status-snapshot`** — per-session `activity`
   (`idle | running | requires-action`), mirrored from the backend's native
   lifecycle signal — never derived by counting sends vs results. The snapshot
   (sent on connect and re-broadcast periodically) is authoritative: the client
   rebuilds its whole activity map from it, so a lost terminal frame self-heals.
   `requires-action` suppresses the loader.
-- **`preview`** — live token frames, cumulative text, never persisted;
+- **`session:preview`** — live token frames, cumulative text, never persisted;
   cleared when the turn with matching `meta.apiMessageId` lands.
 
 ## Folder layout & conventions
@@ -184,7 +184,7 @@ built on the provider-agnostic `acp/` layer. Session create/resume with temp-id
 rename, `session/load` history replay, interrupt via `session/cancel`, per-turn
 token usage, token streaming for thinking _and_ text, inline base64 images,
 per-chat model switching from the catalog `session/new` returns inline, and
-backend-generated session titles surfaced through `sessions_changed`. Agents are
+backend-generated session titles surfaced through `sessions:changed`. Agents are
 Hermes **profiles** — discovered from `$HERMES_HOME`, imported with
 `moi hermes init <profile>`, never created from the UI (OpenClaw's model).
 Sessions run in Hermes's `dont_ask` mode to match Moi's bypass-permissions trust

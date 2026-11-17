@@ -72,7 +72,7 @@ per-tab selections and the workspace pin. Submitting a view and renaming a chat 
 update it in one write. `GET /api/workspaces/:id/state` returns it; every write
 (`PUT`/`DELETE /sessions/:id/pin`, `PUT`/`DELETE /sessions/:id/selection`,
 `PATCH /sessions/:id/config`, `POST /sessions/:id/archive`) answers with the new state,
-and every change is published as `state:changed` with the whole state. A `revision`
+and every change is published as `personal-state:changed` with the whole state. A `revision`
 that goes up with each change lets clients drop an older copy that arrives late.
 With Collab enabled, unpinned selections are local to each browser tab. Until a
 browser tab chooses a chat, it uses the server selection so CLI view handoffs open
@@ -96,7 +96,7 @@ to its tab, preserving attribution, history, and fork provenance. Existing works
 chats used for pinned execution keep their attribution and remain active. Archived
 chats are removed from selections and the workspace pin. An archive failure keeps the
 view available to retry. A running pending view can be closed, but not discarded.
-`session_archived` notifications clear the chat from every connected browser's cache and local
+`session:archived` notifications clear the chat from every connected browser's cache and local
 selections. Local selections become explicitly empty so they do not fall back to
 another server-selected chat. Unrelated selections and pins remain unchanged.
 
@@ -109,4 +109,4 @@ another server-selected chat. Unrelated selections and pins remain unchanged.
 Compiled view manifests and build completion live in `server/applets/views.ts`.
 CLI creation and metadata commands live in `server/cli/commands/views.ts`.
 On the client, `client/features/workspace/workspace-state.ts` owns the one state cache,
-its writes, and the app-wide `state:changed` listener.
+its writes, and the app-wide `personal-state:changed` listener.

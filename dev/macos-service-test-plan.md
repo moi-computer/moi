@@ -160,7 +160,7 @@ const done = Promise.withResolvers()
 sock.onopen = () => sock.send(JSON.stringify({ type: "chat", workspaceId: wsId,
   sessionId: crypto.randomUUID(), isNew: true, content: "Reply with the single word: pong" }))
 sock.onmessage = e => { const m = JSON.parse(e.data); console.log(m.type);
-  if (JSON.stringify(m).includes("pong") && m.type !== "status_snapshot") done.resolve() }
+  if (JSON.stringify(m).includes("pong") && m.type !== "sessions:status-snapshot") done.resolve() }
 setTimeout(() => done.reject(new Error("no assistant reply in 120s")), 120000)
 await done.promise
 console.log("AGENT REPLIED UNDER THE DAEMON ✓")'

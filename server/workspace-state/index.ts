@@ -3,7 +3,7 @@
 // the only process that writes these files (the CLI goes through the control
 // port), so the cache never goes stale. Writes for one workspace run one at a
 // time, each as a synchronous change applied to a copy and saved atomically.
-// Every saved change is published to browsers as `state:changed`.
+// Every saved change is published to browsers as `personal-state:changed`.
 import { existsSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -99,7 +99,11 @@ export async function updateWorkspaceState<T>(
     draft.revision++
     await writeStateFile(statePath(ws.id), draft, lease)
     loaded.state = draft
-    publishEvent({ type: 'state:changed', workspaceId: ws.id, state: toWorkspaceState(draft) })
+    publishEvent({
+      type: 'personal-state:changed',
+      workspaceId: ws.id,
+      state: toWorkspaceState(draft)
+    })
     return result
   })
 }

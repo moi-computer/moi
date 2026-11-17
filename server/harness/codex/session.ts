@@ -97,7 +97,7 @@ type SessionRecord = {
 }
 
 const sessions = new Map<string, SessionRecord>() // key: `${workspaceId}:${sessionId}`
-// `${workspaceId}:${tempId}` -> native thread id after session_renamed.
+// `${workspaceId}:${tempId}` -> native thread id after session:renamed.
 const aliases = new Map<string, string>()
 const resumes = new Map<string, Promise<SessionRecord>>()
 type SendLane = { tail: Promise<void>; generation: number }
@@ -206,7 +206,7 @@ function publishActivity(rec: SessionRecord) {
   if (rec.activity === activity) return
   rec.activity = activity
   broadcast(rec.workspaceId, {
-    type: 'status',
+    type: 'session:status',
     sessionId: rec.sessionId,
     activity
   })
@@ -349,7 +349,7 @@ function flushPreviews(rec: SessionRecord) {
     const entry = rec.previews.get(itemId)
     if (!entry) continue
     broadcast(rec.workspaceId, {
-      type: 'preview',
+      type: 'session:preview',
       sessionId: rec.sessionId,
       messageId: itemId,
       parentToolUseId: null,
@@ -629,7 +629,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       setProcessing(rec, false, null)
       if (rec.refreshSessionsOnTurnComplete) {
         rec.refreshSessionsOnTurnComplete = false
-        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+        broadcast(rec.workspaceId, { type: 'sessions:changed', sessionId: rec.sessionId })
       }
       if (turn?.status === 'failed' && turn.error?.message) {
         broadcast(rec.workspaceId, {
@@ -682,7 +682,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       if (status?.type === 'active') setProcessing(rec, true, rec.activeTurnId)
       else if (status?.type === 'notLoaded') {
         releaseSession(rec, 'ChatGPT unloaded this chat')
-        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+        broadcast(rec.workspaceId, { type: 'sessions:changed', sessionId: rec.sessionId })
       } else if (status?.type === 'idle' || status?.type === 'systemError') {
         flushCommandOutput(rec)
         setProcessing(rec, false, null)
@@ -694,12 +694,12 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     case 'thread/archived':
     case 'thread/deleted': {
       releaseSession(rec, 'ChatGPT closed this chat')
-      broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      broadcast(rec.workspaceId, { type: 'sessions:changed', sessionId: rec.sessionId })
       return
     }
     case 'thread/unarchived':
     case 'thread/name/updated': {
-      broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      broadcast(rec.workspaceId, { type: 'sessions:changed', sessionId: rec.sessionId })
       return
     }
     // Reuse the notice id so completion updates the hook's started row.
@@ -765,7 +765,7 @@ function startCodexSessionTitleJob(rec: SessionRecord, client: CodexClient) {
         isCurrent: () => isCurrentCodexSession(rec, abort)
       })
       if (!renamed || !isCurrentCodexSession(rec, abort)) return
-      broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      broadcast(rec.workspaceId, { type: 'sessions:changed', sessionId: rec.sessionId })
       debug(
         `codex session title ws=${rec.workspaceId} thread=${rec.sessionId} title=${JSON.stringify(title)}`
       )
@@ -989,7 +989,11 @@ async function sendMessage(
   } catch (err) {
     // No session record exists to run setProcessing through — clear the
     // client's optimistic spinner explicitly or it sticks until reconnect.
-    broadcast(input.workspaceId, { type: 'status', sessionId: input.sessionId, activity: 'idle' })
+    broadcast(input.workspaceId, {
+      type: 'session:status',
+      sessionId: input.sessionId,
+      activity: 'idle'
+    })
     broadcast(input.workspaceId, {
       kind: 'error',
       sessionId: input.sessionId,
@@ -1144,7 +1148,11 @@ export async function interruptCodexRun(input: {
     broadcast(input.workspaceId, { kind: 'stopped', sessionId: rec?.sessionId ?? input.sessionId })
     if (rec) setProcessing(rec, false, null)
     else
-      broadcast(input.workspaceId, { type: 'status', sessionId: input.sessionId, activity: 'idle' })
+      broadcast(input.workspaceId, {
+        type: 'session:status',
+        sessionId: input.sessionId,
+        activity: 'idle'
+      })
     return
   }
   try {
