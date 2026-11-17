@@ -74,15 +74,8 @@ subset of regular `moi` commands and also `moi remote` commands. Do not create l
 prefer not to store workspace state here (it gets out of sync quickly). Full command reference is in
 "Using the Moi CLI"
 
-Q: What's in the linked dir?
-A: a skill (this one), `.moi` folder with link meta, your private/intermediate files and work.
-
-Q: How do I know if I am in local or remote workspaсe?
-A: You are instructed in `<moi-context>`. Check by calling `moi remote` if not explicitly told which
-workspace it is.
-
-Q: What to store in owner dir vs linked dir
-A: Owner - source of truth, shared state, applets etc. Linked - just local work visible to you and the user.
+The newest `<moi-context>` identifies whether the workspace is local or remote. If it does not,
+run `moi remote` to check.
 
 ### Boundaries
 

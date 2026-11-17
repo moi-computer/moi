@@ -84,7 +84,7 @@ function waitingForLogin(): () => void {
 }
 
 const login = defineCommand({
-  meta: { name: 'login', description: 'Sign in to Moi Cloud in your browser (for HUMANS only)' },
+  meta: { name: 'login', description: 'Sign in to Moi Cloud in your browser (for humans only)' },
   args: {
     browser: {
       type: 'boolean',
@@ -112,7 +112,7 @@ const login = defineCommand({
 })
 
 const logout = defineCommand({
-  meta: { name: 'logout', description: 'Sign out of Moi Cloud (for HUMANS only)' },
+  meta: { name: 'logout', description: 'Sign out of Moi Cloud' },
   args: { yes: { type: 'boolean', description: 'Confirm permanently revoking this agent login' } },
   async run({ args }) {
     await reportErrors(async () => {

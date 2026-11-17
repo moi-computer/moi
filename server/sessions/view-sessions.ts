@@ -92,6 +92,8 @@ export async function sendWorkspaceMessage(
       sessionId,
       context: {
         ...input.context,
+        // Resolve here for both browser messages and programmatic view builds;
+        // the agent must not infer file location from its local working directory.
         workspaceMode: ws.remote ? 'remote' : 'local',
         session: {
           id: sessionId,
