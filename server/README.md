@@ -26,6 +26,10 @@ Keep shared helpers in the feature that owns them. A folder does not imply a
 strict dependency layer: workspace setup installs skills, applets use workspace
 environment settings, and view builds coordinate with session metadata.
 
+[sessions/send-message.ts](sessions/send-message.ts) prepares and sends workspace messages
+for chat, onboarding, and view builds, including the agent context envelope.
+[sessions/view-sessions.ts](sessions/view-sessions.ts) owns view creation and build handoffs.
+
 The two registries have different jobs: `workspaces/registry.ts` owns the local
 workspace list; `harness/registry.ts` owns the available agent backends.
 

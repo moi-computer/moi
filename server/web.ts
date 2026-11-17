@@ -25,7 +25,8 @@ import { navigationRelay } from './navigation-relay'
 import { resolveScratchOp } from './scratchpad/relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace, listWorkspaces } from './workspaces/registry'
-import { failInterruptedViewStarts, sendWorkspaceMessage } from './sessions/view-sessions'
+import { failInterruptedViewStarts } from './sessions/view-sessions'
+import { sendWorkspaceMessage } from './sessions/send-message'
 import { prepareWorkspaceStates } from './workspace-state'
 import {
   addClient,

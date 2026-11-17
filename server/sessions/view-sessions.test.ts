@@ -1,3 +1,4 @@
+import { sendWorkspaceMessage } from './send-message'
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import {
   DEFAULT_WORKSPACE_STATE_ROOT,
@@ -13,12 +14,7 @@ import { renderMoiContext } from '@/lib/moi-context'
 import { allHarnesses, harnessFor } from '../harness/registry'
 import type { SendMessageInput } from '../harness/types'
 import { ForkUnsupportedError } from '../harness/fork'
-import {
-  createViewFromSession,
-  submitView,
-  sendWorkspaceMessage,
-  failInterruptedViewStarts
-} from './view-sessions'
+import { createViewFromSession, submitView, failInterruptedViewStarts } from './view-sessions'
 import {
   createPendingView,
   getPendingView,

@@ -102,7 +102,8 @@ another server-selected chat. Unrelated selections and pins remain unchanged.
 
 ## Implementation
 
-`server/sessions/view-sessions.ts` coordinates sends and view handoffs.
+[`send-message.ts`](../server/sessions/send-message.ts) prepares workspace messages and sends them to the harness.
+[`view-sessions.ts`](../server/sessions/view-sessions.ts) coordinates view creation and build handoffs.
 `pending-views.ts` in the same directory owns pending-view persistence;
 `store.ts` owns chat entries, `selected.ts` owns selections and pins,
 `archive.ts` owns archiving, and `lifecycle.ts` coordinates ID renames.
