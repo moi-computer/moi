@@ -56,14 +56,14 @@ They reuse the workspace info query for names, icons, and themes. Each owner loa
 and wakes when needed; failed requests fall back to the registered name or workspace ID.
 A registered reference remains listed after Cloud access is removed.
 
-Presence uses `${apiBase}/collab`. Cloud publishes the member list under the owner's address
+Shared updates and presence use one `${apiBase}/events` WebSocket. Cloud publishes the member list under the owner's address
 (`ownerId:workspaceId`); see [Cloud](cloud.md#methods-the-cloud-calls). Membership changes use
 `/cloud${apiBase}/members/:membershipId` and `/cloud${apiBase}/invitations`. The host and
 accepted human members can manage membership.
 The UI does not offer leaving yet.
 
 Scratchpad documents and assets stay on the owner. Saves replace the full document;
-reopen the canvas to see edits made elsewhere.
+workspace events refresh open canvases after saves and reconnects.
 
 ## Local mock workspace
 

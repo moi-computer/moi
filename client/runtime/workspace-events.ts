@@ -1,56 +1,5 @@
-import type { NavigationRequest } from '@/lib/navigation'
-import type {
-  AppSettings,
-  CompiledView,
-  HarnessAvailability,
-  HarnessStatus,
-  WidgetInfo,
-  HarnessType,
-  WorkspaceState
-} from '@/lib/types'
-
-export type WorkspaceEvent =
-  | { type: 'connection:opened' }
-  | {
-      type: 'harness-status:changed'
-      harness: HarnessType
-      status: HarnessStatus
-    }
-  | { type: 'workspace-harness:switched'; workspaceId: string; harness: HarnessType }
-  | { type: 'widget:updated'; workspaceId?: string; name: string }
-  | { type: 'widget-layout:updated'; workspaceId: string; widgets: WidgetInfo[] }
-  // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`
-  // narrows to one kind; absent means both widgets and views.
-  | { type: 'applets:refresh'; workspaceId?: string; only?: 'widgets' | 'views' }
-  | { type: 'view:updated'; workspaceId?: string; name: string }
-  | { type: 'view-layout:updated'; workspaceId: string; views: CompiledView[] }
-  | { type: 'view:deleted'; workspaceId: string; name: string }
-  // A workspace's chat state changed (pin, selection, chat settings, views
-  // being built). Carries the whole state, so caches update without a refetch.
-  | { type: 'state:changed'; workspaceId: string; state: WorkspaceState }
-  // `origin` on an event is the browser tab whose write caused it (absent for
-  // CLI and agent changes), so that tab can skip its own echo. See
-  // client/lib/browser-tab-id.ts.
-  | { type: 'theme:updated'; workspaceId: string; origin?: string }
-  | { type: 'workspace:updated'; workspaceId: string; origin?: string }
-  // The registry list changed (reorder, create) without touching any open
-  // workspace's layout — clients refetch just the sidebar list.
-  | { type: 'workspaces-list:updated'; origin?: string }
-  // A workspace's env changed outside the UI — refetch the env view.
-  | { type: 'env:updated'; workspaceId: string }
-  // Workspace readiness changed. Patch its cache without a refetch.
-  | {
-      type: 'harness:updated'
-      workspaceId: string
-      availability: HarnessAvailability
-    }
-  // The Scratchpad canvas for `workspaceId` was saved — open tabs reload from
-  // disk. `origin` is the tab that wrote it, so that tab can skip its own echo.
-  | { type: 'scratchpad:updated'; workspaceId: string; origin?: string }
-  // App settings changed (PATCH /api/settings from any client) — carries the
-  // new value so caches update without a refetch.
-  | { type: 'settings:updated'; settings: AppSettings }
-  | NavigationRequest
+import type { WorkspaceEvent } from '@/lib/events'
+export type { WorkspaceEvent } from '@/lib/events'
 
 export type WorkspaceEventHandler = (event: WorkspaceEvent) => void
 
@@ -61,7 +10,7 @@ export type WorkspaceEventsClientOptions = {
   reconnectMaxDelayMs?: number
 }
 
-// The page's workspace events socket. `AppProvider` opens it when the app
+// The machine's app events socket. `AppProvider` opens it when the app
 // mounts and closes it when the app unmounts; subscribers come and go freely
 // in between without touching the connection. A dropped socket reopens on its
 // own. Framework-free, so the connection logic is testable without React.
@@ -105,6 +54,10 @@ export class WorkspaceEventsClient {
     }
   }
 
+  emit(event: WorkspaceEvent) {
+    for (const handler of this.listeners) handler(event)
+  }
+
   send(message: object) {
     if (this.socket?.readyState !== WebSocket.OPEN) return
     this.socket.send(JSON.stringify(message))
@@ -138,13 +91,13 @@ export class WorkspaceEventsClient {
     socket.onopen = () => {
       this.reconnectAttempt = 0
       this.sendNavigationPresence()
-      for (const handler of this.listeners) handler({ type: 'connection:opened' })
+      this.emit({ type: 'connection:opened' })
     }
 
     socket.onmessage = event => {
       try {
         const data = JSON.parse(event.data) as WorkspaceEvent
-        for (const handler of this.listeners) handler(data)
+        this.emit(data)
       } catch {}
     }
 

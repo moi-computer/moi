@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import type { WorkspaceEntry } from '@/lib/types'
 
 import { api } from './index'
-import { setEventServer } from '../events'
+import { setEventServer, workspaceEventsTopic } from '../events'
 import { loadLayout } from '../workspaces/layout'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 
@@ -30,8 +30,8 @@ beforeEach(async () => {
   workspaceId = (await registerWorkspace(workspaceDir, { harness: 'codex' })).id
   published = []
   setEventServer({
-    publish: (_topic, data) => {
-      published.push(data)
+    publish: (topic, data) => {
+      if (topic === workspaceEventsTopic(workspaceId)) published.push(data)
     }
   })
 })
@@ -70,8 +70,8 @@ test('glyphs and uploads keep their complete presentation in one icon object', a
 
   expect((await putIcon()).status).toBe(200)
   expect(published.map(event => JSON.parse(event))).toEqual([
-    { type: 'workspace:updated', workspaceId },
-    { type: 'workspace:updated', workspaceId }
+    { type: 'workspace:updated' },
+    { type: 'workspace:updated' }
   ])
   const plain = await loadLayout(workspaceDir)
   expect(plain.icon?.type).toBe('upload')
@@ -129,7 +129,7 @@ test('theme saves broadcast changes and expose the theme in workspace lists', as
   const list = (await (await api.request('/api/workspaces')).json()) as WorkspaceEntry[]
 
   expect(response.status).toBe(204)
-  expect(published).toContain(JSON.stringify({ type: 'theme:updated', workspaceId }))
+  expect(published).toContain(JSON.stringify({ type: 'theme:updated' }))
   expect(list[0]?.theme).toEqual(theme)
 })
 

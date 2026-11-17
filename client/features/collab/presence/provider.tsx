@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useRouter } from 'wouter'
 import { usePathname } from 'wouter/use-browser-location'
 
+import type { WorkspaceSocket } from '@/client/runtime/workspace-socket'
 import { tabFromPath } from '@/lib/workspace-tabs'
 
 import { CollabClient, NO_ENGINE } from './client'
@@ -21,10 +22,15 @@ export function pageFromPath(path: string, workspaceId: string, base = ''): stri
 export type CollabProviderProps = {
   workspaceId: string
   enabled: boolean
+  // The workspace's live connection; presence opens its own when none is shared.
+  socket?: WorkspaceSocket
   children: ReactNode
 }
-export function CollabProvider({ workspaceId, enabled, children }: CollabProviderProps) {
-  const engine = useMemo(() => new CollabClient(workspaceId, enabled), [workspaceId, enabled])
+export function CollabProvider({ workspaceId, enabled, socket, children }: CollabProviderProps) {
+  const engine = useMemo(
+    () => new CollabClient(workspaceId, enabled, socket),
+    [workspaceId, enabled, socket]
+  )
   const router = useRouter()
   const path = usePathname(router)
   const { base } = router

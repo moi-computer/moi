@@ -1223,8 +1223,6 @@ workspaces.post('/create', async c => {
 })
 
 // `/:id` is registered after the static `/discover` so the literal path wins.
-// `/api/workspaces/ws` (the live-event WebSocket) is intercepted by Bun's routes
-// table before it ever reaches Hono, so it never collides with `:id`.
 workspaces.route('/:id', one)
 
 // ---- top-level API ----------------------------------------------------------

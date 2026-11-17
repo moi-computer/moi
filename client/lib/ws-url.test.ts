@@ -23,11 +23,11 @@ afterEach(() => {
 describe('wsUrl', () => {
   test('uses ws:// over http', () => {
     stubLocation({ protocol: 'http:', host: 'localhost:13337' })
-    expect(wsUrl('/ws')).toBe('ws://localhost:13337/ws')
+    expect(wsUrl('/api/harness/events')).toBe('ws://localhost:13337/api/harness/events')
   })
 
   test('uses wss:// over https (behind a TLS proxy)', () => {
     stubLocation({ protocol: 'https:', host: 'moi.example.com' })
-    expect(wsUrl('/api/workspaces/ws')).toBe('wss://moi.example.com/api/workspaces/ws')
+    expect(wsUrl('/api/events')).toBe('wss://moi.example.com/api/events')
   })
 })

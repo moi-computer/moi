@@ -6,6 +6,7 @@ import { COLLAB_MAX_CONNECTIONS, isCollabClientMessage } from '@/lib/collab/prot
 import type { CollabClientMessage } from '@/lib/collab/types'
 import { CollabService } from '@/server/collab/service'
 
+import { WorkspaceSocket } from '@/client/runtime/workspace-socket'
 import { CollabClient, NO_ENGINE } from './client'
 import { getCurrentUser } from '../host-state'
 import { setIdentity } from '../../identity/store'
@@ -134,7 +135,7 @@ test('an explicit user enables workspace presence without an applet and clearing
   signIn(profile)
   expect(sockets).toHaveLength(1)
   const socket = sockets[0]!
-  expect(socket.url).toBe('ws://localhost/api/workspaces/workspace/collab')
+  expect(socket.url).toBe('ws://localhost/api/workspaces/workspace/events')
   socket.open()
   expect(socket.sent[0]).toMatchObject({ type: 'join', profile })
   expect(engine.getSnapshot().connections[0]?.userId).toEqual(profile.id)
@@ -216,19 +217,17 @@ test('a rejected join retries after capacity frees and cleanup cancels pending w
   try {
     const client = new CollabClient('workspace')
     stop = client.start()
-    const rejected = sockets[0]!
-    rejected.open()
-    expect(rejected.readyState).toBe(3)
+    const recovered = sockets[0]!
+    recovered.open()
+    // The socket also carries shared updates, so a rejected join keeps it open.
+    expect(recovered.readyState).toBe(TestSocket.OPEN)
     expect(client.getSnapshot().status).toBe('disconnected')
-    expect(clearHeartbeat).toHaveBeenCalledWith(heartbeat.mock.results.at(-1)!.value)
 
     service.leave('occupied-0')
     await Bun.sleep(550)
-    expect(sockets).toHaveLength(2)
-    const recovered = sockets[1]!
-    recovered.open()
+    expect(sockets).toHaveLength(1)
     expect(client.getSnapshot().status).toBe('connected')
-    expect(recovered.sent[0]).toMatchObject({ type: 'join', profile: { id: 'alice' } })
+    expect(recovered.sent.filter(message => message.type === 'join')).toHaveLength(2)
 
     client.setPresence({
       registrationId: 'queued',
@@ -243,16 +242,16 @@ test('a rejected join retries after capacity frees and cleanup cancels pending w
     const sent = recovered.sent.length
     await Bun.sleep(550)
     expect(recovered.sent).toHaveLength(sent)
-    expect(sockets).toHaveLength(2)
+    expect(sockets).toHaveLength(1)
 
     stop = client.start()
-    sockets[2]!.open()
-    sockets[2]!.close()
+    sockets[1]!.open()
+    sockets[1]!.close()
     const retryTimer = timer.mock.results.at(-1)!.value
     stop()
     expect(clearTimer).toHaveBeenCalledWith(retryTimer)
     await Bun.sleep(550)
-    expect(sockets).toHaveLength(3)
+    expect(sockets).toHaveLength(2)
   } finally {
     stop?.()
     heartbeat.mockRestore()
@@ -429,10 +428,35 @@ test('remote presence connects to the owner with the same membership rules', () 
   const engine = new CollabClient(id)
   stop = engine.start()
   expect(sockets).toHaveLength(1)
-  expect(new URL(sockets[0]!.url).pathname).toBe('/api/workspaces/alice:board/collab')
+  expect(new URL(sockets[0]!.url).pathname).toBe('/api/workspaces/alice:board/events')
   sockets[0]!.open()
   expect(engine.getSnapshot().status).toBe('connected')
   expect(engine.getSnapshot().users.some(user => user.id === 'visitor')).toBe(true)
   signOut()
   expect(engine.getSnapshot().status).toBe('disconnected')
+})
+
+test('presence joins a shared workspace socket and leaving keeps it for shared updates', async () => {
+  const socket = new WorkspaceSocket(() => 'ws://localhost/api/workspaces/workspace/events')
+  const updates: unknown[] = []
+  socket.subscribe({ message: message => updates.push(message) })
+  const release = socket.start()
+  sockets[0]!.open()
+  expect(sockets[0]!.sent).toEqual([])
+
+  signIn({ id: 'alice', name: 'Alice' })
+  const engine = new CollabClient('workspace', true, socket)
+  stop = engine.start()
+  expect(sockets).toHaveLength(1)
+  expect(engine.getSnapshot().status).toBe('connected')
+  sockets[0]!.onmessage?.({ data: JSON.stringify({ type: 'widget:updated', name: 'counter' }) })
+  expect(updates).toContainEqual({ type: 'widget:updated', name: 'counter' })
+
+  // Leaving replaces the connection so the owner drops this viewer's presence.
+  stop()
+  await Bun.sleep(10)
+  expect(sockets).toHaveLength(2)
+  sockets[1]!.open()
+  expect(sockets[1]!.sent).toEqual([])
+  release()
 })

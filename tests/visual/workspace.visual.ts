@@ -132,7 +132,8 @@ test(
       const NativeWebSocket = window.WebSocket
       window.WebSocket = new Proxy(NativeWebSocket, {
         construct(target, args) {
-          if (!String(args[0]).includes('/collab')) return Reflect.construct(target, args)
+          if (!/\/api\/workspaces\/[^/]+\/events$/.test(String(args[0])))
+            return Reflect.construct(target, args)
           const socket = {
             readyState: 1,
             onopen: undefined as (() => void) | undefined,

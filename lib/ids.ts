@@ -8,14 +8,8 @@ const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
 // whole life. 10 chars (~52 bits) stays collision-free at any realistic count.
 export const newWorkspaceId = customAlphabet(ALPHABET, 10)
 
-// Ids no workspace can hold, because a URL carrying one never reaches it:
-// `/api/workspaces/:id` is registered after the literal collection routes, so
-// `create`, `discover`, `order` and `previews` match those instead, and `ws` is claimed by
-// the live-event WebSocket upgrade in `server/web.ts` before Hono sees the
-// request. A workspace registered under one of these would persist fine and
-// then be unreachable in the app. `server/api/reserved-ids.test.ts` re-derives
-// this list from the router so a new collection route cannot outgrow it.
-export const RESERVED_WORKSPACE_IDS = ['create', 'discover', 'order', 'previews', 'ws']
+// Literal collection routes take precedence over workspace IDs.
+export const RESERVED_WORKSPACE_IDS = ['create', 'discover', 'order', 'previews']
 
 // Ids may also be chosen by hand (`moi init --id <id>`), so they are validated
 // rather than assumed. Slightly wider than the generated alphabet — dashes and

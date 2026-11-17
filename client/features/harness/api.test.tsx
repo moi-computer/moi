@@ -10,7 +10,10 @@ import {
 } from '@tanstack/react-query'
 import { AppProvider } from '@/client/app/app-provider'
 import { WorkspaceEventsClient } from '@/client/runtime/workspace-events'
-import type { WorkspaceEventHandler } from '@/client/runtime/workspace-events'
+import {
+  __setQueryClientForTests,
+  handleFrame
+} from '@/client/features/chat/connection/chat-connection'
 import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useHarnessStatus, useRetryHarnessStatus } from './api'
@@ -32,18 +35,10 @@ test('workspaces and onboarding share status; auth events and harness switches u
   for (const [key, value] of Object.entries(globals))
     Object.defineProperty(globalThis, key, { configurable: true, value })
   notifyManager.setNotifyFunction(callback => act(callback))
-  const handlers = new Set<WorkspaceEventHandler>()
   const connect = spyOn(WorkspaceEventsClient.prototype, 'connect').mockImplementation(() => {})
   const close = spyOn(WorkspaceEventsClient.prototype, 'close').mockImplementation(() => {})
-  const subscription = spyOn(WorkspaceEventsClient.prototype, 'subscribe').mockImplementation(
-    handler => {
-      handlers.add(handler)
-      return () => {
-        handlers.delete(handler)
-      }
-    }
-  )
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  __setQueryClientForTests(client)
   const requests: string[] = []
   let harness = 'claude-code'
   let signedOut = false
@@ -75,7 +70,7 @@ test('workspaces and onboarding share status; auth events and harness switches u
     await act(async () => root.unmount())
     client.clear()
     focusManager.setFocused(undefined)
-    subscription.mockRestore()
+    __setQueryClientForTests(null)
     connect.mockRestore()
     close.mockRestore()
     fetchSpy.mockRestore()
@@ -133,12 +128,11 @@ test('workspaces and onboarding share status; auth events and harness switches u
     await Bun.sleep(10)
   })
   await act(async () => {
-    for (const handler of handlers)
-      handler({
-        type: 'harness-status:changed',
-        harness: 'claude-code',
-        status: { availability: { status: 'login-required', reason: 'Signed out' } }
-      })
+    handleFrame({
+      type: 'harness-status:changed',
+      harness: 'claude-code',
+      status: { availability: { status: 'login-required', reason: 'Signed out' } }
+    })
     old.resolve(
       Response.json({
         'claude-code': { availability: { status: 'available' } },
@@ -151,12 +145,11 @@ test('workspaces and onboarding share status; auth events and harness switches u
   expect(document.querySelector('[data-workspace]')?.textContent).toBe('claude-code:login-required')
   pending = undefined
   await act(async () => {
-    for (const handler of handlers)
-      handler({
-        type: 'harness-status:changed',
-        harness: 'claude-code',
-        status: { availability: { status: 'available' } }
-      })
+    handleFrame({
+      type: 'harness-status:changed',
+      harness: 'claude-code',
+      status: { availability: { status: 'available' } }
+    })
     await Bun.sleep(20)
   })
   expect(document.querySelector('[data-onboarding]')?.textContent).toBe('available')
@@ -188,7 +181,7 @@ test('workspaces and onboarding share status; auth events and harness switches u
   expect(document.querySelector('[data-workspace]')?.textContent).toBe('codex:login-required')
   expect(document.querySelector('[data-onboarding]')?.textContent).toBe('available')
   await act(async () => {
-    for (const handler of handlers) handler({ type: 'connection:opened' })
+    void client.invalidateQueries({ queryKey: ['harness-status'] })
     await Bun.sleep(20)
   })
   expect(
@@ -216,12 +209,11 @@ test('workspaces and onboarding share status; auth events and harness switches u
     await Bun.sleep(10)
   })
   await act(async () => {
-    for (const handler of handlers)
-      handler({
-        type: 'harness-status:changed',
-        harness: 'claude-code',
-        status: { availability: { status: 'available' } }
-      })
+    handleFrame({
+      type: 'harness-status:changed',
+      harness: 'claude-code',
+      status: { availability: { status: 'available' } }
+    })
     retryResponse.resolve(
       Response.json({
         'claude-code': { availability: { status: 'login-required' } },

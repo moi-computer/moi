@@ -276,7 +276,7 @@ export function HarnessDebugPage() {
   // Live client frames: our own chat socket, same protocol as the real UI.
   useEffect(() => {
     if (!workspaceId) return
-    const sock = new WebSocket(wsUrl('/ws'))
+    const sock = new WebSocket(wsUrl('/api/harness/events'))
     wsRef.current = sock
     sock.onmessage = e => {
       try {

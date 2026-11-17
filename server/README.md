@@ -54,6 +54,20 @@ workspace list; `harness/registry.ts` owns the available agent backends.
 New server wiring can stay at the root. Feature implementations belong in the
 corresponding directory above.
 
+## Live connections
+
+| Socket                       | Source and scope                                                                        |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| `/cloud/api/events`          | Cloud account and membership changes (owned by Batiok)                                  |
+| `/api/events`                | This machine's workspace list, app settings, personal state, environment and navigation |
+| `/api/harness/events`        | This machine's chats, run activity and harness readiness across workspaces              |
+| `/api/workspaces/:id/events` | Shared workspace updates and presence, served by the owner                              |
+
+Remote shared connections use `ownerId:workspaceId`, just like owner HTTP requests.
+The URL supplies workspace scope; shared event payloads omit `workspaceId`. The
+browser attaches its local reference ID when notifying cache consumers. Personal
+state and navigation always use the visitor's machine.
+
 ## Storage ownership
 
 | State                                                                 | Location and owner                                                                                                     |

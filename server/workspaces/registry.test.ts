@@ -159,7 +159,7 @@ describe('registerWorkspace with a chosen id', () => {
       'Workspace id create is reserved'
     )
     // Case-insensitive, so the rule cannot be sidestepped by spelling.
-    await expect(registerWorkspace('/Users/foo/project', { id: 'WS' })).rejects.toThrow(
+    await expect(registerWorkspace('/Users/foo/project', { id: 'CREATE' })).rejects.toThrow(
       'is reserved'
     )
     expect(await listWorkspaces()).toEqual([])

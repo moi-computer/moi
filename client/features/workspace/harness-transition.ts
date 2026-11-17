@@ -76,8 +76,6 @@ export function useWorkspaceHarnessChanges(id: string, harness: HarnessType | nu
   useWorkspaceEvent(event => {
     if (event.type === 'connection:opened') {
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(id) })
-    } else if (event.type === 'workspace-harness:switched' && event.workspaceId === id) {
-      void receiveWorkspaceHarness(queryClient, id, event.harness)
     }
   })
 }

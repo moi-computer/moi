@@ -17,7 +17,13 @@ import { PORT } from './constants'
 import { control } from './control'
 import { proxyUserState } from './collab/cloudflare-access'
 import { collabManager } from './collab/manager'
-import { EVENTS_TOPIC, setEventServer } from './events'
+import {
+  EVENTS_TOPIC,
+  HARNESS_EVENTS_TOPIC,
+  WORKSPACE_REFRESH_TOPIC,
+  workspaceEventsTopic,
+  setEventServer
+} from './events'
 import { killBuildWorkers } from './applets/build-worker'
 import { killAllWorkers } from './applets/functions'
 import { startScratchpadSweeper } from './scratchpad/document'
@@ -41,11 +47,12 @@ import { renderStatus } from './status'
 import { serveVendorEmojibase, serveVendorReact } from './vendor'
 
 type WsData = {
-  channel: 'chat' | 'events' | 'collab'
+  channel: 'chat' | 'events' | 'workspace'
   workspaceId: string
   workspacePath?: string
   // The collab profile a proxy (Cloudflare Access) verified for the upgrade.
   verifiedProfile?: UserProfile
+  presence?: boolean
 }
 
 function isClientMessage(value: unknown): value is ClientMessage {
@@ -104,7 +111,7 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
     : new Response('Upgrade failed', { status: 500 })
 }
 
-// Bun owns the fullstack surface: the HTML shell + dev bundler/HMR, and the two
+// Bun owns the fullstack surface: the HTML shell + dev bundler/HMR and
 // WebSocket channels (which need Bun's native `server.upgrade` + pub/sub). Every
 // HTTP API route is delegated to the Hono app (`./api`) via `fetch`.
 const registeredWorkspaces = await listWorkspaces()
@@ -167,29 +174,25 @@ export const app = Bun.serve<WsData>({
 
     // Chat websocket — app-wide (one per client, not per workspace). Each chat
     // frame carries its own workspaceId.
-    '/ws': (req: Request, server: Bun.Server<WsData>) =>
+    '/api/harness/events': (req: Request, server: Bun.Server<WsData>) =>
       upgrade(server, req, { channel: 'chat', workspaceId: '' }),
 
-    // Live widget-event stream (build/refresh pushes). A static path, so Bun
-    // routes it ahead of the Hono-served `/api/workspaces/:id`; the upgrade
-    // happens in-handler via the route's `server` argument.
-    '/api/workspaces/ws': (req: Request, server: Bun.Server<WsData>) =>
+    // App settings, personal workspace state, and navigation stay on this machine.
+    '/api/events': (req: Request, server: Bun.Server<WsData>) =>
       upgrade(server, req, { channel: 'events', workspaceId: '' }),
 
-    '/api/workspaces/:id/collab': async (req: Request, server: Bun.Server<WsData>) => {
+    '/api/workspaces/:id/events': async (req: Request, server: Bun.Server<WsData>) => {
       const workspaceId = decodeURIComponent(new URL(req.url).pathname.split('/')[3] ?? '')
       const workspace = await getWorkspace(workspaceId)
       if (!workspace) return new Response('Workspace not found', { status: 404 })
-      if (getAppConfig().environment !== 'cloud') {
-        return new Response('Collab is not enabled for this workspace', { status: 403 })
-      }
+      if (workspace.remote) return new Response('Use the owner workspace address', { status: 404 })
       // Behind Cloudflare Access, presence is joined only as the verified viewer.
       const { provider, profile } = await proxyUserState(req)
       if (provider && !profile) {
         return new Response('Sign in through Cloudflare Access to join', { status: 401 })
       }
       return upgrade(server, req, {
-        channel: 'collab',
+        channel: 'workspace',
         workspaceId,
         workspacePath: workspace.path,
         ...(profile ? { verifiedProfile: profile } : {})
@@ -210,11 +213,11 @@ export const app = Bun.serve<WsData>({
   },
   websocket: {
     open(ws) {
-      if (ws.data.channel === 'collab') {
-        if (ws.data.workspacePath)
-          collabManager.open(ws, ws.data.workspacePath, ws.data.verifiedProfile)
-        else ws.close(1008, 'Missing workspace')
+      if (ws.data.channel === 'workspace') {
+        ws.subscribe(workspaceEventsTopic(ws.data.workspaceId))
+        ws.subscribe(WORKSPACE_REFRESH_TOPIC)
       } else if (ws.data.channel === 'chat') {
+        ws.subscribe(HARNESS_EVENTS_TOPIC)
         addClient(ws)
         // Authoritative snapshot of every non-idle session across all
         // harnesses so the client can light/clear spinners correctly even for
@@ -225,8 +228,16 @@ export const app = Bun.serve<WsData>({
       }
     },
     async message(ws, message) {
-      if (ws.data.channel === 'collab') {
-        collabManager.message(ws, message)
+      if (ws.data.channel === 'workspace') {
+        // Presence starts with the first presence message; until then the socket only pings.
+        if (!ws.data.presence && String(message) === '{"type":"ping"}') {
+          ws.send('{"type":"pong"}')
+        } else if (getAppConfig().environment === 'cloud' && ws.data.workspacePath) {
+          if (!ws.data.presence)
+            collabManager.open(ws, ws.data.workspacePath, ws.data.verifiedProfile)
+          ws.data.presence = true
+          collabManager.message(ws, message)
+        }
         return
       }
       if (ws.data.channel === 'events') {
@@ -281,9 +292,14 @@ export const app = Bun.serve<WsData>({
       } catch {}
     },
     close(ws) {
-      if (ws.data.channel === 'collab') collabManager.close(ws)
-      else if (ws.data.channel === 'chat') removeClient(ws)
-      else {
+      if (ws.data.channel === 'workspace') {
+        collabManager.close(ws)
+        ws.unsubscribe(workspaceEventsTopic(ws.data.workspaceId))
+        ws.unsubscribe(WORKSPACE_REFRESH_TOPIC)
+      } else if (ws.data.channel === 'chat') {
+        removeClient(ws)
+        ws.unsubscribe(HARNESS_EVENTS_TOPIC)
+      } else {
         navigationRelay.remove(ws)
         ws.unsubscribe(EVENTS_TOPIC)
       }

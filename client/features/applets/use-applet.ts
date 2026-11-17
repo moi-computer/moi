@@ -150,9 +150,7 @@ function useApplet(kind: AppletKindSpec, name: string, revision?: string): Apple
     }
   })
 
-  // Owner events don't reach visitors yet. The applet lists refetch on window
-  // focus and carry each bundle's revision, so a remote applet reloads only when
-  // its build changed: a reload remounts it and keeps the old module in memory.
+  // Revisions catch rebuilds missed while the owner's socket was disconnected.
   const remote = isRemoteWorkspace(workspaceId)
   const seen = useRef({ key, revision })
   useEffect(() => {

@@ -1,3 +1,5 @@
+import { isSharedWorkspaceEvent } from '@/lib/events'
+import { WorkspaceSocket } from '@/client/runtime/workspace-socket'
 import { getWorkspaceApiBase } from '@/client/features/workspace/remote'
 import { getWorkspaceDirectory, subscribeWorkspaceDirectory } from '../members/store'
 import { wsUrl } from '@/client/lib/ws-url'
@@ -58,25 +60,28 @@ export const NO_ENGINE: CollabEngineApi = {
   deletePresence: noop
 }
 
-// One presence connection per mounted workspace with an explicit profile.
+// Presence for one mounted workspace with an explicit profile. It rides the
+// workspace socket: holding the socket and joining is being present.
 export class CollabClient implements CollabEngineApi {
   readonly store = new CollabStore()
-  private socket: WebSocket | null = null
+  private release: (() => void) | undefined
   private retry: ReturnType<typeof setTimeout> | undefined
-  private heartbeat: ReturnType<typeof setInterval> | undefined
+  private unsubscribeSocket: (() => void) | undefined
   private unsubscribeMembers: (() => void) | undefined
   private unsubscribeCurrentUser: (() => void) | undefined
   private presenceTimer: ReturnType<typeof setTimeout> | undefined
   private queuedPresence = new Map<string, CollabClientMessage>()
   private stopped = true
   private attempts = 0
-  private lastMessageAt = 0
   private localDirectory: readonly UserProfile[] | undefined
   private userId = getCurrentUser()?.id
 
   constructor(
     readonly workspaceId: string,
-    readonly enabled = true
+    readonly enabled = true,
+    private readonly socket = new WorkspaceSocket(() =>
+      wsUrl(`${getWorkspaceApiBase(workspaceId)}/events`)
+    )
   ) {
     this.store.setSender(message => this.send(message))
   }
@@ -127,18 +132,18 @@ export class CollabClient implements CollabEngineApi {
       const profile = getCurrentUser()
       if (profile?.id !== this.userId) {
         this.userId = profile?.id
-        this.store.disconnect()
-        clearTimeout(this.retry)
-        if (this.socket) this.socket.close()
-        else this.connect()
+        this.leave()
+        this.connect()
       } else if (profile) this.send({ type: 'profile', profile })
     })
     this.unsubscribeMembers = subscribeWorkspaceDirectory(() => {
-      if (!this.wantsConnection()) {
-        clearTimeout(this.retry)
-        this.socket?.close()
-        this.store.disconnect()
-      } else this.connect()
+      if (this.wantsConnection()) this.connect()
+      else this.leave()
+    })
+    this.unsubscribeSocket = this.socket.subscribe({
+      open: () => this.join(),
+      message: message => this.receive(message),
+      close: () => this.reset()
     })
     this.connect()
     return () => this.stop()
@@ -158,59 +163,50 @@ export class CollabClient implements CollabEngineApi {
       this.store.disconnect()
       return
     }
-    if (this.socket) return
-    clearTimeout(this.retry)
+    if (this.release) return
     this.store.connecting()
-    const socket = new WebSocket(wsUrl(`${getWorkspaceApiBase(this.workspaceId)}/collab`))
-    this.socket = socket
-    socket.onopen = () => {
-      if (socket !== this.socket) return
-      this.lastMessageAt = Date.now()
-      const profile = getCurrentUser()
-      if (!profile) {
-        socket.close()
-        return
-      }
-      this.heartbeat = setInterval(() => {
-        if (Date.now() - this.lastMessageAt > 45_000) socket.close()
-        else this.rawSend({ type: 'ping' })
-      }, 15_000)
-      this.rawSend({
-        type: 'join',
-        version: COLLAB_PROTOCOL_VERSION,
-        profile,
-        location: this.store.getLocation()
-      })
-    }
-    socket.onmessage = event => {
-      if (socket !== this.socket) return
-      this.lastMessageAt = Date.now()
-      try {
-        const message = JSON.parse(String(event.data)) as CollabServerMessage
-        if (message.type === 'welcome') this.attempts = 0
-        const rejectedJoin =
-          message.type === 'error' && this.store.getSnapshot().status !== 'connected'
-        this.store.receive(message)
-        if (rejectedJoin) socket.close()
-      } catch {
-        this.store.disconnect('The collaboration connection returned an invalid message.')
-        socket.close()
-      }
-    }
-    socket.onerror = () => socket.close()
-    socket.onclose = () => {
-      if (socket !== this.socket) return
-      clearInterval(this.heartbeat)
-      clearTimeout(this.presenceTimer)
-      this.presenceTimer = undefined
-      this.queuedPresence.clear()
-      this.socket = null
-      this.store.disconnect()
-      if (this.wantsConnection()) {
-        const delay = Math.min(500 * 2 ** this.attempts++, 10_000)
-        this.retry = setTimeout(() => this.connect(), delay)
-      }
-    }
+    this.release = this.socket.start()
+    this.join()
+  }
+
+  private join(): void {
+    const profile = getCurrentUser()
+    if (!this.release || !profile || !this.socket.isOpen) return
+    this.socket.send({
+      type: 'join',
+      version: COLLAB_PROTOCOL_VERSION,
+      profile,
+      location: this.store.getLocation()
+    })
+  }
+
+  private receive(message: { type?: unknown }): void {
+    if (!this.release || isSharedWorkspaceEvent(message)) return
+    const reply = message as CollabServerMessage
+    if (reply.type === 'welcome') this.attempts = 0
+    const rejectedJoin = reply.type === 'error' && this.store.getSnapshot().status !== 'connected'
+    this.store.receive(reply)
+    if (!rejectedJoin) return
+    // Shared updates keep flowing on this socket; only the join is retried.
+    this.store.disconnect()
+    const delay = Math.min(500 * 2 ** this.attempts++, 10_000)
+    this.retry = setTimeout(() => this.join(), delay)
+  }
+
+  private reset(): void {
+    clearTimeout(this.retry)
+    clearTimeout(this.presenceTimer)
+    this.presenceTimer = undefined
+    this.queuedPresence.clear()
+    this.store.disconnect()
+  }
+
+  private leave(): void {
+    this.reset()
+    if (!this.release) return
+    this.socket.reconnect()
+    this.release()
+    this.release = undefined
   }
 
   private send(message: CollabClientMessage): void {
@@ -237,26 +233,14 @@ export class CollabClient implements CollabEngineApi {
   }
 
   private rawSend(message: CollabClientMessage): void {
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      try {
-        this.socket.send(JSON.stringify(message))
-      } catch {
-        this.socket.close()
-      }
-    }
+    if (this.release) this.socket.send(message)
   }
 
   private stop(): void {
     this.stopped = true
     this.unsubscribeCurrentUser?.()
     this.unsubscribeMembers?.()
-    clearTimeout(this.retry)
-    clearTimeout(this.presenceTimer)
-    this.presenceTimer = undefined
-    clearInterval(this.heartbeat)
-    this.queuedPresence.clear()
-    this.socket?.close()
-    this.socket = null
-    this.store.disconnect()
+    this.unsubscribeSocket?.()
+    this.leave()
   }
 }

@@ -64,12 +64,6 @@ export function useWorkspaceLayout(workspaceId: string) {
 export function useWorkspaceHarness(workspaceId: string) {
   const queryClient = useQueryClient()
   useWorkspaceEvent(event => {
-    if (event.type === 'harness:updated' && event.workspaceId === workspaceId) {
-      void queryClient.cancelQueries({ queryKey: workspaceKeys.harness(workspaceId) })
-      queryClient.setQueryData<WorkspaceHarness>(workspaceKeys.harness(workspaceId), prev =>
-        prev ? { ...prev, availability: event.availability } : prev
-      )
-    }
     // Env can swap credentials; the server dropped its cache — refetch.
     if (event.type === 'env:updated' && event.workspaceId === workspaceId) {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.harness(workspaceId) })

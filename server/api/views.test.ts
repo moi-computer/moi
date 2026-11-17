@@ -253,7 +253,7 @@ test('deletes a view and its owned state while preserving shared files and data'
     body: stringify([])
   })
   expect(rpcAfterDelete.status).toBe(500)
-  expect(published).toContainEqual({ type: 'view:deleted', workspaceId, name: 'cards' })
+  expect(published).toContainEqual({ type: 'view:deleted', name: 'cards' })
 })
 
 test('deleting a view keeps a shared server module callable and the remaining view buildable', async () => {
@@ -331,7 +331,7 @@ test('archive failure leaves compiled view files, chats and tabs available to re
   expect(await Bun.file(sourcePath).exists()).toBe(true)
   expect(await Bun.file(serverPath).exists()).toBe(true)
   expect((await readWorkspaceState(ws)).selected['views/cards']).toBe('child')
-  expect(published).not.toContainEqual({ type: 'view:deleted', workspaceId, name: 'cards' })
+  expect(published).not.toContainEqual({ type: 'view:deleted', name: 'cards' })
 })
 
 test('a bundled pending view moves from the state to the compiled list', async () => {

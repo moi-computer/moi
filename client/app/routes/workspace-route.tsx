@@ -6,6 +6,8 @@ import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider } from '@/client/features/collab'
 import { useQueryClient } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
+import { useWorkspaceSocket } from '@/client/features/workspace/use-workspace-socket'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useAppConfig } from '@/client/api/app-config'
@@ -30,7 +32,6 @@ type WorkspaceRouteProps = {
 // Navigation reads the raw browser address so encoded paths and query params
 // are decoded exactly once; the route only owns the workspace ID.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
-  const { environment } = useAppConfig()
   const separator = id.indexOf(':')
   if (separator !== -1)
     return (
@@ -43,12 +44,28 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
     <SidebarLayout>
       <Workspace id={id}>
         <WorkspaceLayoutProvider id={id}>
-          <CollabProvider workspaceId={id} enabled={environment === 'cloud'}>
+          <WorkspaceLive id={id}>
             <WorkspaceContent id={id} />
-          </CollabProvider>
+          </WorkspaceLive>
         </WorkspaceLayoutProvider>
       </Workspace>
     </SidebarLayout>
+  )
+}
+
+type WorkspaceLiveProps = {
+  id: string
+  children: ReactNode
+}
+
+// One owner connection carries shared updates always and presence on Cloud.
+function WorkspaceLive({ id, children }: WorkspaceLiveProps) {
+  const { environment } = useAppConfig()
+  const socket = useWorkspaceSocket(id)
+  return (
+    <CollabProvider workspaceId={id} enabled={environment === 'cloud'} socket={socket}>
+      {children}
+    </CollabProvider>
   )
 }
 

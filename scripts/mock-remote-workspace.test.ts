@@ -92,6 +92,54 @@ describe('owner startup', () => {
       { done: true }
     ])
   })
+  test('owner edits share the presence socket without exposing personal state', async () => {
+    const socket = new WebSocket(
+      origin.replace('http:', 'ws:') + '/api/workspaces/owner-board/events'
+    )
+    const received: Record<string, unknown>[] = []
+    const welcome = Promise.withResolvers<void>()
+    const changed = Promise.withResolvers<void>()
+    socket.onmessage = event => {
+      const message = JSON.parse(String(event.data))
+      received.push(message)
+      if (message.type === 'welcome') welcome.resolve()
+      if (message.type === 'workspace:updated') changed.resolve()
+    }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        socket.onopen = () => resolve()
+        socket.onerror = reject
+      })
+      socket.send(
+        JSON.stringify({
+          type: 'join',
+          version: 1,
+          profile: { id: 'visitor', name: 'Visitor', color: 'blue' }
+        })
+      )
+      await welcome.promise
+      const state = await fetch(origin + '/api/workspaces/owner-board/state/tabs', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ openTabs: ['views/launch-plan'] })
+      })
+      expect(state.status).toBe(200)
+      const config = await fetch(origin + '/api/workspaces/owner-board/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Updated launch', origin: 'other-tab' })
+      })
+      expect(config.status).toBe(200)
+      await changed.promise
+      expect(received.find(message => message.type === 'workspace:updated')).toEqual({
+        type: 'workspace:updated',
+        origin: 'other-tab'
+      })
+      expect(received.some(message => message.type === 'state:changed')).toBe(false)
+    } finally {
+      socket.close()
+    }
+  })
 })
 
 // DOM typings hide Bun’s supported custom handshake headers.
@@ -254,10 +302,10 @@ test('owner content and collaboration require accepted membership', async () => 
   const { origin, request, ownerRequests } = await setup()
   const path = '/api/workspaces/alice:owner-board'
   expect((await fetch(origin + path)).status).toBe(401)
-  for (const suffix of ['', '/widgets', '/collab'])
+  for (const suffix of ['', '/widgets', '/events'])
     expect((await request(path + suffix)).status).toBe(404)
   await new Promise<void>((resolve, reject) => {
-    const socket = new TestWebSocket(origin.replace('http:', 'ws:') + path + '/collab', {
+    const socket = new TestWebSocket(origin.replace('http:', 'ws:') + path + '/events', {
       headers: { origin, cookie: 'session=visitor' }
     })
     const timeout = setTimeout(() => {
@@ -296,7 +344,7 @@ test('owner content and collaboration require accepted membership', async () => 
 test('proxy tunnels visitor and owner WebSockets', async () => {
   const { origin, request } = await setup()
   await request('/cloud/api/invitations/mock-owner-invite/accept', { method: 'POST' })
-  for (const path of ['/ws', '/api/workspaces/alice:owner-board/collab']) {
+  for (const path of ['/api/harness/events', '/api/workspaces/alice:owner-board/events']) {
     await new Promise<void>((resolve, reject) => {
       const socket = new TestWebSocket(origin.replace('http:', 'ws:') + path, {
         headers: { origin, cookie: 'session=visitor' }

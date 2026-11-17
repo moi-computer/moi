@@ -1,3 +1,8 @@
+import { useWorkspaceSocket } from '@/client/features/workspace/use-workspace-socket'
+import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
+import { workspaceKeys } from '@/client/api/workspace-keys'
+import { queryClient } from '@/client/api/query-client'
+import type { WorkspaceEvent } from '@/lib/events'
 import { afterEach, expect, test } from 'bun:test'
 import { act, useState, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -66,7 +71,11 @@ function installDom() {
   const globals = {
     window,
     document,
-    location: { protocol: 'http:', host: 'localhost:13337' },
+    location: {
+      protocol: 'http:',
+      host: 'localhost:13337',
+      pathname: '/workspace/visitor-board/overview'
+    },
     HTMLElement: window.HTMLElement,
     WebSocket: FakeWebSocket,
     IS_REACT_ACT_ENVIRONMENT: true
@@ -141,7 +150,7 @@ test('components outside the app open no socket', async () => {
 
 test('a dropped socket reopens on its own and delivers events again', async () => {
   installDom()
-  const client = new WorkspaceEventsClient('ws://localhost/api/workspaces/ws', {
+  const client = new WorkspaceEventsClient('ws://localhost/api/events', {
     reconnectBaseDelayMs: 1
   })
   const received: string[] = []
@@ -188,4 +197,95 @@ test('scoped listeners isolate workspaces and still receive global refreshes', a
     'one:view:updated',
     'two:view:updated'
   ])
+})
+
+test('owner events use the visitor cache ID while personal state and navigation use the machine socket', async () => {
+  const { root } = installDom()
+  const priorCleanup = cleanup
+  cleanup = async () => {
+    await priorCleanup()
+    queryClient.clear()
+  }
+  seedWorkspaceInfo('visitor-board', { user_id: 'alice', workspace_id: 'board' })
+  seedWorkspaceInfo('alice:board')
+  const received: WorkspaceEvent[] = []
+  function Listener() {
+    useWorkspaceSocket('visitor-board')
+    useWorkspaceEvent(event => received.push(event))
+    return null
+  }
+  await act(async () =>
+    root.render(
+      <QueryClientProvider client={queryClient}>
+        <EventsProvider>
+          <Listener />
+        </EventsProvider>
+      </QueryClientProvider>
+    )
+  )
+  const machine = FakeWebSocket.instances.find(socket => socket.url.endsWith('/api/events'))!
+  const owner = FakeWebSocket.instances.find(socket =>
+    socket.url.endsWith('/api/workspaces/alice:board/events')
+  )!
+  expect(FakeWebSocket.instances).toHaveLength(2)
+  machine.open()
+  owner.open()
+  expect(machine.sent.map(message => JSON.parse(message).type)).toEqual(['navigation:presence'])
+  expect(owner.sent).toEqual([])
+  received.length = 0
+  // A payload cannot override the identity bound to this connection.
+  owner.onmessage?.({
+    data: JSON.stringify({ type: 'view:updated', name: 'plan', workspaceId: 'another' })
+  })
+  owner.onmessage?.({
+    data: JSON.stringify({ type: 'state:changed', workspaceId: 'visitor-board', state: {} })
+  })
+  owner.onmessage?.({
+    data: JSON.stringify({
+      type: 'navigation:request',
+      workspaceId: 'visitor-board',
+      href: '/wrong'
+    })
+  })
+  machine.onmessage?.({
+    data: JSON.stringify({
+      type: 'state:changed',
+      workspaceId: 'visitor-board',
+      state: { revision: 3, selected: {}, sessions: {}, pendingViews: {} }
+    })
+  })
+  machine.onmessage?.({
+    data: JSON.stringify({
+      type: 'navigation:request',
+      workspaceId: 'visitor-board',
+      href: '/right',
+      requestId: 'local-request'
+    })
+  })
+  expect(received).toEqual([
+    { type: 'view:updated', name: 'plan', workspaceId: 'visitor-board' },
+    {
+      type: 'state:changed',
+      workspaceId: 'visitor-board',
+      state: { revision: 3, selected: {}, sessions: {}, pendingViews: {} }
+    },
+    {
+      type: 'navigation:request',
+      workspaceId: 'visitor-board',
+      href: '/right',
+      requestId: 'local-request'
+    }
+  ])
+  queryClient.setQueryData(workspaceKeys.layout('alice:board'), { name: 'Old' })
+  expect(queryClient.getQueryState(workspaceKeys.layout('alice:board'))?.isInvalidated).toBe(false)
+  owner.onmessage?.({ data: JSON.stringify({ type: 'workspace:updated' }) })
+  expect(queryClient.getQueryState(workspaceKeys.layout('alice:board'))?.isInvalidated).toBe(true)
+  owner.close()
+  await Bun.sleep(550)
+  const reconnected = FakeWebSocket.instances.at(-1)!
+  expect(reconnected.url).toBe(owner.url)
+  received.length = 0
+  reconnected.open()
+  expect(received).toEqual([{ type: 'workspace:connected', workspaceId: 'visitor-board' }])
+  expect(machine.closed).toBe(false)
 })

@@ -1,3 +1,6 @@
+import type { HarnessStatuses, WorkspaceHarness } from '@/lib/types'
+import type { WorkspaceEvent } from '@/lib/events'
+import { receiveWorkspaceHarness } from '@/client/features/workspace/harness-transition'
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -26,6 +29,34 @@ type ChatFrameContext = {
 export function reduceChatFrame(data: Record<string, unknown>, context: ChatFrameContext) {
   const { queryClient, sendMessage, onWorkspaceSwitch } = context
   const store = liveStore.getState()
+
+  if (data.type === 'harness-status:changed') {
+    const event = data as Extract<WorkspaceEvent, { type: 'harness-status:changed' }>
+    const queryKey = ['harness-status']
+    void queryClient?.cancelQueries({ queryKey })
+    queryClient?.setQueryData<HarnessStatuses>(queryKey, previous =>
+      previous ? { ...previous, [event.harness]: event.status } : undefined
+    )
+    if (!queryClient?.getQueryData(queryKey)) void queryClient?.invalidateQueries({ queryKey })
+    if (event.status.availability.status === 'available')
+      void queryClient?.invalidateQueries({ queryKey: ['workspaces', 'harness'] })
+    return
+  }
+  if (data.type === 'harness:updated') {
+    const event = data as Extract<WorkspaceEvent, { type: 'harness:updated' }>
+    const queryKey = workspaceKeys.harness(event.workspaceId)
+    void queryClient?.cancelQueries({ queryKey })
+    queryClient?.setQueryData<WorkspaceHarness>(queryKey, previous =>
+      previous ? { ...previous, availability: event.availability } : previous
+    )
+    void queryClient?.invalidateQueries({ queryKey: ['harness-status'] })
+    return
+  }
+  if (data.type === 'workspace-harness:switched') {
+    const event = data as Extract<WorkspaceEvent, { type: 'workspace-harness:switched' }>
+    if (queryClient) void receiveWorkspaceHarness(queryClient, event.workspaceId, event.harness)
+    return
+  }
 
   if (data.type === 'status_snapshot') {
     store.reconcileActivity(

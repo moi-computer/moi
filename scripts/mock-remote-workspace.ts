@@ -514,6 +514,8 @@ if (import.meta.main) {
   process.env.MOI_SECRET_BACKEND = 'file'
   process.env.MOI_ENVIRONMENT = 'cloud'
   const { collabManager } = await import('../server/collab/manager')
+  const { setEventServer, workspaceEventsTopic, WORKSPACE_REFRESH_TOPIC } =
+    await import('../server/events')
   const { api } = await import('../server/api')
   const { registerWorkspace } = await import('../server/workspaces/registry')
   const { saveLayout, loadLayout } = await import('../server/workspaces/layout')
@@ -605,6 +607,7 @@ export default function LaunchPlan() {
   await buildAllViews(owner)
   await buildAllWidgets(owner)
 
+  const present = new WeakSet<object>()
   const ownerServer = Bun.serve({
     hostname: '127.0.0.1',
     port: Number(process.env.MOCK_OWNER_PORT ?? 13340),
@@ -614,18 +617,30 @@ export default function LaunchPlan() {
         return new Response('Unknown mock owner or workspace', { status: 404 })
       }
       console.log(`OWNER ${request.method} ${pathname}`)
-      if (pathname === '/api/workspaces/owner-board/collab') {
+      if (pathname === '/api/workspaces/owner-board/events') {
         if (server.upgrade(request)) return
         return new Response('WebSocket upgrade required', { status: 426 })
       }
       return api.fetch(request)
     },
     websocket: {
-      open: socket => collabManager.open(socket, owner),
-      message: (socket, message) => collabManager.message(socket, message),
+      open: socket => {
+        socket.subscribe(workspaceEventsTopic('owner-board'))
+        socket.subscribe(WORKSPACE_REFRESH_TOPIC)
+      },
+      // Same rule as server/web.ts: presence starts with the first presence message.
+      message: (socket, message) => {
+        if (!present.has(socket)) {
+          if (String(message) === '{"type":"ping"}') return void socket.send('{"type":"pong"}')
+          present.add(socket)
+          collabManager.open(socket, owner)
+        }
+        collabManager.message(socket, message)
+      },
       close: socket => collabManager.close(socket)
     }
   })
+  setEventServer(ownerServer)
   const proxyPort = Number(process.env.MOCK_PROXY_PORT ?? 9898)
   const batiok = process.env.MOCK_BATIOK_ORIGIN ?? 'http://localhost:8787'
   const proxy = createMockRemoteProxy(batiok, ownerServer.url.origin)

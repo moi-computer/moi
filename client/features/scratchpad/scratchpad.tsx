@@ -231,8 +231,12 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
   // the skew notice instead (unmounting the editor, which also stops the
   // autosave timer) so this stale tab can't save over the newer file.
   useWorkspaceEvent((e: WorkspaceEvent) => {
-    if (e.type !== 'scratchpad:updated' || e.workspaceId !== workspaceId) return
-    if (e.origin && e.origin === BROWSER_TAB_ID) return
+    if (
+      (e.type !== 'scratchpad:updated' && e.type !== 'workspace:connected') ||
+      e.workspaceId !== workspaceId
+    )
+      return
+    if ('origin' in e && e.origin === BROWSER_TAB_ID) return
     if (!editorRef.current) return
     fetch(`${apiBase}/scratchpad`)
       .then(r => r.json())

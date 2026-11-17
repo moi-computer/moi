@@ -28,12 +28,6 @@ test('every literal route under /api/workspaces is a reserved id', () => {
   }
 })
 
-test('the WebSocket path stays reserved', () => {
-  // `/api/workspaces/ws` is served from Bun's routes table in `web.ts`, not the
-  // Hono router above, so it can never be re-derived — it is pinned here.
-  expect(RESERVED_WORKSPACE_IDS).toContain('ws')
-})
-
 test('a reserved id is refused before it can shadow its route', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'moi-reserved-ids-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
@@ -51,6 +45,7 @@ test('a reserved id is refused before it can shadow its route', async () => {
   }
 })
 
-test('shared is available as a workspace id', () => {
+test('shared and ws are available as workspace ids', () => {
   expect(validateWorkspaceId('shared')).toBeNull()
+  expect(validateWorkspaceId('ws')).toBeNull()
 })
