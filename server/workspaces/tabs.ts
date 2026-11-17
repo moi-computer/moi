@@ -2,8 +2,7 @@
 import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
 import { viewTabId } from '@/lib/workspace-tabs'
 
-// One row of `moi tabs`. Open tabs are a per-browser preference, so the server
-// lists destinations only.
+// `moi tabs` lists all destinations, regardless of which tabs are open.
 export type TabRow = {
   id: WorkspaceTabId
   title: string

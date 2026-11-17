@@ -78,7 +78,8 @@ import {
 import { saveSessionConfig } from '../sessions/config'
 import type { SessionConfigPatch } from '../sessions/config'
 import { archiveWorkspaceSession } from '../sessions/archive'
-import { getWorkspaceState } from '../workspace-state'
+import { getWorkspaceState, updateWorkspaceState } from '../workspace-state'
+import { normalizeOpenTabs } from '@/lib/workspace-layout'
 import { DIST_DIR, prebuilt } from '../static'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from '../skills/update'
 import { serveWorkspaceImagePreview } from '../workspaces/preview'
@@ -511,10 +512,17 @@ one.get('/uploads/:uploadId', personalWorkspace, c => {
   })
 })
 
-// Per-user chat state: pin, the chat each tab shows, per-chat settings and
-// fork history, and views being built. Every write below answers with the new
-// state; other clients get it as `state:changed`.
+// Personal state writes return the latest snapshot and publish `state:changed`.
 one.get('/state', personalWorkspace, async c => c.json(await getWorkspaceState(c.get('ws'))))
+
+one.put('/state/tabs', personalWorkspace, async c => {
+  const body = await c.req.json().catch(() => null)
+  const ws = c.get('ws')
+  await updateWorkspaceState(ws, state => {
+    state.openTabs = normalizeOpenTabs(body?.openTabs)
+  })
+  return c.json(await getWorkspaceState(ws))
+})
 
 // The agent's chats. Tab ownership and settings come from `/state`.
 one.get('/sessions', personalWorkspace, async c => {

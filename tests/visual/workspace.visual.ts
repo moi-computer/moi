@@ -9,6 +9,28 @@ import { API, suite, WORKSPACE } from './fixtures'
 const { describe, test } = suite(import.meta.path)
 const WORKSPACE_PAGE = `/#/workspace/${WORKSPACE}`
 
+test('floating chat keeps its open and closed state after reload', async page => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'moi:ui',
+      JSON.stringify({
+        version: 0,
+        state: { workspaces: { northwind: { layoutMode: 'fullscreen' } } }
+      })
+    )
+  })
+  await page.goto(WORKSPACE_PAGE)
+  await page.getByRole('button', { name: 'Agent', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Close chat', exact: true })).toBeVisible()
+  await page.goto(WORKSPACE_PAGE)
+  await expect(page.getByRole('button', { name: 'Close chat', exact: true })).toBeVisible()
+  await takeSnapshot('chat restored after reload')
+  await page.getByRole('button', { name: 'Close chat', exact: true }).click()
+  await page.goto(WORKSPACE_PAGE)
+  await expect(page.getByRole('button', { name: 'Agent', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Close chat', exact: true })).toHaveCount(0)
+})
+
 describe('Workspace', () => {
   test('home', async page => {
     // Standalone Moi never asks Cloud for shared workspaces.
@@ -590,15 +612,16 @@ test(
   'failed owner view discovery can be retried',
   async page => {
     let unavailable = true
-    // Tabs are a per-browser preference: this browser last had the view open.
+    // This browser session last visited the view before the owner's failure.
     await page.addInitScript(() => {
-      localStorage.setItem(
-        'moi:ui',
+      sessionStorage.setItem(
+        'moi:workspace-session',
         JSON.stringify({
           state: {
             workspaces: {
               'shared-board': {
-                tabs: { open: ['overview', 'views/counter'], active: 'views/counter' }
+                activeTab: 'views/counter',
+                chatOpen: false
               }
             }
           },

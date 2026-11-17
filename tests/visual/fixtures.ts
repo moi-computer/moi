@@ -187,6 +187,7 @@ export const API: Record<string, unknown> = {
   [`/api/workspaces/${WORKSPACE}/harness`]: harness,
   [`/api/workspaces/${WORKSPACE}/state`]: {
     revision: 1,
+    openTabs: [],
     selected: { overview: SESSION },
     sessions: {},
     pendingViews: {}

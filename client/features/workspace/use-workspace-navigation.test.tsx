@@ -15,11 +15,11 @@ import type {
   WorkspaceTabId,
   WorkspaceTabsState
 } from '@/lib/types'
-import { createDefaultWorkspaceLayout, createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
 import { useWorkspaceNavigation } from './use-workspace-navigation'
-import { defaultWorkspaceUi, useUiStore } from '@/client/store/ui'
+import { useWorkspaceSessionStore } from '@/client/store/workspace-session'
 
 beforeEach(() => seedWorkspaceInfo('abc'))
 afterEach(() => appQueryClient.removeQueries({ queryKey: workspaceKeys.layout('abc') }))
@@ -41,7 +41,7 @@ function readNavigation(
     navigate,
     queryClient = new QueryClient(),
     onOpenChat = () => {},
-    tabs = createDefaultWorkspaceTabs()
+    tabs = { open: ['overview'], active: 'overview' }
   }: ReadNavigationOptions = {}
 ) {
   const previous = queryClient.getQueryData<WorkspaceState>(workspaceKeys.state('abc'))
@@ -50,9 +50,12 @@ function readNavigation(
     selected: {},
     sessions: {},
     pendingViews: {},
-    ...previous
+    ...previous,
+    openTabs: tabs.open.filter(tab => tab !== 'overview')
   })
-  useUiStore.setState({ workspaces: { abc: { ...defaultWorkspaceUi, tabs } } })
+  useWorkspaceSessionStore.setState({
+    workspaces: { abc: { activeTab: tabs.active, chatOpen: false } }
+  })
   const queryKey = workspaceKeys.views('abc')
   if (!queryClient.getQueryDefaults(queryKey).queryFn)
     queryClient.setQueryDefaults(queryKey, { queryFn: async () => views, retry: false })

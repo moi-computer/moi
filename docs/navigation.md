@@ -67,7 +67,11 @@ Modified clicks, downloads, and explicit link targets retain browser behavior.
 
 A tab click restores its last address from browser memory; an explicit link opens exactly the
 state it names. Parked views keep their own params. Reload preserves only the active URL.
-Personal workspace state in Moi’s `DATA_DIR` stores tab paths such as `views/events`, tab order, and the active tab, without query strings. Changes sync across browser windows connected to that Moi. Each window keeps its own view parameters in memory.
+
+Open tabs and their order are shared across browsers connected to your Moi. Each browser tab
+remembers its own active tab across reloads. All available tabs start open until you change the
+list; Overview always stays first. See [storage ownership](../server/README.md#storage-ownership)
+for persistence details.
 
 ## Implementation
 

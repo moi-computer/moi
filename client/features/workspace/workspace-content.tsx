@@ -1,3 +1,4 @@
+import { useFloatingChatOpen } from './workspace-preferences'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { AnimatePresence } from 'motion/react'
@@ -126,7 +127,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   const frame = useWorkspaceFrame()
   const { mode, canUseSplit, setMode } = frame
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
-  const [floatingChatOpen, setFloatingChatOpen] = useState(false)
+  const [floatingChatOpen, setFloatingChatOpen] = useFloatingChatOpen()
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
   const pendingViewRefs = useRef(new Map<string, PendingViewHandle>())
   const sessionActivity = useLive(state => state.activity)
@@ -237,16 +238,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     closePopup: () => setFloatingChatOpen(false),
     openPopup: () => setFloatingChatOpen(true)
   })
-
-  useEffect(() => {
-    const open = tabsState.open.filter(tab => tabAvailable(tab, allViews))
-    if (open.length === tabsState.open.length) return
-    const nextOpen = effectiveOpenTabs(tabsState, allViews)
-    setTabs({
-      open: nextOpen,
-      active: nextOpen.includes(tabsState.active) ? tabsState.active : nextOpen[0]
-    })
-  }, [allViews, setTabs, tabsState])
 
   useEffect(() => {
     if (!activeDraftViewId) return

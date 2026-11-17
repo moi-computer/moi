@@ -4,6 +4,7 @@ import { dirname } from 'node:path'
 
 import type { PendingView, SessionFork, WorkspaceSessionState } from '@/lib/types'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
+import { normalizeOpenTabs } from '@/lib/workspace-layout'
 import { LockTimeoutError, type Lease } from './lock'
 import { WORKSPACE_STATE_VERSION, type StoredWorkspaceState } from './types'
 
@@ -95,6 +96,7 @@ export function normalizeWorkspaceState(
   workspacePath: string
 ): StoredWorkspaceState {
   const state = emptyWorkspaceState(optionalString(value.workspacePath) ?? workspacePath)
+  if (Array.isArray(value.openTabs)) state.openTabs = normalizeOpenTabs(value.openTabs)
   if (typeof value.revision === 'number' && Number.isSafeInteger(value.revision))
     state.revision = value.revision
   if (isRecord(value.chatDefaults))

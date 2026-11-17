@@ -1,5 +1,4 @@
-import type { LayoutMode, WorkspaceTabsState } from '@/lib/types'
-import { createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
+import type { LayoutMode } from '@/lib/types'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type { StateStorage } from 'zustand/middleware'
@@ -7,16 +6,12 @@ import type { StateStorage } from 'zustand/middleware'
 // Per-browser UI preferences and onboarding markers, persisted to localStorage
 // so they survive reloads. Server-backed per-user app state belongs in DATA_DIR.
 export type WorkspaceUi = {
-  // Open tabs and the tab a bare `/workspace/:id` lands on. Each window follows
-  // its own URL; the last window to change tabs decides what is saved.
-  tabs: WorkspaceTabsState
   layoutMode: LayoutMode
   dockedChatWidth: number
   popupChatWidth: number
 }
 
 export const defaultWorkspaceUi: WorkspaceUi = {
-  tabs: createDefaultWorkspaceTabs(),
   layoutMode: 'split',
   dockedChatWidth: 360,
   popupChatWidth: 440

@@ -13,10 +13,9 @@ A remote workspace is a registered local folder whose `.moi/.workspace.json` poi
 
 New local and remote configs use version 2. Remote configs contain only `version` and `remote`.
 
-The owner stores shared content, widgets, theme, name, and icon. Your Moi stores model defaults
-and per-chat settings in `DATA_DIR/workspaces/{localId}/state.json`, shared by every browser
-connected to it. Open tabs, the active tab, split/fullscreen mode, and panel widths are saved per
-workspace in browser localStorage; a newly opened workspace starts on Overview.
+Shared content and configuration stay on the owner's machine. Personal tabs and chat state
+stay on your Moi installation. See [storage ownership](../server/README.md#storage-ownership)
+for the full storage map.
 
 ## Chat and agent
 

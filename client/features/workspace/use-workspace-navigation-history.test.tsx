@@ -8,7 +8,7 @@ import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react
 import { Link, Route, Router } from 'wouter'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { defaultWorkspaceUi, useUiStore } from '@/client/store/ui'
+import { useWorkspaceSessionStore } from '@/client/store/workspace-session'
 import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { resolveUrl } from '@/lib/navigation'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
@@ -79,10 +79,16 @@ function mountNavigation(
   seedWorkspaceInfo('abc', remote ? { user_id: 'alice', workspace_id: 'board' } : undefined)
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   // The fake server's copy of the workspace state.
-  useUiStore.setState({ workspaces: { abc: { ...defaultWorkspaceUi, tabs } } })
-  const savedTabs = () => useUiStore.getState().workspaces.abc?.tabs
+  useWorkspaceSessionStore.setState({
+    workspaces: { abc: { activeTab: tabs.active, chatOpen: false } }
+  })
+  const savedTabs = () => ({
+    open: queryClient.getQueryData<WorkspaceState>(workspaceKeys.state('abc'))?.openTabs,
+    active: useWorkspaceSessionStore.getState().workspaces.abc?.activeTab
+  })
   let server: WorkspaceState = {
     revision: 1,
+    openTabs: tabs.open.filter(tab => tab !== 'overview'),
     selected: { overview: 'previous' },
     pinnedSessionId: 'other',
     sessions: { source: { tabId: 'scratchpad' } },
@@ -104,6 +110,14 @@ function mountNavigation(
         const method = init?.method ?? 'GET'
         if (url.endsWith('/sessions')) return Response.json(await responses.sessions)
         if (url.endsWith('/state') && method === 'GET') return Response.json(server)
+        if (url === '/api/workspaces/abc/state/tabs' && method === 'PUT') {
+          server = {
+            ...server,
+            openTabs: JSON.parse(String(init?.body)).openTabs,
+            revision: server.revision + 1
+          }
+          return Response.json(server)
+        }
         const write = url.match(/\/sessions\/([^/]+)\/(pin|selection)$/)
         if (!write) throw new Error(`Unexpected request: ${method} ${url}`)
         const sessionId = decodeURIComponent(write[1]!)
@@ -142,10 +156,11 @@ function mountNavigation(
 
   function Probe() {
     const [revealed, setRevealed] = useState(false)
-    const { activeTab, onNavigationClick, navigateToTab } = useWorkspaceNavigation({
-      views: [{ id: 'orders', status: 'compiled', title: 'Orders' }],
-      onOpenChat: () => setRevealed(true)
-    })
+    const { activeTab, tabsState, setTabs, onNavigationClick, navigateToTab } =
+      useWorkspaceNavigation({
+        views: [{ id: 'orders', status: 'compiled', title: 'Orders' }],
+        onOpenChat: () => setRevealed(true)
+      })
     return (
       <div onClick={onNavigationClick}>
         <a
@@ -172,7 +187,30 @@ function mountNavigation(
         <button data-tab="orders" onClick={() => navigateToTab('views/orders')}>
           Orders
         </button>
+        <button
+          data-action="close-scratchpad"
+          onClick={() =>
+            setTabs({
+              ...tabsState,
+              open: tabsState.open.filter(tab => tab !== 'scratchpad')
+            })
+          }
+        >
+          Close Scratchpad
+        </button>
+        <button
+          data-action="reorder"
+          onClick={() =>
+            setTabs({
+              ...tabsState,
+              open: ['overview', 'views/orders', 'scratchpad']
+            })
+          }
+        >
+          Reorder tabs
+        </button>
         <output id="active-tab">{activeTab}</output>
+        <output id="open-tabs">{tabsState.open.join(' ')}</output>
         <output id="revealed">{revealed ? 'yes' : 'no'}</output>
       </div>
     )
@@ -470,7 +508,7 @@ describe('mounted chat links', () => {
   )
 })
 
-test('remote tab navigation saves in the browser and sends nothing', async () => {
+test('switching an already open remote tab only saves this session’s active tab', async () => {
   const fixture = mountNavigation('overview', undefined, true)
   await fixture.render()
   await act(async () => {
@@ -491,12 +529,85 @@ test('tabs saved elsewhere update the open set and leave this window on its tab'
     active: 'scratchpad' as const
   }
   await act(async () => {
-    useUiStore.getState().setWorkspaceUi('abc', { tabs })
+    fixture.setState({ openTabs: tabs.open.filter(tab => tab !== 'overview') })
     await Bun.sleep(10)
   })
   expect(fixture.window.location.pathname).toBe('/prefix/workspace/abc/overview')
   expect(fixture.document.getElementById('active-tab')?.textContent).toBe('overview')
   expect(fixture.history).toHaveLength(entries)
-  // The other window's choice stays saved as the landing tab.
-  expect(fixture.savedTabs()).toEqual(tabs)
+  expect(fixture.savedTabs()).toEqual({ open: ['scratchpad'], active: 'overview' })
+})
+
+test('a remote workspace with no saved tabs opens all available tabs', async () => {
+  const fixture = mountNavigation('overview', undefined, true)
+  fixture.setState({ openTabs: undefined })
+  await fixture.render()
+  expect(fixture.document.getElementById('open-tabs')?.textContent).toBe(
+    'overview scratchpad views/orders'
+  )
+  expect(fixture.writes()).toHaveLength(0)
+})
+
+test('an empty saved list shows only Overview and does not reopen available tabs', async () => {
+  const fixture = mountNavigation('', { open: ['overview'], active: 'overview' }, true)
+  await fixture.render()
+  expect(fixture.savedTabs()?.open).toEqual([])
+  expect(fixture.document.getElementById('open-tabs')?.textContent).toBe('overview')
+  expect(fixture.document.getElementById('active-tab')?.textContent).toBe('overview')
+  expect(fixture.writes()).toHaveLength(0)
+})
+
+test('closing the last optional tab saves an empty list and keeps Overview open', async () => {
+  const fixture = mountNavigation('overview', undefined, true)
+  await fixture.render()
+  await act(async () => {
+    const event = new fixture.window.Event('click', { bubbles: true, cancelable: true })
+    Object.assign(event, { button: 0 })
+    fixture.document.querySelector('button[data-action="close-scratchpad"]')!.dispatchEvent(event)
+    await Bun.sleep(10)
+  })
+  expect(fixture.savedTabs()?.open).toEqual([])
+  expect(fixture.document.getElementById('open-tabs')?.textContent).toBe('overview')
+  expect(fixture.writes()).toHaveLength(1)
+  expect(JSON.parse(String(fixture.writes()[0]?.[1]?.body))).toEqual({ openTabs: [] })
+})
+
+test('later visits preserve saved order, hide deleted views and leave other views closed', async () => {
+  const fixture = mountNavigation(
+    'overview',
+    {
+      open: ['overview', 'views/gone', 'scratchpad'],
+      active: 'overview'
+    },
+    true
+  )
+  await fixture.render()
+  expect(fixture.document.getElementById('open-tabs')?.textContent).toBe('overview scratchpad')
+  expect(fixture.writes()).toHaveLength(0)
+})
+
+test('opening, reordering and closing remote tabs saves only the visitor’s open list', async () => {
+  const fixture = mountNavigation('overview', undefined, true)
+  await fixture.render()
+  const click = (selector: string) =>
+    act(async () => {
+      const event = new fixture.window.Event('click', { bubbles: true, cancelable: true })
+      Object.assign(event, { button: 0 })
+      fixture.document.querySelector(selector)!.dispatchEvent(event)
+      await Bun.sleep(10)
+    })
+  await click('button[data-tab="orders"]')
+  expect(fixture.savedTabs()).toEqual({
+    open: ['scratchpad', 'views/orders'],
+    active: 'views/orders'
+  })
+  await click('button[data-action="reorder"]')
+  expect(fixture.savedTabs()?.open).toEqual(['views/orders', 'scratchpad'])
+  await click('button[data-action="close-scratchpad"]')
+  expect(fixture.savedTabs()?.open).toEqual(['views/orders'])
+  expect(fixture.writes()).toHaveLength(3)
+  for (const [url, init] of fixture.writes()) {
+    expect(url).toBe('/api/workspaces/abc/state/tabs')
+    expect(Object.keys(JSON.parse(String(init?.body)))).toEqual(['openTabs'])
+  }
 })

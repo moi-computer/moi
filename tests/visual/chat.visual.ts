@@ -54,6 +54,7 @@ describe('Chat', () => {
     async page => {
       const state: WorkspaceState = {
         revision: 1,
+        openTabs: [],
         selected: {},
         sessions: {},
         pendingViews: {},
@@ -118,7 +119,7 @@ describe('Chat', () => {
 })
 
 test(
-  'chat placement survives reload while the popup starts closed',
+  'chat placement and the open popup survive reload',
   async page => {
     await page.goto(WORKSPACE_PAGE)
     await page.getByRole('button', { name: 'Undock chat', exact: true }).click()
@@ -127,8 +128,6 @@ test(
     await expect(resize).toHaveAttribute('aria-valuenow', '440')
     await page.goto('/')
     await page.goto(`/?reopen=popup#/workspace/${WORKSPACE}`)
-    await expect(page.getByRole('button', { name: 'Dock chat', exact: true })).not.toBeVisible()
-    await page.getByRole('button', { name: 'Agent', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Dock chat', exact: true })).toBeVisible()
     await takeSnapshot('saved popup')
     await page.getByRole('button', { name: 'Dock chat', exact: true }).click()

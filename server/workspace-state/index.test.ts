@@ -43,6 +43,18 @@ test('a missing file reads as empty state for the workspace', async () => {
   expect(existsSync(statePath())).toBe(false)
 })
 
+test('loading an older tab list drops Overview and preserves the remaining order', async () => {
+  await mkdir(join(root, ws.id), { recursive: true })
+  await Bun.write(
+    statePath(),
+    JSON.stringify({
+      version: 1,
+      openTabs: ['overview', 'views/orders', 'scratchpad', 'overview']
+    })
+  )
+  expect((await readWorkspaceState(ws)).openTabs).toEqual(['views/orders', 'scratchpad'])
+})
+
 test('an update saves the whole state in one file and returns the change result', async () => {
   const result = await updateWorkspaceState(ws, state => {
     state.pinnedSessionId = 's1'

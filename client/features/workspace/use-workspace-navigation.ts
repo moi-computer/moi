@@ -46,7 +46,7 @@ type UseWorkspaceNavigationOptions = {
 export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNavigationOptions) {
   const queryClient = useQueryClient()
   const { workspaceId, apiBase } = useWorkspaceLayoutCtx()
-  const [tabsState, saveTabs] = useWorkspaceTabs()
+  const [tabsState, saveTabs, saveActiveTab] = useWorkspaceTabs(views)
   const latest = useRef({ views, tabsState, onOpenChat })
   useLayoutEffect(() => {
     latest.current = { views, tabsState, onOpenChat }
@@ -219,8 +219,9 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
     remembered.set(activeTab, `moi:/${activeTab}${search}`)
     const current = latest.current.tabsState
     const open = current.open.includes(activeTab) ? current.open : [...current.open, activeTab]
-    if (open !== current.open || current.active !== activeTab) setTabs({ open, active: activeTab })
-  }, [activeTab, isAvailableTab, latest, remembered, search, setTabs])
+    if (open !== current.open) setTabs({ open, active: activeTab })
+    else if (current.active !== activeTab) saveActiveTab(activeTab)
+  }, [activeTab, isAvailableTab, latest, remembered, search, setTabs, saveActiveTab])
 
   // React bubbling includes applet/chat portals. Native modified clicks and
   // downloads keep a real href, so the browser can handle them normally.

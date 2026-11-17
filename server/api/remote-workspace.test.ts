@@ -67,6 +67,41 @@ const put = (body: unknown) => ({
   body: JSON.stringify(body)
 })
 
+test('remote open tabs persist on the visitor without changing the owner or reference', async () => {
+  const referenceBefore = await Bun.file(join(visitor, '.moi/.workspace.json')).text()
+  const ownerBefore = await Bun.file(join(owner, '.moi/.workspace.json')).text()
+  const openTabs = ['views/two', 'scratchpad', 'views/one']
+  const response = await api.request(`${local}/state/tabs`, put({ openTabs }))
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({ revision: 1, openTabs })
+  expect(await Bun.file(join(root, 'state', visitorId, 'state.json')).json()).toMatchObject({
+    openTabs
+  })
+  setWorkspaceStateRoot(join(root, 'state')) // Reload from disk, as after a server restart.
+  expect(await (await api.request(`${local}/state`)).json()).toMatchObject({ openTabs })
+  expect(await (await api.request(`${base}/state`)).json()).not.toHaveProperty('openTabs')
+  expect(await Bun.file(join(visitor, '.moi/.workspace.json')).text()).toBe(referenceBefore)
+  expect(await Bun.file(join(owner, '.moi/.workspace.json')).text()).toBe(ownerBefore)
+})
+
+test('tab writes omit Overview, drop invalid paths and deduplicate', async () => {
+  const response = await api.request(
+    `${local}/state/tabs`,
+    put({ openTabs: ['scratchpad', 'overview', 'views/../bad', 'chats/id', 1, 'scratchpad'] })
+  )
+  expect(await response.json()).toMatchObject({ openTabs: ['scratchpad'] })
+})
+
+test('saving only Overview keeps an explicit empty list after a restart', async () => {
+  const response = await api.request(`${local}/state/tabs`, put({ openTabs: ['overview'] }))
+  expect(await response.json()).toMatchObject({ openTabs: [] })
+  expect(await Bun.file(join(root, 'state', visitorId, 'state.json')).json()).toMatchObject({
+    openTabs: []
+  })
+  setWorkspaceStateRoot(join(root, 'state'))
+  expect(await (await api.request(`${local}/state`)).json()).toMatchObject({ openTabs: [] })
+})
+
 test('visitor API returns the reference, folder and resolved routing', async () => {
   const list = await (await api.request('/api/workspaces')).json()
   expect(list.find((entry: { id: string }) => entry.id === visitorId)).toMatchObject({

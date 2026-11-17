@@ -315,6 +315,9 @@ export type WorkspaceSessionState = {
 // Personal state on this Moi installation, shared across its browser windows.
 // GET /api/workspaces/:id/state; writes publish `state:changed`.
 export type WorkspaceState = {
+  // Personal tab list/order, excluding the always-open Overview.
+  // Missing opens all available tabs; an empty list opens only Overview.
+  openTabs?: WorkspaceTabId[]
   // Personal defaults for new chats on this Moi installation.
   chatDefaults?: SessionConfig
   // Goes up by one with every saved change. Lets clients drop an older copy
@@ -614,11 +617,7 @@ export type LayoutMode = 'fullscreen' | 'split'
 
 export type WorkspaceTabId = 'overview' | 'scratchpad' | `views/${string}`
 
-// Open tabs plus the workspace's saved DEFAULT tab. `active` is not live focus
-// state — the live active tab is each browser tab's URL (`/workspace/:id/<tab>`).
-// The saved default answers one question: where a bare `/workspace/:id` lands
-// (and which row `moi tabs` marks). Navigating writes it, so it tracks the last
-// tab switch, last writer wins across clients.
+// Client tab list and remembered active tab; the URL determines live focus.
 export type WorkspaceTabsState = {
   open: WorkspaceTabId[]
   active: WorkspaceTabId

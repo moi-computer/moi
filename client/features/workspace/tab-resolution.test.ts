@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import type { ViewInfo, WorkspaceTabsState } from '@/lib/types'
-import { normalizeWorkspaceTabs } from '@/lib/workspace-layout'
+import { normalizeOpenTabs } from '@/lib/workspace-layout'
 
 import { effectiveOpenTabs, resolveActiveTab, tabAvailable } from './tab-resolution'
 
@@ -19,25 +19,16 @@ const tabs = (open: WorkspaceTabsState['open'], active: WorkspaceTabsState['acti
   active
 })
 
-describe('normalizeWorkspaceTabs', () => {
-  test('falls back to defaults on missing/empty state', () => {
-    expect(normalizeWorkspaceTabs(undefined)).toEqual({
-      open: ['overview'],
-      active: 'overview'
-    })
-    expect(normalizeWorkspaceTabs(tabs([], 'scratchpad'))).toEqual({
-      open: ['overview'],
-      active: 'overview'
-    })
+describe('normalizeOpenTabs', () => {
+  test('keeps missing or empty input empty', () => {
+    expect(normalizeOpenTabs(undefined)).toEqual([])
+    expect(normalizeOpenTabs([])).toEqual([])
   })
 
-  test('pins Overview first, dedupes open, and preserves a valid active tab', () => {
+  test('keeps only optional tabs, in order, without duplicates', () => {
     expect(
-      normalizeWorkspaceTabs(tabs(['scratchpad', 'overview', 'scratchpad'], 'scratchpad'))
-    ).toEqual({
-      open: ['overview', 'scratchpad'],
-      active: 'scratchpad'
-    })
+      normalizeOpenTabs(['views/orders', 'overview', 'scratchpad', 'unknown', 'scratchpad'])
+    ).toEqual(['views/orders', 'scratchpad'])
   })
 })
 
