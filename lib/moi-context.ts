@@ -27,8 +27,9 @@ const MOI_CONTEXT_OPEN = '<moi-context>'
 const MOI_CONTEXT_CLOSE = '</moi-context>'
 // Start of the first line inside the tag. Doubles as the strip guard: a user
 // literally typing `<moi-context>` in their message won't have their text
-// eaten. Keep this phrase byte-stable when rewording the envelope.
-const MOI_CONTEXT_MARKER = 'You are running in a `moi` workspace'
+// eaten. Retain older markers so persisted chat history still strips correctly.
+const MOI_CONTEXT_MARKER = 'You are in a Moi workspace'
+const LEGACY_MOI_CONTEXT_MARKER = 'You are running in a `moi` workspace'
 
 const SYSTEM_REMINDER_OPEN = '<system-reminder>'
 const SYSTEM_REMINDER_CLOSE = '</system-reminder>'
@@ -57,6 +58,8 @@ export type TabContext = {
 // the server for programmatic pending-view sends. Extend this (and
 // `renderMoiContext`) when new ambient fields land.
 export type MoiContext = {
+  // Server-resolved; the browser cannot choose the execution location.
+  workspaceMode?: 'local' | 'remote'
   // Server-resolved path to the installed COLLAB.md reference for this workspace.
   collabReference?: string
   // The workspace tab the user is on when they hit send.
@@ -133,10 +136,18 @@ function describeTab(tab: Pick<TabContext, 'id' | 'title'>): string {
 // wrapped text would double-wrap it.
 export function renderMoiContextBody(ctx: MoiContext): string {
   const preamble = [
-    `${MOI_CONTEXT_MARKER} — a shared UI the user chats with you from, which you can extend and customize.`,
-    'Read the **`moi-workspace` skill** before responding — even to a simple question — unless you already read it in this chat.'
+    `${MOI_CONTEXT_MARKER}: a shared UI where the user chats with you, which you can extend and customize.`,
+    'Read the `moi-workspace` skill before responding unless already read in this chat.'
   ].join('\n')
   const sections: string[] = []
+  if (ctx.workspaceMode) {
+    const lines = [`Workspace: ${ctx.workspaceMode}`]
+    if (ctx.workspaceMode === 'remote')
+      lines.push(
+        'You run in the local linked dir. Shared workspace files live on the owner’s machine.'
+      )
+    sections.push(lines.join('\n'))
+  }
   const appletIsActiveView =
     ctx.applet?.kind === 'view' && ctx.activeTab?.id === `views/${ctx.applet.id}`
   if (ctx.activeTab) {
@@ -186,6 +197,7 @@ export function renderMoiContext(ctx: MoiContext): string {
 export function isMoiContext(value: unknown): value is MoiContext {
   if (!isParamsRecord(value)) return false
   const v = value as {
+    workspaceMode?: unknown
     collabReference?: unknown
     activeTab?: unknown
     applet?: unknown
@@ -193,6 +205,9 @@ export function isMoiContext(value: unknown): value is MoiContext {
     directives?: unknown
   }
   return (
+    (v.workspaceMode === undefined ||
+      v.workspaceMode === 'local' ||
+      v.workspaceMode === 'remote') &&
     (v.activeTab === undefined || isTabContext(v.activeTab)) &&
     (v.collabReference === undefined || typeof v.collabReference === 'string') &&
     (v.applet === undefined || isAppletContext(v.applet)) &&
@@ -263,7 +278,8 @@ function stripOneMoiContext(text: string): string {
   if (start === -1) return text
   const end = text.indexOf(MOI_CONTEXT_CLOSE, start)
   if (end === -1) return text
-  if (!text.slice(start, end).includes(MOI_CONTEXT_MARKER)) return text
+  const body = text.slice(start, end)
+  if (!body.includes(MOI_CONTEXT_MARKER) && !body.includes(LEGACY_MOI_CONTEXT_MARKER)) return text
   let before = text.slice(0, start)
   let after = text.slice(end + MOI_CONTEXT_CLOSE.length)
   if (

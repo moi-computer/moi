@@ -92,6 +92,7 @@ export async function sendWorkspaceMessage(
       sessionId,
       context: {
         ...input.context,
+        workspaceMode: ws.remote ? 'remote' : 'local',
         session: {
           id: sessionId,
           tabId: record.tabId,

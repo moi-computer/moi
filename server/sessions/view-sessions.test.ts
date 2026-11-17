@@ -858,3 +858,18 @@ test('rejected ordinary sends do not mark a pending view submitted', async () =>
   ).rejects.toThrow('Unavailable')
   expect((await getPendingView(ws, view.id))?.status).toBe('draft')
 })
+
+test('workspace mode comes from the server for local and remote sends', async () => {
+  for (const remote of [undefined, { user_id: 'owner', workspace_id: 'shared' }]) {
+    ws.remote = remote
+    await sendWorkspaceMessage(ws, {
+      workspaceId: ws.id,
+      workspacePath: ws.path,
+      sessionId: 'source',
+      isNew: false,
+      content: 'Hello',
+      context: { workspaceMode: remote ? 'local' : 'remote' }
+    })
+    expect(sent.at(-1)?.context?.workspaceMode).toBe(remote ? 'remote' : 'local')
+  }
+})

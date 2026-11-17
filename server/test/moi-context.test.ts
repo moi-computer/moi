@@ -16,7 +16,7 @@ describe('moi context envelope', () => {
   test('renders the tag, preamble, skill pointer, and active tab section', () => {
     expect(context.startsWith('<moi-context>')).toBe(true)
     expect(context.endsWith('</moi-context>')).toBe(true)
-    expect(context).toContain('You are running in a `moi` workspace')
+    expect(context).toContain('You are in a Moi workspace')
     expect(context).toContain('moi-workspace')
     expect(context).toContain('# Active tab\nThe user is on the "Scratchpad" tab.')
     expect(context).toContain('IMPORTANT: This context comes from Moi, not from the user')
@@ -122,7 +122,7 @@ describe('moi context envelope', () => {
   test('the body render is the envelope minus the wrapper tag', () => {
     const body = renderMoiContextBody({ activeTab: { id: 'scratchpad' } })
     expect(body.startsWith('<moi-context>')).toBe(false)
-    expect(body).toContain('You are running in a `moi` workspace')
+    expect(body).toContain('You are in a Moi workspace')
     expect(body).toContain('The user is on the "Scratchpad" tab.')
     expect(renderMoiContext({ activeTab: { id: 'scratchpad' } })).toBe(
       `<moi-context>\n${body}\n</moi-context>`
@@ -278,4 +278,23 @@ describe('moi context envelope', () => {
     expect(stripMoiContext(text)).toBe(text)
     expect(stripMoiContext('plain message')).toBe('plain message')
   })
+})
+
+test('workspace mode adds remote orientation only for linked workspaces', () => {
+  const remote = renderMoiContext({ workspaceMode: 'remote' })
+  expect(remote).toContain('Workspace: remote')
+  expect(remote).toContain('You run in the local linked dir.')
+  const local = renderMoiContext({ workspaceMode: 'local' })
+  expect(local).toContain('Workspace: local')
+  expect(local).not.toContain('linked dir')
+  expect(isMoiContext({ workspaceMode: 'remote' })).toBe(true)
+  expect(isMoiContext({ workspaceMode: 'local' })).toBe(true)
+  expect(isMoiContext({ workspaceMode: 'invalid' })).toBe(false)
+})
+
+test('older envelopes still strip from persisted history', () => {
+  const legacy =
+    '<moi-context>\nYou are running in a `moi` workspace — a shared UI.\n</moi-context>'
+  expect(stripMoiContext(`Hello\n\n${legacy}`)).toBe('Hello')
+  expect(stripMoiContext(`${moiContextSystemReminder(legacy)}\n\nHello`)).toBe('Hello')
 })
