@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRemoteClient, resolveRemoteConfig } from './client'
 import { cloudRoutes } from './routes'
+import { createAgentKeys } from './agent'
 
 const board = { user_id: 'alice', workspace_id: 'board' }
 
@@ -170,6 +171,44 @@ test('managed credentials can refresh but cannot be replaced by login or logout'
   await expect(client.login(() => {})).rejects.toThrow('Cloud manages sign-in')
 })
 
+test('browser login replaces a human login bound to previous Cloud settings', async () => {
+  await credentials()
+  const previous = {
+    ...(await stored()),
+    url: 'https://previous.example/cloud',
+    clientId: 'old-client'
+  }
+  await Bun.write(join(directory, 'remote-auth.json'), JSON.stringify(previous))
+  await client.login(async () => {
+    expect(await stored()).toEqual(previous)
+  })
+  expect(await stored()).toMatchObject({
+    url: cloudUrl(),
+    clientId: 'moi-cli',
+    refreshToken: 'new-refresh'
+  })
+  expect(refreshes).toBe(0)
+  expect((await client.remoteStatus()).me.id).toBe('u1')
+})
+
+test('browser login preserves agent credentials from another cloud, including during login', async () => {
+  const agent = await createAgentKeys({
+    url: 'https://previous.example/cloud',
+    clientId: 'old-client'
+  })
+  const file = join(directory, 'remote-auth.json')
+  await Bun.write(file, JSON.stringify(agent))
+  await expect(client.login(() => {})).rejects.toThrow('Signed in as an agent')
+  expect(requests).toBe(0)
+  await rm(file)
+  await expect(
+    client.login(async () => {
+      await Bun.write(file, JSON.stringify(agent))
+    })
+  ).rejects.toThrow('agent credentials kept')
+  expect(await stored()).toEqual(agent)
+})
+
 test('changed URL, mount path, or client ID never receives saved credentials', async () => {
   await credentials()
   for (const overrides of [
@@ -178,8 +217,8 @@ test('changed URL, mount path, or client ID never receives saved credentials', a
     { clientId: 'another-client' }
   ]) {
     await config(overrides)
-    await expect(client.remoteStatus()).rejects.toThrow('different cloud')
-    await expect(client.logout()).rejects.toThrow('different cloud')
+    await expect(client.remoteStatus()).rejects.toThrow('sign in again with `moi remote login`')
+    await expect(client.logout()).rejects.toThrow('sign in again with `moi remote login`')
   }
   expect(requests).toBe(0)
 })
@@ -217,7 +256,7 @@ test('failed logout keeps credentials so revocation can be retried', async () =>
 
 test('development requires a target; published installs default to production', () => {
   expect(() => resolveRemoteConfig({}, true)).toThrow('For development, configure the Cloud URL')
-  expect(resolveRemoteConfig({}, false).url).toBe('https://run.moi.computer/cloud')
+  expect(resolveRemoteConfig({}, false).url).toBe('https://moi.computer/cloud')
   expect(resolveRemoteConfig({ url: 'http://localhost:8787/custom/cloud/' }, true).url).toBe(
     'http://localhost:8787/custom/cloud'
   )

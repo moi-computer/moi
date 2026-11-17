@@ -24,7 +24,7 @@ import {
 import { serverCwd } from '../../server-cwd'
 import { superviseServerUpdates } from '../../update'
 import { PACKAGE_ROOT } from '../../version'
-import { provisionWorkspace } from '../../workspaces/init'
+import { provisionWorkspace, skillsDirFor } from '../../workspaces/init'
 import { isServerRunning, registerViaControl, waitForServer } from '../control'
 import pc from '../pc'
 import { spawnServer } from '../server'
@@ -215,7 +215,13 @@ export const init = defineCommand({
           return
         }
         entry = result
-        console.log(pc.green('✓') + ' Initialized ' + pc.bold(result.path) + ' for ' + args.remote)
+        console.log(pc.green('✓') + ' Linked ' + pc.bold(result.path) + ' to ' + args.remote)
+        console.log('\nYou run locally. Shared files stay on the owner’s machine.')
+        console.log('\nNext:')
+        console.log('  1. Read ' + join(skillsDirFor(result.path), 'moi-workspace', 'SKILL.md'))
+        console.log('  2. Run commands from ' + result.path)
+        console.log('  3. Run `moi remote` for available commands\n')
+        if (!args.web) return
       } catch (error) {
         console.error(error instanceof Error ? error.message : 'Remote initialization failed')
         process.exitCode = 1

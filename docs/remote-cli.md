@@ -37,17 +37,26 @@ Later `accept` calls reuse the saved identity. `--name` and `--client` apply onl
 rename an agent with `moi remote rename-agent "Legal assistant"`. Client must be `grok-bot`,
 `instinct`, `muse`, `dot`, `duet`, or `other`.
 
-`accept` prints the init command. With `--json`, it returns `remote: { user_id, workspace_id }`
+`accept` suggests an init command with a new folder. Remote initialization prints the installed skill path, tells the agent to read it, and points to `moi remote` for commands. Without `--web`, it finishes without opening a browser or contacting the local server.
+
+With `--json`, `accept` returns `remote: { user_id, workspace_id }`
 matching the config, plus `success` and `membershipId`. First agent acceptance also returns
 `agentId` and `hostId`.
 
 ```sh
+moi remote workspaces                  # Shared workspaces, invitations, and acceptance help
 moi remote invitations --json
 moi remote accept "<invitation-id-or-url>"
 moi remote leave                        # Current folder's remote workspace
 moi remote leave <ownerId>:<workspaceId> # Explicit workspace
-moi remote leave --path ./project       # Another folder's remote workspace
+(cd ./project && moi remote leave)      # Another folder's remote workspace
 ```
+
+`moi remote workspaces --json` returns `workspaces` and `invitations` arrays without formatted help.
+
+`moi remote` shows your signed-in identity. Inside a linked remote workspace it also shows the
+remote ID and a command cheatsheet; local workspaces and unlinked folders show your identity and a help hint.
+Use `moi remote workspaces` to list shared workspaces and pending invitations.
 
 `moi init [directory]` creates a local workspace at version 2. With `--remote`, it writes the
 version 2 remote reference, installs the skill, and registers the folder without downloading
@@ -71,7 +80,7 @@ workspaces keeps the identity available for future invitations.
 
 ## Remote operations
 
-Run these from a remote workspace folder, or add `--path ./project`.
+Run these from the linked remote workspace folder. To target another workspace, change into its folder first.
 
 ```sh
 moi remote read notes.txt
@@ -114,7 +123,7 @@ bun server/cli.ts remote
 bun server/cli.ts remote logout
 ```
 
-Published installs default to `https://run.moi.computer/cloud`, and the public client ID is `moi-cli`. Both can be set through `remote.url` and `remote.clientId` in `config.json`. Managed machines set `remote.managed` to `true`. The URL includes the cloud mount path; the CLI appends `/api/...`. HTTP is accepted only for localhost testing. Source checkouts (including `bun link`) and `NODE_ENV=development` require an explicit `remote.url`, so development never silently targets production.
+Published installs default to `https://moi.computer/cloud`, and the public client ID is `moi-cli`. Both can be set through `remote.url` and `remote.clientId` in `config.json`. Managed machines set `remote.managed` to `true`. The URL includes the cloud mount path; the CLI appends `/api/...`. HTTP is accepted only for localhost testing. Source checkouts (including `bun link`) and `NODE_ENV=development` require an explicit `remote.url`, so development never silently targets production.
 
 ## Use from server code
 

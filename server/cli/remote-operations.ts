@@ -1,12 +1,13 @@
 import { defineCommand } from 'citty'
 import { mkdir, rename, rm } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { basename, dirname, resolve } from 'node:path'
 import { z } from 'zod'
 import { remoteRequest } from '../remote/client'
 import { cloudRoutes } from '../remote/routes'
 import { currentRemoteWorkspace } from '../remote/workspace'
+import { resolveWorkspaceRoot } from '../skills/version'
+import { getLayoutPath, loadWorkspaceFileConfig } from '../workspaces/layout'
 
-const path = { type: 'string' as const, description: 'Local linked workspace folder' }
 const json = { type: 'boolean' as const, description: 'Print JSON result' }
 const commandResult = z.object({
   exitCode: z.number().int(),
@@ -40,12 +41,22 @@ const execEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('stderr'), data: z.string() }),
   z.object({ type: z.literal('exit'), code: z.number().int() })
 ])
-async function target(folder?: string) {
-  const current = await currentRemoteWorkspace(folder)
-  if (!current)
-    throw new Error(
-      'This folder is not a remote workspace — run moi init --remote ownerId:workspaceId first'
-    )
+async function target() {
+  const current = await currentRemoteWorkspace()
+  if (!current) {
+    const root = await resolveWorkspaceRoot(process.cwd())
+    const config = await loadWorkspaceFileConfig(root)
+    let message = 'This folder is not linked to a remote workspace'
+    if (!config.remote && (await Bun.file(getLayoutPath(root)).exists())) {
+      const name = Bun.stripANSI(config.name || basename(root)).replace(
+        // oxlint-disable-next-line no-control-regex -- Workspace names must not control the terminal.
+        /[\u0000-\u001f\u007f-\u009f]/g,
+        ''
+      )
+      message += `\nIt is an existing local workspace: ${name}`
+    }
+    throw new Error(message)
+  }
   type Options = Parameters<typeof remoteRequest>[1]
   return {
     file: (file: string, options?: Options) =>
@@ -61,10 +72,10 @@ async function stdin() {
 export function remoteOperations(report: (action: () => Promise<void>) => Promise<void>) {
   const read = defineCommand({
     meta: { name: 'read', description: 'Read a remote workspace file to stdout' },
-    args: { file: { type: 'positional', required: true }, path },
+    args: { file: { type: 'positional', required: true } },
     run: ({ args }) =>
       report(async () => {
-        const response = await (await target(args.path)).file(args.file)
+        const response = await (await target()).file(args.file)
         if (response.body)
           for await (const chunk of response.body) await Bun.write(Bun.stdout, chunk)
       })
@@ -74,13 +85,12 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
     args: {
       file: { type: 'positional', required: true },
       content: { type: 'positional', required: false },
-      path,
       json
     },
     run: ({ args }) =>
       report(async () => {
         const response = await (
-          await target(args.path)
+          await target()
         ).file(args.file, {
           method: 'PUT',
           body: args.content ?? (await stdin()),
@@ -97,7 +107,6 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
     args: {
       file: { type: 'positional', required: true },
       'patch-file': { type: 'string' },
-      path,
       json
     },
     run: ({ args }) =>
@@ -106,7 +115,7 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
           ? await Bun.file(resolve(args['patch-file'])).text()
           : await stdin()
         const response = await (
-          await target(args.path)
+          await target()
         ).file(args.file, {
           method: 'PATCH',
           body: JSON.stringify({ patch: diff }),
@@ -120,7 +129,6 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
     args: {
       source: { type: 'positional', required: true },
       destination: { type: 'positional', required: true },
-      path,
       json
     },
     run: ({ args }) =>
@@ -128,7 +136,7 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
         const file = Bun.file(resolve(args.source))
         if (!(await file.exists())) throw new Error('Local source file not found')
         const response = await (
-          await target(args.path)
+          await target()
         ).file(args.destination, {
           method: 'PUT',
           body: file,
@@ -147,12 +155,11 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
     args: {
       source: { type: 'positional', required: true },
       destination: { type: 'positional', required: true },
-      path,
       json
     },
     run: ({ args }) =>
       report(async () => {
-        const response = await (await target(args.path)).file(args.source)
+        const response = await (await target()).file(args.source)
         const destination = resolve(args.destination),
           temporary = `${destination}.${crypto.randomUUID()}.tmp`
         await mkdir(dirname(destination), { recursive: true })
@@ -174,11 +181,11 @@ export function remoteOperations(report: (action: () => Promise<void>) => Promis
       name: 'exec',
       description: 'Run a shell command on the remote host, in this workspace'
     },
-    args: { command: { type: 'positional', required: true }, path, json },
+    args: { command: { type: 'positional', required: true }, json },
     run: ({ args }) =>
       report(async () => {
         const controller = new AbortController()
-        const request = await target(args.path)
+        const request = await target()
         const id = crypto.randomUUID()
         let cancellation: Promise<void> | undefined
         const interrupt = () => {

@@ -94,7 +94,7 @@ export function resolveRemoteConfig(
       `For development, configure the Cloud URL to point to your local cloud dev server.\nSet remote.url in ${join(directory, 'config.json')}\nFor example, http://localhost:8787/cloud`
     )
   }
-  const url = new URL(remote.url ?? 'https://run.moi.computer/cloud')
+  const url = new URL(remote.url ?? 'https://moi.computer/cloud')
   if (
     url.protocol !== 'https:' &&
     !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
@@ -173,7 +173,7 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
     })
   }
 
-  async function read(config: RemoteConfig): Promise<Credentials> {
+  async function readStoredCredentials(): Promise<Credentials> {
     let value: unknown
     try {
       value = await Bun.file(authFile).json()
@@ -184,12 +184,15 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
     }
     const parsed = credentialsSchema.safeParse(value)
     if (!parsed.success) throw new Error('Invalid remote credentials — run moi remote login')
-    if (parsed.data.url !== config.url || parsed.data.clientId !== config.clientId) {
-      throw new Error(
-        'Saved login belongs to a different cloud — restore the previous Cloud URL or run moi remote login'
-      )
-    }
     return parsed.data
+  }
+
+  async function read(config: RemoteConfig): Promise<Credentials> {
+    const credentials = await readStoredCredentials()
+    if (credentials.url !== config.url || credentials.clientId !== config.clientId) {
+      throw new Error('Your saved login is not valid — sign in again with `moi remote login`')
+    }
+    return credentials
   }
 
   async function writePrivate(path: string, value: unknown, assertLock: () => void) {
@@ -253,7 +256,9 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
   ): Promise<void> {
     const config = await remoteConfig()
     if (config.managed) throw new Error('Cloud manages sign-in on this machine')
-    if ((await Bun.file(authFile).exists()) && isAgent(await read(config)))
+    // A fresh human login can replace credentials for previous Cloud settings.
+    // Inspect identity without authorizing those credentials for the new server.
+    if ((await Bun.file(authFile).exists()) && isAgent(await readStoredCredentials()))
       throw new Error('Signed in as an agent — use a separate Moi data directory for human login')
     if (await Bun.file(pendingFile).exists())
       throw new Error('An agent join is pending — retry that invitation first')
@@ -282,7 +287,7 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
       })
       if (token.ok) {
         await locked(async assertLock => {
-          if ((await Bun.file(authFile).exists()) && isAgent(await read(config)))
+          if ((await Bun.file(authFile).exists()) && isAgent(await readStoredCredentials()))
             throw new Error(
               'An agent signed in while browser login was pending; agent credentials kept'
             )
@@ -603,7 +608,12 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
           )
       } else {
         if (!name?.trim() || name.trim().length > 80 || !client)
-          throw new Error('First agent acceptance requires --name and --client')
+          throw new Error(
+            'Create your agent identity with --name and --client\n' +
+              '--name: your display name, shown to workspace members (for example, "Research assistant")\n' +
+              `--client: the app you run in (${AGENT_CLIENTS.join(', ')}); use "other" if yours is not listed\n` +
+              'Retry: moi remote accept "<invitation-url>" --name "Research assistant" --client other'
+          )
         pending = {
           fingerprint,
           name: name.trim(),

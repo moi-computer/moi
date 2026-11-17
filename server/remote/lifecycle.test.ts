@@ -136,14 +136,19 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
     await Bun.write(join(dir, 'config.json'), JSON.stringify({ remote: { url } }))
     const client = createRemoteClient(dir),
       invite = url + '/agent-invite/first?token=' + 'A'.repeat(43)
-    async function cli(args: string[], code = 0) {
+    async function cli(args: string[], code = 0, cwd = dir) {
       const child = Bun.spawn(
         [
           process.execPath,
           join(import.meta.dir, '../cli.ts'),
           ...(args[0] === 'init' ? args : ['remote', ...args])
         ],
-        { env: { ...Bun.env, MOI_DATA_DIR: dir, NO_COLOR: '1' }, stdout: 'pipe', stderr: 'pipe' }
+        {
+          cwd,
+          env: { ...Bun.env, MOI_DATA_DIR: dir, NO_COLOR: '1' },
+          stdout: 'pipe',
+          stderr: 'pipe'
+        }
       )
       const [stdout, stderr, exit] = await Promise.all([
         new Response(child.stdout).text(),
@@ -154,6 +159,10 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
       if (code === 0) expect(stderr).toBe('')
       return { stdout, stderr }
     }
+    const guidance = (await cli(['accept', invite], 1)).stderr
+    expect(guidance).toContain('--name: your display name')
+    expect(guidance).toContain('use "other" if yours is not listed')
+    expect(guidance).toContain('moi remote accept "<invitation-url>"')
     expect(
       (await cli(['accept', invite, '--name', 'Lawyer', '--client', 'muse'], 1)).stderr
     ).toContain('keys kept')
@@ -174,6 +183,14 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
     expect(
       JSON.parse((await cli(['init', folder, '--remote', 'owner:one', '--json'])).stdout)
     ).toEqual(firstInit)
+    const initOutput = (await cli(['init', folder, '--remote', 'owner:one'])).stdout
+    expect(initOutput).toContain('You run locally. Shared files stay on the owner’s machine.')
+    expect(initOutput).toContain('Run commands from ' + folder)
+    expect(initOutput).toContain('Run `moi remote`')
+    const skillPath = initOutput.match(/1\. Read (.+)/)?.[1]
+    expect(skillPath).toBeDefined()
+    expect(await Bun.file(skillPath!).exists()).toBe(true)
+    expect(initOutput).not.toContain('moi start')
     const configFile = Bun.file(join(folder, '.moi/.workspace.json'))
     const originalConfig = await configFile.text()
     expect(JSON.parse(originalConfig)).toEqual({ version: 2, remote: acceptance.remote })
@@ -192,9 +209,11 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
     )
     expect(await Bun.file(join(folder, '.moi/package.json')).exists()).toBe(false)
     expect(
-      JSON.parse((await cli(['--json', '--path', folder])).stdout).currentWorkspace.workspace_id
+      JSON.parse((await cli(['--json'], 0, folder)).stdout).currentWorkspace.workspace_id
     ).toBe('one')
-    expect((await cli(['accept', 'second'])).stdout).toContain('moi init --remote owner:two')
+    expect((await cli(['accept', 'second'])).stdout).toContain(
+      'moi init ./workspace-folder --remote owner:two'
+    )
     expect(await client.fetchSharedWorkspaces()).toHaveLength(2)
     expect((await cli(['init', folder, '--remote', 'owner:two', '--json'], 1)).stderr).toContain(
       'different workspace configuration'
@@ -209,11 +228,11 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
     ).toContain('different workspace configuration')
     expect(await localConfig.text()).toBe(localBefore)
     expect((await cli(['leave', '', '--path', folder], 1)).stderr).toContain(
-      'workspace address or --path'
+      'Unknown option --path'
     )
     expect((await cli(['leave', ''], 1)).stderr).toContain('ownerId:workspaceId')
     expect(await client.fetchSharedWorkspaces()).toHaveLength(2)
-    await cli(['leave', '--path', folder, '--json'])
+    await cli(['leave', '--json'], 0, folder)
     expect(await client.fetchSharedWorkspaces()).toHaveLength(1)
     expect(await configFile.text()).toBe(originalConfig)
     await cli(['leave', 'owner:two', '--json'])
@@ -233,7 +252,7 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
 test('human credentials cannot be overwritten by an agent invitation', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'moi-human-'))
   try {
-    const url = 'https://run.moi.computer/cloud',
+    const url = 'https://moi.computer/cloud',
       file = join(dir, 'remote-auth.json')
     await Bun.write(join(dir, 'config.json'), JSON.stringify({ remote: { url } }))
     const credentials = {

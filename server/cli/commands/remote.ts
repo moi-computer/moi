@@ -6,12 +6,15 @@ import { clearLine, cursorTo } from 'node:readline'
 import { currentRemoteWorkspace } from '../../remote/workspace'
 import { parseRemoteWorkspaceAddress } from '@/lib/workspace-config'
 import pc from '../pc'
+import { columns, keyValue } from '../ui'
+import { resolveWorkspace, staleSkillNotice } from '../../skills/version'
+import { getLayoutPath } from '../../workspaces/layout'
 import {
   login as signIn,
   logout as signOut,
   CloudSignInRequired,
-  cloudUrl,
   remoteStatus,
+  fetchSharedWorkspaces,
   invitations as listInvitations,
   accept as acceptInvitation,
   renameAgent,
@@ -21,6 +24,17 @@ import {
 // Profile fields are user supplied; they must not control the terminal.
 // oxlint-disable-next-line no-control-regex -- Deliberately remove terminal control characters.
 const text = (value: string) => Bun.stripANSI(value).replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+
+async function warnIfSkillStale() {
+  try {
+    const { root, harness } = await resolveWorkspace(process.cwd())
+    if (!harness && !(await Bun.file(getLayoutPath(root)).exists())) return
+    const notice = await staleSkillNotice(root)
+    if (notice) console.error('\n' + pc.yellow(notice))
+  } catch {
+    // A skill check must not prevent displaying remote status.
+  }
+}
 
 async function reportErrors(action: () => Promise<void>): Promise<void> {
   try {
@@ -70,7 +84,7 @@ function waitingForLogin(): () => void {
 }
 
 const login = defineCommand({
-  meta: { name: 'login', description: 'Sign in to Moi Cloud in your browser' },
+  meta: { name: 'login', description: 'Sign in to Moi Cloud in your browser (for HUMANS only)' },
   args: {
     browser: {
       type: 'boolean',
@@ -90,13 +104,15 @@ const login = defineCommand({
       } finally {
         stopWaiting()
       }
-      console.log(`\n${pc.green('Congratulations!')} You are now signed in.\n`)
+      const { me } = await remoteStatus()
+      const identity = 'email' in me ? me.email : me.name
+      console.log(`${pc.green('✓')} Signed in as ${text(identity)}\n`)
     })
   }
 })
 
 const logout = defineCommand({
-  meta: { name: 'logout', description: 'Sign out of Moi Cloud' },
+  meta: { name: 'logout', description: 'Sign out of Moi Cloud (for HUMANS only)' },
   args: { yes: { type: 'boolean', description: 'Confirm permanently revoking this agent login' } },
   async run({ args }) {
     await reportErrors(async () => {
@@ -107,12 +123,11 @@ const logout = defineCommand({
 })
 
 const jsonArg = { type: 'boolean' as const, description: 'Print JSON' }
-const pathArg = {
-  type: 'string' as const,
-  description: 'Local workspace folder (defaults to current folder)'
-}
 const rename = defineCommand({
-  meta: { name: 'rename-agent', description: 'Change your agent name across workspaces' },
+  meta: {
+    name: 'rename-agent',
+    description: 'Change your agent name across workspaces (for agents only)'
+  },
   args: { name: { type: 'positional', required: true }, json: jsonArg },
   async run({ args }) {
     await reportErrors(async () => {
@@ -137,12 +152,59 @@ const invitations = defineCommand({
     })
   }
 })
+const workspaces = defineCommand({
+  meta: { name: 'workspaces', description: 'List shared workspaces and pending invitations' },
+  args: { json: jsonArg },
+  async run({ args }) {
+    await reportErrors(async () => {
+      const [available, pending] = await Promise.all([fetchSharedWorkspaces(), listInvitations()])
+      if (args.json) {
+        console.log(JSON.stringify({ workspaces: available, invitations: pending }, null, 2))
+        return
+      }
+      console.log('\n' + pc.bold('Available shared workspaces') + '\n')
+      if (available.length) {
+        console.log(
+          columns(
+            ['Workspace', 'Shared by', 'Remote ID'].map(label => pc.dim(label)),
+            available.map(workspace => [
+              text(workspace.id),
+              text(workspace.owner.email),
+              text(`${workspace.owner.id}:${workspace.id}`)
+            ])
+          )
+        )
+        console.log(
+          '\n' + pc.dim('To link from a new folder: ') + pc.cyan('moi init --remote <remote-id>')
+        )
+      } else console.log('  No shared workspaces yet')
+      console.log('\n' + pc.bold('Pending invitations') + '\n')
+      if (pending.length) {
+        console.log(
+          columns(
+            ['Workspace', 'Invited by', 'Invitation ID'].map(label => pc.dim(label)),
+            pending.map(invitation => [
+              text(invitation.workspaceName),
+              text(invitation.inviter.email),
+              text(invitation.id)
+            ])
+          )
+        )
+        console.log('\n' + pc.dim('To accept: ') + pc.cyan('moi remote accept <invitation-id>'))
+      } else console.log('  No pending invitations')
+      console.log('\nHelp and full command list: ' + pc.cyan('moi remote workspaces --help') + '\n')
+    })
+  }
+})
 const accept = defineCommand({
   meta: { name: 'accept', description: 'Accept a workspace invitation as a human or agent' },
   args: {
     invite: { type: 'positional', required: true },
-    name: { type: 'string', description: 'Name for a new agent identity' },
-    client: { type: 'string', description: 'Agent client: ' + AGENT_CLIENTS.join(', ') },
+    name: { type: 'string', description: 'Your agent display name, shown to workspace members' },
+    client: {
+      type: 'string',
+      description: 'The app you run in: ' + AGENT_CLIENTS.join(', ') + '; use other if not listed'
+    },
     json: jsonArg
   },
   async run({ args }) {
@@ -151,7 +213,7 @@ const accept = defineCommand({
       console.log(
         args.json
           ? JSON.stringify(result)
-          : `Invitation accepted\n\nmoi init --remote ${result.remote.user_id}:${result.remote.workspace_id}`
+          : `Invitation accepted\n\nCreate a local linked folder (choose an unused folder name):\nmoi init ./workspace-folder --remote ${result.remote.user_id}:${result.remote.workspace_id}`
       )
     })
   }
@@ -164,19 +226,18 @@ const leave = defineCommand({
       required: false,
       description: 'ownerId:workspaceId (defaults to current folder)'
     },
-    path: pathArg,
     json: jsonArg
   },
   async run({ args }) {
     await reportErrors(async () => {
-      if (args.workspace !== undefined && args.path)
-        throw new Error('Use a workspace address or --path, not both')
       const target =
         args.workspace !== undefined
           ? parseRemoteWorkspaceAddress(args.workspace)
-          : await currentRemoteWorkspace(args.path)
+          : await currentRemoteWorkspace()
       if (!target)
-        throw new Error('No remote workspace here — provide ownerId:workspaceId or --path')
+        throw new Error(
+          'No remote workspace here — run from a linked workspace folder or provide ownerId:workspaceId'
+        )
       const result = await leaveWorkspace(target.user_id, target.workspace_id)
       console.log(args.json ? JSON.stringify(result) : 'Left the workspace; local files kept')
     })
@@ -187,15 +248,25 @@ const remoteSubCommands = {
   login,
   logout,
   'rename-agent': rename,
+  workspaces,
   invitations,
   accept,
   leave
 }
 
 export const remote = defineCommand({
-  meta: { name: 'remote', description: 'Show your cloud account and shared workspaces' },
-  args: { json: jsonArg, path: pathArg },
+  meta: { name: 'remote', description: 'Show your identity and linked workspace commands' },
+  args: { json: jsonArg },
   subCommands: remoteSubCommands,
+  setup({ rawArgs }) {
+    // Citty accepts unknown options. Reject the removed selector before dispatch
+    // so an old script cannot silently operate on the current workspace.
+    const separator = rawArgs.indexOf('--')
+    const options = separator < 0 ? rawArgs : rawArgs.slice(0, separator)
+    if (options.some(arg => arg === '--path' || arg.startsWith('--path='))) {
+      throw new Error('Unknown option --path — run this command from the workspace folder')
+    }
+  },
   async run({ args, rawArgs }) {
     // citty also runs the parent after a subcommand; only bare `remote` shows status.
     const sub = rawArgs.find(arg => !arg.startsWith('-'))
@@ -203,26 +274,57 @@ export const remote = defineCommand({
     await reportErrors(async () => {
       const status = {
         ...(await remoteStatus()),
-        currentWorkspace: await currentRemoteWorkspace(args.path)
+        currentWorkspace: await currentRemoteWorkspace()
       }
       if (args.json) {
         console.log(JSON.stringify(status, null, 2))
+        await warnIfSkillStale()
         return
       }
+      const detail = 'email' in status.me ? status.me.email : status.me.client
       console.log(
-        `\n${text(status.me.name || ('email' in status.me ? status.me.email : status.me.client))} <${text('email' in status.me ? status.me.email : status.me.client)}>\nAccount: ${text(status.me.id)}\nCloud: ${await cloudUrl()}\n`
+        '\nSigned in as ' + pc.bold(text(status.me.name || detail)) + pc.dim(` <${text(detail)}>`)
       )
-      if (status.currentWorkspace)
-        console.log(
-          `Remote workspace: ${text(status.currentWorkspace.user_id)}:${text(status.currentWorkspace.workspace_id)}\n`
+      const linked = status.currentWorkspace
+      if (linked) {
+        const workspace = status.workspaces.find(
+          item => item.id === linked.workspace_id && item.owner.id === linked.user_id
         )
-      console.log('Shared workspaces')
-      if (!status.workspaces.length) console.log('  No shared workspaces')
-      for (const workspace of status.workspaces)
         console.log(
-          `  ${text(workspace.owner.id)}:${text(workspace.id)}  — ${text(workspace.owner.name || workspace.owner.email)} <${text(workspace.owner.email)}>`
+          '\nCurrent workspace is linked to: ' +
+            pc.bold(text(linked.workspace_id)) +
+            (workspace ? ' by ' + text(workspace.owner.email) : '')
         )
+        console.log('Remote ID: ' + text(`${linked.user_id}:${linked.workspace_id}`))
+        console.log(
+          '\n' +
+            keyValue([
+              [pc.cyan('moi remote read <remote-path>'), 'Read a file'],
+              [pc.cyan('moi remote write <remote-path> "content"'), 'Write a file'],
+              [pc.cyan('moi remote patch <remote-path>'), 'Apply a diff from stdin'],
+              [pc.cyan('moi remote exec "command"'), 'Run a command remotely'],
+              [pc.cyan('moi remote file-upload <local-path> <remote-path>'), 'Upload a local file'],
+              [
+                pc.cyan('moi remote file-download <remote-path> <local-path>'),
+                'Download a remote file'
+              ]
+            ])
+        )
+        console.log(
+          '\n' +
+            pc.cyan(
+              'moi check|bundle|theme|config|tabs|ui-components|call-server-fn|debug|scratch'
+            ) +
+            '\n' +
+            pc.dim('These regular commands work on the remote workspace')
+        )
+      } else {
+        console.log('\nThis folder is not linked to a remote workspace')
+      }
+      console.log('\n' + pc.dim('Help and full command list: ') + pc.cyan('moi remote --help'))
+      if (linked) console.log(pc.dim('Command help:  ') + pc.cyan('moi remote <command> --help'))
       console.log()
+      await warnIfSkillStale()
     })
   }
 })
