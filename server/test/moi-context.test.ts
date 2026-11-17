@@ -283,10 +283,10 @@ describe('moi context envelope', () => {
 test('workspace mode adds remote orientation only for linked workspaces', () => {
   const remote = renderMoiContext({ workspaceMode: 'remote' })
   expect(remote).toContain('Workspace: remote')
-  expect(remote).toContain('You run in the local linked dir.')
+  expect(remote).toContain('You run in a local directory linked to a remote workspace.')
   const local = renderMoiContext({ workspaceMode: 'local' })
   expect(local).toContain('Workspace: local')
-  expect(local).not.toContain('linked dir')
+  expect(local).not.toContain('linked to a remote workspace')
   expect(isMoiContext({ workspaceMode: 'remote' })).toBe(true)
   expect(isMoiContext({ workspaceMode: 'local' })).toBe(true)
   expect(isMoiContext({ workspaceMode: 'invalid' })).toBe(false)

@@ -143,9 +143,7 @@ export function renderMoiContextBody(ctx: MoiContext): string {
   if (ctx.workspaceMode) {
     const lines = [`Workspace: ${ctx.workspaceMode}`]
     if (ctx.workspaceMode === 'remote')
-      lines.push(
-        'You run in the local linked dir. Shared workspace files live on the owner’s machine.'
-      )
+      lines.push('You run in a local directory linked to a remote workspace.')
     sections.push(lines.join('\n'))
   }
   const appletIsActiveView =

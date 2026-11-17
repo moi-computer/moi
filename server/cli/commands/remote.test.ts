@@ -98,6 +98,7 @@ test('profile names cannot inject terminal commands', async () => {
   }
 })
 
+// This flow starts multiple real CLI processes; allow for slower CI startup.
 test('human CLI login, status, workspaces, invitations, acceptance and logout', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'moi-human-commands-'))
   let accepted = false,
@@ -229,7 +230,7 @@ test('human CLI login, status, workspaces, invitations, acceptance and logout', 
     server.stop(true)
     await rm(directory, { recursive: true, force: true })
   }
-})
+}, 20_000)
 
 test('invalid or unauthenticated acceptance leaves credentials untouched', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'moi-accept-signed-out-'))
