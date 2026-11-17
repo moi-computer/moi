@@ -216,7 +216,6 @@ export const init = defineCommand({
         }
         entry = result
         console.log(pc.green('✓') + ' Linked ' + pc.bold(result.path) + ' to ' + args.remote)
-        console.log('\nYou run locally. Shared files stay on the owner’s machine.')
         console.log('\nNext:')
         console.log('  1. Read ' + join(skillsDirFor(result.path), 'moi-workspace', 'SKILL.md'))
         console.log('  2. Run commands from ' + result.path)
