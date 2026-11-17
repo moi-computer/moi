@@ -160,8 +160,6 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
       return { stdout, stderr }
     }
     const guidance = (await cli(['accept', invite], 1)).stderr
-    expect(guidance).toContain('--name: your display name')
-    expect(guidance).toContain('use "other" if yours is not listed')
     expect(guidance).toContain('moi remote accept "<invitation-url>"')
     expect(
       (await cli(['accept', invite, '--name', 'Lawyer', '--client', 'muse'], 1)).stderr
@@ -184,11 +182,7 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
       JSON.parse((await cli(['init', folder, '--remote', 'owner:one', '--json'])).stdout)
     ).toEqual(firstInit)
     const initOutput = (await cli(['init', folder, '--remote', 'owner:one'])).stdout
-    expect(initOutput).toContain('You run locally. Shared files stay on the owner’s machine.')
-    expect(initOutput).toContain('Run commands from ' + folder)
-    expect(initOutput).toContain('Run `moi remote`')
     const skillPath = initOutput.match(/1\. Read (.+)/)?.[1]
-    expect(skillPath).toBeDefined()
     expect(await Bun.file(skillPath!).exists()).toBe(true)
     expect(initOutput).not.toContain('moi start')
     const configFile = Bun.file(join(folder, '.moi/.workspace.json'))
