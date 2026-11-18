@@ -97,7 +97,8 @@ export class ReconnectingSocket {
       clearInterval(this.heartbeat)
       this.socket = undefined
       for (const listener of this.listeners) listener.close?.()
-      const delay = Math.min((this.options.baseDelayMs ?? 500) * 2 ** this.attempts++, 10_000)
+      const maxDelay = Math.min((this.options.baseDelayMs ?? 500) * 2 ** this.attempts++, 10_000)
+      const delay = maxDelay * (0.5 + Math.random() * 0.5)
       this.retry = setTimeout(() => this.open(), delay)
     }
   }
