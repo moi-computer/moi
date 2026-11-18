@@ -184,6 +184,8 @@ describe('workspace sharing', () => {
 
   test('Copy prompt copies the current workspace name and the returned invite URL', async () => {
     const ui = await mountAccount({
+      pendingMutation: true,
+      pendingMutationPaths: ['/agent-invitations'],
       children: <AgentInvite workspaceId="one" workspaceName="SF Trip" />
     })
     seedWorkspaceInfo('one', { user_id: 'alice', workspace_id: 'board' }, ui.qc)
@@ -203,6 +205,10 @@ describe('workspace sharing', () => {
       expect(ui.calls.some(call => call.path === path)).toBe(false)
       ui.failures.mutation = true
       await ui.click('Copy prompt')
+      const button = ui.document.querySelector('section button')!
+      expect(button.textContent).toBe('Loading invite…')
+      expect(button.hasAttribute('disabled')).toBe(true)
+      await act(async () => ui.mutationRequest.resolve())
       expect(copied).toEqual([])
       expect(notification).toHaveBeenCalledWith({
         title: 'Couldn’t copy invite prompt',
@@ -212,9 +218,8 @@ describe('workspace sharing', () => {
       ui.failures.mutation = false
       await ui.click('Copy prompt')
       expect(copied).toEqual([
-        'Follow the instructions at this one-time link to join my Moi workspace “SF Trip”:\n\nhttps://example.com/invite/test'
+        'Follow the instructions at this one-time link to join my Moi workspace “SF Trip”: https://example.com/invite/test'
       ])
-      const button = ui.document.querySelector('section button')!
       expect(button.textContent).toBe('Copied')
       expect(notification).toHaveBeenCalledTimes(1)
       await act(async () => {

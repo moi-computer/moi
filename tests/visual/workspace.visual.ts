@@ -129,6 +129,7 @@ test(
   'active avatar tooltip and sharing controls',
   async page => {
     await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} } })
       const NativeWebSocket = window.WebSocket
       window.WebSocket = new Proxy(NativeWebSocket, {
         construct(target, args) {
@@ -249,6 +250,10 @@ test(
         .getByRole('button', { name: 'Copy prompt' })
     ).toBeVisible()
     await takeSnapshot('sharing from own avatar')
+    await page.route('**/agent-invitations', () => new Promise(() => {}))
+    await page.getByRole('button', { name: 'Copy prompt' }).click()
+    await expect(page.getByRole('button', { name: 'Loading invite…' })).toBeVisible()
+    await takeSnapshot('loading agent invite')
     await page.getByRole('button', { name: 'Alex (You), open sharing', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Email', exact: true })).not.toBeVisible()
   },

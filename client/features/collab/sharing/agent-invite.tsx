@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { IconTextScan2 } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
+import { Spinner } from '@/client/components/ui/spinner'
 import { toast } from '@/client/components/ui/toast'
 
 import { useIdentity } from '../../identity/use-identity'
@@ -8,9 +9,7 @@ import { createAgentInviteLink } from '../members/api'
 
 function composeAgentInvitePrompt(inviteUrl: string, workspaceName?: string) {
   const name = workspaceName ? ` “${workspaceName}”` : ''
-  return `Follow the instructions at this one-time link to join my Moi workspace${name}:
-
-${inviteUrl}`
+  return `Follow the instructions at this one-time link to join my Moi workspace${name}: ${inviteUrl}`
 }
 
 async function copyAsyncText(getText: () => Promise<string>) {
@@ -78,8 +77,17 @@ export function AgentInvite({
         disabled={status === 'copying' || identity?.type !== 'user' || identity.isAnonymous}
         onClick={copyPrompt}
       >
-        <IconTextScan2 data-icon="inline-start" stroke={1.5} aria-hidden="true" />
-        {status === 'copied' ? 'Copied' : 'Copy prompt'}
+        {status === 'copying' ? (
+          <>
+            <Spinner data-icon="inline-start" aria-hidden="true" />
+            Loading invite…
+          </>
+        ) : (
+          <>
+            <IconTextScan2 data-icon="inline-start" stroke={1.5} aria-hidden="true" />
+            {status === 'copied' ? 'Copied' : 'Copy prompt'}
+          </>
+        )}
       </Button>
     </section>
   )
