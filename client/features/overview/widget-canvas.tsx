@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { useCallback, useState } from 'react'
 
 import { motion } from 'motion/react'
 
@@ -44,27 +43,8 @@ function WidgetGrid({
   onMove,
   onRemove
 }: WidgetGridProps) {
-  const [layout, setLayout] = useState<Layout>(() => packItems(items))
-  const [previousItems, setPreviousItems] = useState(items)
+  const layout = packItems(items)
   const { width, containerRef, mounted } = useContainerWidth({ measureBeforeMount: true })
-
-  if (previousItems !== items) {
-    setPreviousItems(items)
-    setLayout(previous => {
-      const previousById = new Map(previous.map(item => [item.i, item]))
-      const kept = items
-        .filter(item => previousById.has(item.id))
-        .map(item => ({ ...previousById.get(item.id)!, w: item.w, h: item.h }))
-      const keptIds = new Set(kept.map(item => item.i))
-      return [
-        ...kept,
-        ...packItems(
-          items.filter(item => !keptIds.has(item.id)),
-          kept
-        )
-      ]
-    })
-  }
 
   const gridLayout: Layout = emptyState
     ? [
@@ -80,15 +60,6 @@ function WidgetGrid({
       ]
     : layout
 
-  const handleLayoutChange = useCallback(
-    (next: Layout) => {
-      const widgets = next.filter(item => item.i !== EMPTY_STATE_ID)
-      setLayout(widgets)
-      onMove?.(widgets.map(item => ({ id: item.i, x: item.x, y: item.y })))
-    },
-    [onMove]
-  )
-
   return (
     <div ref={containerRef} className="w-full">
       {mounted && (
@@ -99,7 +70,11 @@ function WidgetGrid({
           dragConfig={{ enabled: !!customizing }}
           resizeConfig={{ enabled: false }}
           compactor={verticalCompactor}
-          onLayoutChange={handleLayoutChange}
+          onDragStop={next =>
+            onMove?.(
+              next.filter(item => item.i !== EMPTY_STATE_ID).map(({ i, x, y }) => ({ id: i, x, y }))
+            )
+          }
         >
           {layout.map(item => (
             <div key={item.i}>
