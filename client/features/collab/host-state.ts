@@ -1,5 +1,5 @@
 import { getIdentity, subscribeIdentity } from '../identity/store'
-import { agentIcon } from '@/client/lib/agent-icon'
+import { agentIcon } from '@/client/lib/agent-client'
 import { collabIdentityId, type Identity } from '../identity/types'
 import { isUserProfile } from '@/lib/collab/protocol'
 import { colorForId, isUserColor } from '@/lib/collab/colors'

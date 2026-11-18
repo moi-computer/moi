@@ -1,5 +1,5 @@
 import { User } from '@/client/features/collab/components/user'
-import { agentClientLabel } from '@/client/lib/agent-icon'
+import { agentClientLabel } from '@/client/lib/agent-client'
 import { identityProfile } from '@/client/features/collab/host-state'
 import { Spinner } from '@/client/components/ui/spinner'
 import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
