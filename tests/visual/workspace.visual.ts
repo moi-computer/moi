@@ -274,6 +274,7 @@ test(
       page.getByRole('button', { name: 'Users in this workspace', exact: true })
     ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Alex (You), open sharing' })).toBeVisible()
     await takeSnapshot('remote overview')
     await page.getByRole('button', { name: 'Shared board menu', exact: true }).click()
     await expect(page.getByRole('menuitem', { name: 'Theme', exact: true })).toBeVisible()

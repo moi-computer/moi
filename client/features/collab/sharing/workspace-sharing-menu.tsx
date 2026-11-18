@@ -48,9 +48,11 @@ export function WorkspaceSharingMenu({
         : members,
     page
   })
-  const active = users.filter(user => user.status === 'active')
-  const shown = active.slice(0, 4).toReversed()
-  const hidden = active.length - shown.length
+  const headerUsers = users.filter(
+    user => user.status === 'active' || (user.self && memberIds?.has(user.profile.id))
+  )
+  const shown = headerUsers.slice(0, 4).toReversed()
+  const hidden = headerUsers.length - shown.length
   const [open, setOpen] = useState(false)
   const headerRef = useRef<HTMLDivElement>(null)
 
