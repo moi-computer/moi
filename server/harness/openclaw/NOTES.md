@@ -692,9 +692,7 @@ silent gateway will hang forever. We race a 2–5 s timer.
 The package is a pinned **development dependency**. Release builds bundle only
 this client implementation and its dependencies; the full OpenClaw application
 is not installed with Moi. The build follows the public export to its generated
-implementation module and preserves upstream behavior. See
-[package builds](../../../docs/package-build.md) for the artifact layout and
-required upgrade checks.
+implementation module and preserves upstream behavior.
 
 ## 11. What our code does
 
