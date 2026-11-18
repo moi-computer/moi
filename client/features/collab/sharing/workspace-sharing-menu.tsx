@@ -24,16 +24,18 @@ import { pageFromPath } from '../presence/provider'
 import { useConnectionState, useWorkspaceUsers, useMe } from '../presence/hooks'
 import { summarizeWorkspaceUsers, type WorkspaceUserInfo } from '../presence/users'
 import { WorkspaceMembers } from './workspace-members'
-// import { AgentInvite } from './agent-invite'
+import { AgentInvite } from './agent-invite'
 
 export type TabInfo = { label: string; Icon: TabIcon }
 type WorkspaceSharingMenuProps = {
+  workspaceName?: string
   workspaceId: string
   describeTab: (tab: WorkspaceTabId) => TabInfo | null
   onOpenTab: (tab: WorkspaceTabId) => void
 }
 export function WorkspaceSharingMenu({
   workspaceId,
+  workspaceName,
   describeTab,
   onOpenTab
 }: WorkspaceSharingMenuProps) {
@@ -150,8 +152,7 @@ export function WorkspaceSharingMenu({
           className="w-96 max-w-[calc(100vw-2rem)] gap-2 bg-transparent p-0 shadow-none"
         >
           <WorkspaceMembers workspaceId={workspaceId} users={people} membership={membership} />
-          {/* Enable once agent invitations are functional and the card is polished. */}
-          {/* <AgentInvite /> */}
+          <AgentInvite workspaceId={workspaceId} workspaceName={workspaceName} />
         </PopoverContent>
       </Popover>
     </div>

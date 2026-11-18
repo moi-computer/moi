@@ -174,6 +174,7 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
       throw new Error('Mock upstreams must be local HTTP origins')
   }
   const cloud = createMockRemoteInvitations()
+  const agentInvitePaths = new Set<string>()
   const memberStreams = new Set<ServerResponse>()
   const remote = /^\/api\/workspaces\/alice:owner-board(?=\/|\?|$)/
   const target = (path: string) => {
@@ -230,6 +231,39 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
       '/cloud/api/invitations/mock-owner-invite/accept'
     ].includes(path)
     try {
+      if (
+        path === '/cloud/api/workspaces/alice:owner-board/agent-invitations/link' &&
+        req.method === 'POST'
+      ) {
+        const access = await ownerAccess(req)
+        if (!access.ok) {
+          res.writeHead(access.status, { 'content-type': 'application/json' })
+          res.end(await access.text())
+          return
+        }
+        const invitePath = `/mock/agent-invites/${crypto.randomUUID()}`
+        agentInvitePaths.add(invitePath)
+        setTimeout(() => agentInvitePaths.delete(invitePath), 15 * 60_000).unref()
+        res.writeHead(201, {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'no-store'
+        })
+        res.end(`http://${req.headers.host}${invitePath}`)
+        return
+      }
+      if (path.startsWith('/mock/agent-invites/') && req.method === 'GET') {
+        const valid = agentInvitePaths.has(path)
+        res.writeHead(valid ? 200 : 404, {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'no-store'
+        })
+        res.end(
+          valid
+            ? 'Product launch agent invitation. This local preview is for testing Copy prompt.'
+            : 'Invitation unavailable'
+        )
+        return
+      }
       if (path === '/mock/member-events' || path === '/mock/snapshot') {
         const auth = await authorize(req)
         if (auth.response) {

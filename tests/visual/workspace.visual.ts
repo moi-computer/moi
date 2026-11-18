@@ -243,6 +243,11 @@ test(
       page.locator('li:has([aria-label="Alex"])').getByText('Owner', { exact: true })
     ).toBeVisible()
     await expect(members.getByText('Owner', { exact: true })).toHaveCount(1)
+    await expect(
+      page
+        .getByRole('region', { name: 'Invite your agent' })
+        .getByRole('button', { name: 'Copy prompt' })
+    ).toBeVisible()
     await takeSnapshot('sharing from own avatar')
     await page.getByRole('button', { name: 'Alex (You), open sharing', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Email', exact: true })).not.toBeVisible()

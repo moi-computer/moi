@@ -121,7 +121,7 @@ function tabItemFor(
 
 export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentProps) {
   const { environment } = useAppConfig()
-  const { layout, workspaceId } = useWorkspaceLayoutCtx()
+  const { layout, workspaceId, name } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
   const viewActions = useViewActions()
   const frame = useWorkspaceFrame()
@@ -536,6 +536,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
         </div>
         {environment === 'cloud' && (
           <WorkspaceSharingMenu
+            workspaceName={name?.trim() || undefined}
             workspaceId={workspaceId}
             describeTab={tab => tabItemFor(tab, allViews, false, () => false)}
             onOpenTab={openTab}

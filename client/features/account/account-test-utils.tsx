@@ -159,6 +159,11 @@ export async function mountAccount({
           }
           return new Response(null, { status: 204 })
         }
+        if (path.endsWith('/agent-invitations/link') && init?.method === 'POST')
+          return new Response('https://example.com/invite/test', {
+            status: 201,
+            headers: { 'Content-Type': 'text/plain' }
+          })
         if (path.endsWith('/invitations')) {
           membership = {
             ...membership,

@@ -12,6 +12,8 @@ import { Router } from 'wouter'
 
 import type { UserProfile, Connection } from '@/lib/collab/types'
 
+import { seedWorkspaceInfo } from '../../workspace/workspace-test-utils'
+import { AgentInvite } from './agent-invite'
 import { WorkspaceSharingMenu } from './workspace-sharing-menu'
 import { summarizeWorkspaceUsers } from '../presence/users'
 import { WorkspaceMembers } from './workspace-members'
@@ -180,6 +182,53 @@ test('menu stays visible without a current user', () => {
 describe('workspace sharing', () => {
   afterEach(cleanupAccount)
 
+  test('Copy prompt copies the current workspace name and the returned invite URL', async () => {
+    const ui = await mountAccount({
+      children: <AgentInvite workspaceId="one" workspaceName="SF Trip" />
+    })
+    seedWorkspaceInfo('one', { user_id: 'alice', workspace_id: 'board' }, ui.qc)
+    const copied: string[] = []
+    const notification = spyOn(toast, 'add')
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          copied.push(text)
+        }
+      }
+    })
+    try {
+      const path = '/cloud/api/workspaces/alice:board/agent-invitations/link'
+      expect(ui.calls.some(call => call.path === path)).toBe(false)
+      ui.failures.mutation = true
+      await ui.click('Copy prompt')
+      expect(copied).toEqual([])
+      expect(notification).toHaveBeenCalledWith({
+        title: 'Couldn’t copy invite prompt',
+        description: 'Only the owner can do that.',
+        type: 'error'
+      })
+      ui.failures.mutation = false
+      await ui.click('Copy prompt')
+      expect(copied).toEqual([
+        'Follow the instructions at this one-time link to join my Moi workspace “SF Trip”:\n\nhttps://example.com/invite/test'
+      ])
+      const button = ui.document.querySelector('section button')!
+      expect(button.textContent).toBe('Copied')
+      expect(notification).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        await Bun.sleep(1550)
+      })
+      expect(button.textContent).toBe('Copy prompt')
+      expect(ui.calls.filter(call => call.path === path)).toHaveLength(2)
+    } finally {
+      notification.mockRestore()
+      if (original) Object.defineProperty(navigator, 'clipboard', original)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
   test('disabled presence shows published workspace members and reflects membership updates', async () => {
     const ui = await mountAccount({
       children: (
@@ -193,8 +242,8 @@ describe('workspace sharing', () => {
     expect(ui.calls.some(call => call.path.endsWith('/members'))).toBe(false)
     expect(ui.document.body.textContent).toContain('Alex')
     expect(ui.document.body.textContent).not.toContain('Offline')
-    expect(ui.document.body.textContent).not.toContain('Invite your agent')
-    expect(ui.document.body.textContent).not.toContain('Copy prompt')
+    expect(ui.document.body.textContent).toContain('Invite your agent')
+    expect(ui.document.body.textContent).toContain('Copy prompt')
 
     const tony = {
       id: 'tony',
