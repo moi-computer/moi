@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { stringify, parse } from 'devalue'
 import { api } from './index'
+import * as events from '../events'
 import {
   DEFAULT_REGISTRY_PATH,
   getWorkspace,
@@ -250,13 +251,22 @@ test('a view being built stays with the visitor until the owner lists it as comp
   expect((await api.request(`${local}/views/compiled`, patch({ title: 'Mine' }))).status).toBe(404)
   expect((await api.request(`${local}/views/compiled`, { method: 'DELETE' })).status).toBe(404)
   const reference = (await getWorkspace(visitorId))!
+  const published = spyOn(events, 'publishEvent')
+  spies.push(published)
   const ownerLists =
     (...ids: string[]) =>
     async () =>
-      Response.json({ views: ids.map(id => ({ id })) })
+      Response.json({ views: ids.map(id => ({ id, status: 'compiled', title: id })) })
   await completeRemoteViewBuilds(reference, ownerLists('compiled'))
   expect(await pendingIds()).toEqual([id])
   await completeRemoteViewBuilds(reference, ownerLists('compiled', id))
+  expect(published).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: 'personal-state:changed',
+      workspaceId: visitorId,
+      completedViews: [{ id, status: 'compiled', title: id }]
+    })
+  )
   expect(await pendingIds()).toEqual([])
 })
 

@@ -1,3 +1,5 @@
+import { api } from './index'
+import * as events from '../events'
 import { claudeCodeHarness } from '../harness/claude-code'
 import * as installer from '../harness/install'
 import * as shellPath from '../harness/shell-path'
@@ -7,7 +9,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { harnessStore } from '../harness/auth'
-import { api } from './index'
 import { codexHarness } from '../harness/codex'
 import {
   DEFAULT_REGISTRY_PATH,
@@ -139,6 +140,30 @@ test('workspace navigation does not probe shared authentication', async () => {
     auth.mockRestore()
     availability.mockRestore()
     models.mockRestore()
+  }
+})
+
+test('a fresh workspace readiness read probes without broadcasting another change', async () => {
+  await Bun.write(join(dir, '.env'), 'OPENAI_API_KEY=test-key\n')
+  const workspace = await registerWorkspace(dir, { harness: 'codex' })
+  workspaceId = workspace.id
+  const publish = spyOn(events, 'publishEvent')
+  const models = spyOn(codexHarness, 'listModels').mockResolvedValue([])
+  const probe = spyOn(codexHarness, 'availability')
+  try {
+    for (let i = 0; i < 2; i++) {
+      const response = await api.request(`/api/workspaces/${workspace.id}/harness?refresh=true`)
+      expect(await response.json()).toMatchObject({
+        hasAuthOverrides: true,
+        availability: { status: 'login-required' }
+      })
+    }
+    expect(probe).toHaveBeenCalledTimes(2)
+    expect(publish).not.toHaveBeenCalledWith({ type: 'harness:changed' })
+  } finally {
+    publish.mockRestore()
+    models.mockRestore()
+    probe.mockRestore()
   }
 })
 

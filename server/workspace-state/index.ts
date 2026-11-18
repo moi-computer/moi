@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import type { WorkspaceState } from '@/lib/types'
+import type { CompiledView, WorkspaceState } from '@/lib/types'
 import { DATA_DIR } from '../data-dir'
 import { publishEvent } from '../events'
 import {
@@ -83,7 +83,8 @@ export async function getWorkspaceState(ws: WorkspaceRef): Promise<WorkspaceStat
 // a change that leaves the state as it was skips the write.
 export async function updateWorkspaceState<T>(
   ws: WorkspaceRef,
-  change: (draft: StoredWorkspaceState) => T
+  change: (draft: StoredWorkspaceState) => T,
+  completedViews?: CompiledView[]
 ): Promise<T> {
   return withLock(ws.id, async lease => {
     const loaded = await load(ws)
@@ -98,11 +99,17 @@ export async function updateWorkspaceState<T>(
     if (!loaded.writable) throw new WorkspaceStateVersionError(statePath(ws.id))
     draft.revision++
     await writeStateFile(statePath(ws.id), draft, lease)
+    const previousPending = loaded.state.pendingViews
     loaded.state = draft
     publishEvent({
       type: 'personal-state:changed',
       workspaceId: ws.id,
-      state: toWorkspaceState(draft)
+      state: toWorkspaceState(draft),
+      ...(completedViews?.length && {
+        completedViews: completedViews.filter(
+          view => previousPending[view.id] && !draft.pendingViews[view.id]
+        )
+      })
     })
     return result
   })

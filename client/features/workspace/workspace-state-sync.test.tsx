@@ -17,12 +17,7 @@ import { useViews } from '@/client/features/views/api'
 import { Workspace } from './workspace-context'
 import { WorkspaceLayoutContext } from './workspace-layout-context'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
-import {
-  receiveWorkspaceState,
-  useWorkspaceState,
-  useWorkspaceStateSync,
-  useWorkspaceStateWrite
-} from './workspace-state'
+import { useWorkspaceState, useWorkspaceStateSync, useWorkspaceStateWrite } from './workspace-state'
 
 const WORKSPACE_ID = 'abc'
 
@@ -66,9 +61,14 @@ function mount(initial: WorkspaceState, respond: (request: Request) => Promise<u
       { preconnect: fetch.preconnect }
     )
   )
-  let handleEvent: (event: ClientEvent) => void = () => {}
+  const handlers = new Set<(event: ClientEvent) => void>()
   const eventsSpy = spyOn(workspaceEvents, 'useClientEvent').mockImplementation(handler => {
-    handleEvent = handler
+    useLayoutEffect(() => {
+      handlers.add(handler)
+      return () => {
+        handlers.delete(handler)
+      }
+    }, [handler])
   })
 
   const root = createRoot(document.getElementById('root')!)
@@ -99,7 +99,10 @@ function mount(initial: WorkspaceState, respond: (request: Request) => Promise<u
     requests,
     render,
     cached: () => queryClient.getQueryData<WorkspaceState>(workspaceKeys.state(WORKSPACE_ID)),
-    emit: (event: ClientEvent) => act(() => handleEvent(event)),
+    emit: (event: ClientEvent) =>
+      act(() => {
+        for (const handler of [...handlers]) handler(event)
+      }),
     settle: () =>
       act(async () => {
         await Bun.sleep(10)
@@ -113,65 +116,78 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-test('a finished view stays visible through pending cleanup and a stale list reply', async () => {
-  const reply = deferred<{ views: CompiledView[] }>()
-  const fixture = mount(
-    workspaceState({
-      pendingViews: { board: { status: 'submitted', requirements: 'Build a board' } }
-    }),
-    () => reply.promise
-  )
-  const queryKey = workspaceKeys.views(WORKSPACE_ID)
-  fixture.queryClient.setQueryData(queryKey, [])
-  const rendered: string[][] = []
-  function Probe() {
-    const { data } = useViews(WORKSPACE_ID)
-    useLayoutEffect(() => {
-      rendered.push(data?.map(view => `${view.id}:${view.status}`) ?? [])
-    }, [data])
-    return null
+test.each(['owner first', 'personal first'])(
+  'a finished view stays visible with %s and a stale list reply',
+  async order => {
+    const reply = deferred<{ views: CompiledView[] }>()
+    const fixture = mount(
+      workspaceState({
+        pendingViews: { board: { status: 'submitted', requirements: 'Build a board' } }
+      }),
+      () => reply.promise
+    )
+    const queryKey = workspaceKeys.views(WORKSPACE_ID)
+    fixture.queryClient.setQueryData(queryKey, [])
+    const rendered: string[][] = []
+    function Probe() {
+      useWorkspaceStateSync()
+      const { data } = useViews(WORKSPACE_ID)
+      useLayoutEffect(() => {
+        rendered.push(data?.map(view => `${view.id}:${view.status}`) ?? [])
+      }, [data])
+      return null
+    }
+    await fixture.render(
+      <WorkspaceLayoutContext.Provider
+        value={{
+          layout: createDefaultWorkspaceLayout(),
+          setLayout: () => {},
+          name: null,
+          cwd: null,
+          harness: 'claude-code',
+          workspaceId: WORKSPACE_ID,
+          apiBase: `/api/workspaces/${WORKSPACE_ID}`,
+          isRemote: false,
+          isLoading: false
+        }}
+      >
+        <Probe />
+      </WorkspaceLayoutContext.Provider>
+    )
+    expect(rendered.at(-1)).toEqual(['board:submitted'])
+
+    const request = fixture.queryClient.refetchQueries({ queryKey })
+    await fixture.settle()
+    fixture.emit({ type: 'views-list:changed', workspaceId: 'other', views: [] })
+    await fixture.settle()
+    expect(rendered.at(-1)).toEqual(['board:submitted'])
+
+    const compiled: CompiledView = { id: 'board', status: 'compiled', title: 'Board' }
+    const owner: ClientEvent = {
+      type: 'views-list:changed',
+      workspaceId: WORKSPACE_ID,
+      views: [compiled]
+    }
+    const personal: ClientEvent = {
+      type: 'personal-state:changed',
+      workspaceId: WORKSPACE_ID,
+      state: workspaceState({ revision: 2 }),
+      completedViews: [compiled]
+    }
+    for (const event of order === 'owner first' ? [owner, personal] : [personal, owner]) {
+      fixture.emit(event)
+      await fixture.settle()
+      expect(rendered.at(-1)).toEqual(['board:compiled'])
+    }
+    reply.resolve({ views: [] })
+    await request
+    await fixture.settle()
+
+    expect(fixture.queryClient.getQueryData<CompiledView[]>(queryKey)).toEqual([compiled])
+    expect(rendered.every(views => views.length === 1)).toBe(true)
+    expect(rendered.at(-1)).toEqual(['board:compiled'])
   }
-  await fixture.render(
-    <WorkspaceLayoutContext.Provider
-      value={{
-        layout: createDefaultWorkspaceLayout(),
-        setLayout: () => {},
-        name: null,
-        cwd: null,
-        harness: 'claude-code',
-        workspaceId: WORKSPACE_ID,
-        apiBase: `/api/workspaces/${WORKSPACE_ID}`,
-        isRemote: false,
-        isLoading: false
-      }}
-    >
-      <Probe />
-    </WorkspaceLayoutContext.Provider>
-  )
-  expect(rendered.at(-1)).toEqual(['board:submitted'])
-
-  const request = fixture.queryClient.refetchQueries({ queryKey })
-  await fixture.settle()
-  fixture.emit({ type: 'views-list:changed', workspaceId: 'other', views: [] })
-  await fixture.settle()
-  expect(rendered.at(-1)).toEqual(['board:submitted'])
-
-  const compiled: CompiledView = { id: 'board', status: 'compiled', title: 'Board' }
-  fixture.emit({ type: 'views-list:changed', workspaceId: WORKSPACE_ID, views: [compiled] })
-  await fixture.settle()
-  expect(rendered.at(-1)).toEqual(['board:compiled'])
-  act(() =>
-    receiveWorkspaceState(fixture.queryClient, WORKSPACE_ID, workspaceState({ revision: 2 }))
-  )
-  await fixture.settle()
-  reply.resolve({ views: [] })
-  await request
-  await fixture.settle()
-
-  expect(fixture.queryClient.getQueryData<CompiledView[]>(queryKey)).toEqual([compiled])
-  expect(rendered.every(views => views.length === 1)).toBe(true)
-  expect(rendered.at(-1)).toEqual(['board:compiled'])
-})
+)
 
 describe('workspace state writes', () => {
   test('a reply waits while a later write is in flight; the last reply becomes the cache', async () => {

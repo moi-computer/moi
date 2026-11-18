@@ -27,7 +27,12 @@ export type HarnessEvent =
 export type AppEvent =
   | WorkspaceOpenRequestMessage
   | ScratchpadOpMessage
-  | { type: 'personal-state:changed'; workspaceId: string; state: WorkspaceState }
+  | {
+      type: 'personal-state:changed'
+      workspaceId: string
+      state: WorkspaceState
+      completedViews?: CompiledView[]
+    }
   | { type: 'env:changed'; workspaceId: string }
   | { type: 'workspaces-list:changed'; origin?: string }
   | { type: 'app-settings:changed'; settings: AppSettings }

@@ -208,21 +208,21 @@ export async function handleBundleViews(
     [...beforeBuilt].some(n => !afterBuilt.has(n)) ||
     [...afterBuilt].some(n => !beforeBuilt.has(n))
 
-  // Install compiled views in the browser before removing their pending entries.
-  // Otherwise tab cleanup can mistake the handoff for a deleted view.
+  let views: CompiledView[] = []
   if (results.some(r => r.status === 'built') || orderChanged || membershipChanged) {
-    publish({
-      type: 'views-list:changed',
-      workspaceId,
-      views: await listCompiledViews(workspacePath)
-    })
+    views = await listCompiledViews(workspacePath)
+    publish({ type: 'views-list:changed', workspaceId, views })
   }
 
   const changedServerModules = new Set<string>()
   for (const r of results) {
     if (r.status === 'built') {
       publish({ type: 'view:changed', workspaceId, name: r.name })
-      await completeViewBuild({ id: workspaceId, path: workspacePath }, r.name)
+      await completeViewBuild(
+        { id: workspaceId, path: workspacePath },
+        r.name,
+        views.find(view => view.id === r.name)
+      )
       for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
   }

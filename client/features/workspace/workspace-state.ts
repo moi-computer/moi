@@ -4,7 +4,7 @@ import { requestJson } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { toast } from '@/client/components/ui/toast'
 import { useClientEvent } from '@/client/runtime/use-client-events'
-import type { WorkspaceState } from '@/lib/types'
+import type { CompiledView, WorkspaceState } from '@/lib/types'
 
 // Personal state for one workspace: tabs, pin, selected chats, chat
 // settings and fork history, and views being built. One cache, kept current by
@@ -161,7 +161,18 @@ export function useWorkspaceStateSync(): void {
   const queryClient = useQueryClient()
   useClientEvent(event => {
     if (event.type !== 'personal-state:changed') return
-    if (!getCachedWorkspaceState(queryClient, event.workspaceId)) return
+    const current = getCachedWorkspaceState(queryClient, event.workspaceId)
+    if (!current || current.revision > event.state.revision) return
+    // The personal socket can deliver completion before the owner sends its views list.
+    const key = workspaceKeys.views(event.workspaceId)
+    const views = queryClient.getQueryData<CompiledView[]>(key)
+    const missing = event.completedViews?.filter(
+      view => current.pendingViews[view.id] && !views?.some(old => old.id === view.id)
+    )
+    if (views && missing?.length) {
+      void queryClient.cancelQueries({ queryKey: key })
+      queryClient.setQueryData(key, [...views, ...missing])
+    }
     receiveWorkspaceState(queryClient, event.workspaceId, event.state)
   })
 }

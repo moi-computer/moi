@@ -64,8 +64,7 @@ export function useViews(workspaceId: string) {
   useClientEvent(event => {
     if (event.type === 'views-list:changed' && event.workspaceId === workspaceId) {
       const queryKey = workspaceKeys.views(workspaceId)
-      // The event is newer than an in-flight list request. Apply it immediately
-      // so the following personal-state:changed can safely remove the pending view.
+      // A stale list request must not overwrite the owner’s update.
       void queryClient.cancelQueries({ queryKey })
       queryClient.setQueryData(queryKey, event.views)
     }

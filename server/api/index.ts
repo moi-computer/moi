@@ -766,9 +766,7 @@ one.get('/harness', personalWorkspace, async c => {
     // Gateway-backed harnesses still have workspace-specific readiness.
     harness.authStatus && !hasAuthOverrides
       ? Promise.resolve({ status: 'available' as const })
-      : refresh
-        ? harnessStore.refresh(ws)
-        : harnessStore.getAvailability(ws),
+      : harnessStore.getAvailability(ws, refresh),
     harness.listModels(ws).catch(err => {
       console.error(`[api] listModels failed for ${harness.id}`, err)
       return []

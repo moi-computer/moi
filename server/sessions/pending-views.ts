@@ -1,6 +1,6 @@
 import { isIdentityIconId } from '@/lib/identity-icons'
 import { newViewId } from '@/lib/ids'
-import type { PendingView, WorkspaceEntry, WorkspaceState } from '@/lib/types'
+import type { CompiledView, PendingView, WorkspaceEntry, WorkspaceState } from '@/lib/types'
 import { readWorkspaceState, updateWorkspaceState, type WorkspaceRef } from '../workspace-state'
 import { requestWorkspace } from '../workspaces/api'
 import { cloudRoutes } from '../remote/routes'
@@ -104,10 +104,14 @@ export async function updatePendingView(
   })
 }
 
-export async function completeViewBuild(ws: WorkspaceRef, id: string) {
-  await updateWorkspaceState(ws, state => {
-    delete state.pendingViews[id]
-  })
+export async function completeViewBuild(ws: WorkspaceRef, id: string, compiled?: CompiledView) {
+  await updateWorkspaceState(
+    ws,
+    state => {
+      delete state.pendingViews[id]
+    },
+    compiled && [compiled]
+  )
 }
 
 // A remote view compiles on its owner, which cannot reach this Moi's state. The
@@ -117,12 +121,14 @@ export async function completeRemoteViewBuilds(ws: WorkspaceEntry, request = req
   if (!Object.keys((await readWorkspaceState(ws)).pendingViews).length) return
   const response = await request(cloudRoutes.compiledViews.path(ws.remote), { method: 'GET' })
   if (!response.ok) throw new Error(`Could not list the owner's views (${response.status})`)
-  const { views } = (await response.json()) as { views: { id: string }[] }
-  const compiled = new Set(views.map(view => view.id))
-  await updateWorkspaceState(ws, state => {
-    for (const id of Object.keys(state.pendingViews))
-      if (compiled.has(id)) delete state.pendingViews[id]
-  })
+  const { views } = (await response.json()) as { views: CompiledView[] }
+  await updateWorkspaceState(
+    ws,
+    state => {
+      for (const view of views) delete state.pendingViews[view.id]
+    },
+    views
+  )
 }
 
 // Follow a temporary id's rename in every build that runs in it.
