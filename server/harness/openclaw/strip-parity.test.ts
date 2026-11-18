@@ -1,26 +1,15 @@
-// Does our mirror of the inbound-metadata stripper still match upstream's?
-//
-// `strip.ts` reimplements `src/auto-reply/reply/strip-inbound-meta.ts` because
-// the `openclaw` package doesn't re-export it on a stable subpath. It IS in the
-// shipped bundle though, under a content-hashed filename, so the pinned
-// version's real implementation can be loaded and compared against ours.
-//
-// That turns "diff the dist by hand whenever you bump openclaw" — which is the
-// kind of instruction nobody follows twice — into a test that fails when the
-// mirror drifts.
-//
-// The test skips itself when the bundle can't be found (the package is an
-// optional dependency, and the hash changes every release). A skipped run means
-// unverified, not verified.
+// Optional comparison against a separately installed OpenClaw gateway.
+// Set OPENCLAW_TEST_DIST to its dist directory; Moi only depends on the client SDK.
 import { describe, expect, test } from 'bun:test'
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { stripInboundMetadata } from './strip'
 
-const DIST = join(import.meta.dir, '../../../node_modules/openclaw/dist')
+const DIST = process.env.OPENCLAW_TEST_DIST
 
 function findBundle(): string | null {
+  if (!DIST) return null
   try {
     const hit = readdirSync(DIST).find(
       f => f.startsWith('strip-inbound-meta-') && f.endsWith('.js')
@@ -106,16 +95,11 @@ const CASES: [name: string, text: string][] = [
 
 const upstream = await loadUpstream()
 
-describe('strip.ts mirrors the pinned openclaw stripper', () => {
+describe('strip.ts mirrors the installed OpenClaw stripper', () => {
   test('the pinned bundle was found and loaded', () => {
-    // A bare `test.skipIf` would let a silently-missing bundle read as a pass.
-    if (!upstream) {
-      console.warn(
-        '[strip-parity] openclaw dist bundle not found — parity NOT verified. ' +
-          'Run `bun install` to check the mirror against the pinned version.'
-      )
-    }
-    expect(findBundle() === null || upstream !== null).toBe(true)
+    if (DIST) expect(upstream).not.toBeNull()
+    else
+      console.warn('[strip-parity] Set OPENCLAW_TEST_DIST to verify against an installed gateway')
   })
 
   for (const [name, text] of CASES) {

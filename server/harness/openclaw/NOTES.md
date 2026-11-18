@@ -4,7 +4,7 @@ Everything we learned wiring Moi to OpenClaw's local gateway. Covers on-disk
 layout, the WebSocket protocol, auth, the RPC surface, the live event stream,
 per-version drift, the things that bit us, and how to use it from Bun.
 
-Pinned dep: **`openclaw@2026.7.1`**. Compatibility: Moi speaks gateway **wire
+Pinned client: **`@openclaw/gateway-client@2026.11.5`**. Compatibility: Moi speaks gateway **wire
 protocol 4**, the protocol of both the 2026.7.x and 2026.6.x lines — verified
 identical for everything Moi uses against live 2026.7.1 and 2026.6.33
 gateways. Protocol-3 gateways (≤ 2026.5.x) reject the handshake with
@@ -637,16 +637,17 @@ against 2026.7.1 with a loopback IRC channel:
   `__openclaw.senderIsOwner: false` (2026.7.x; 6.x rows have no marker), plus
   the strippable inbound-metadata envelope in the text (see `strip.ts`).
 
-## 10. Using the `openclaw` npm package
+## 10. Using the standalone gateway client
 
-**Don't roll your own WS client.** The `openclaw` package publishes a
-supported subpath export:
+**Don't roll your own WS client.** Moi uses the standalone official SDK through
+its local device-auth adapter:
 
 ```ts
-import { GatewayClient } from 'openclaw/plugin-sdk/gateway-runtime'
+import { GatewayClient } from './gateway-client'
 ```
 
-`GatewayClient` handles device-identity loading & signing, token auth, the
+`device-auth.ts` loads or creates the local Ed25519 identity and persists role
+tokens in OpenClaw’s existing files. The SDK handles token auth, the
 challenge-response handshake, reconnect backoff, heartbeat watch, and per-RPC
 timeouts. `opts` is private — connect callbacks go to the constructor
 (that's true on every version we support, not just 2026.7.x):
@@ -685,14 +686,28 @@ Moi builds these shared options once in `gateway.ts → gatewayClientBaseOptions
 and spreads them into both the persistent streaming client and the one-shot
 discovery client, so both advertise `caps: ['tool-events']`.
 
-Important: **always wrap `connect` in your own timeout**. `GatewayClient`
-doesn't enforce one on the initial handshake (only on individual RPCs), so a
-silent gateway will hang forever. We race a 2–5 s timer.
+Moi retains its 2–5 s connection deadline around the SDK’s own handshake
+timeouts so discovery and chat report failures promptly.
 
-The package is a pinned **development dependency**. Release builds bundle only
-this client implementation and its dependencies; the full OpenClaw application
-is not installed with Moi. The build follows the public export to its generated
-implementation module and preserves upstream behavior.
+The SDK is a pinned **development dependency**, bundled into releases. Its small
+`ws` transport remains a runtime dependency because the SDK loads it dynamically.
+The full OpenClaw application is not installed during Moi development or with Moi
+releases. To run the optional metadata-stripper parity test, set
+`OPENCLAW_TEST_DIST` to a separate gateway installation’s `dist` directory.
+
+The isolated package test uses a real gateway and a local model HTTP fixture,
+including a streamed chat and resuming the chat after a gateway restart. From
+the repo root (no credentials or host state are mounted):
+
+```sh
+bun pm pack --filename /tmp/moi-package.tgz
+docker build -t moi-package-test - < scripts/package-test.dockerfile
+docker run --rm -v /tmp/moi-package.tgz:/test/moi.tgz:ro -v "$PWD/scripts:/test/scripts:ro" moi-package-test
+```
+
+Use `--build-arg OPENCLAW_VERSION=<version>` or `--build-arg BUN_VERSION=<version>`
+to check another gateway or Bun release. The standalone client needs Bun 1.4+;
+Bun 1.3 fails its Node WebSocket upgrade path.
 
 ## 11. What our code does
 

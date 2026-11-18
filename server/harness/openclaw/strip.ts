@@ -14,9 +14,9 @@ import { stripMoiContext } from '@/lib/moi-context'
 // stable subpath, so we mirror it here.
 //
 // You don't have to diff it by hand on a bump: `strip-parity.test.ts` loads the
-// real implementation out of the pinned bundle and asserts this mirror agrees
-// with it case for case. If that test starts failing after `bun install`,
-// upstream moved and this file needs to follow. (It also compares clean against
+// real implementation from OPENCLAW_TEST_DIST and asserts this mirror agrees
+// with it case for case. Run it against a separately installed gateway when
+// updating compatibility; if it fails, upstream moved and this file must follow. (It also compares clean against
 // the 2026.6.33 copy — identical except the chat-window block pass, which is
 // 2026.7.x-only but harmless on 6.x rows.)
 

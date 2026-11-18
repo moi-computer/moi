@@ -1,5 +1,5 @@
 // Copied outside the checkout by test-package.ts so imports cannot find dev dependencies.
-import type { GatewayClient as Client } from 'openclaw/plugin-sdk/gateway-runtime'
+import type { GatewayClient as Client } from '@openclaw/gateway-client'
 import assert from 'node:assert/strict'
 import { mkdtempSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -30,7 +30,7 @@ const server = Bun.serve({
         JSON.stringify({
           type: 'event',
           event: 'connect.challenge',
-          payload: { nonce: 'test-nonce' }
+          payload: { nonce: 'test-nonce', ts: Date.now() }
         })
       )
     },
@@ -151,7 +151,7 @@ try {
     })
   )
 } finally {
-  client.stop()
+  await client.stopAndWait()
   server.stop(true)
   rmSync(state, { recursive: true, force: true })
 }

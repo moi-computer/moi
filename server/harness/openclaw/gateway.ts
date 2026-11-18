@@ -17,7 +17,7 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-import type { GatewayClient as OpenClawGatewayClient } from 'openclaw/plugin-sdk/gateway-runtime'
+import type { GatewayClient as OpenClawGatewayClient } from '@openclaw/gateway-client'
 
 import { type GatewayFailure, type GatewayInfo, classifyGatewayError, parseHelloOk } from './compat'
 import { tapWire } from '../debug'

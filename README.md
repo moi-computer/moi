@@ -59,7 +59,7 @@ Works with the harness you already use:
 
 # Quick start
 
-Make sure [Bun](https://bun.sh) 1.3 or newer is installed. Moi uses it to run the web server and bundle the dynamic UI.
+Make sure [Bun](https://bun.sh) 1.4 or newer is installed. Moi uses it to run the web server and bundle the dynamic UI.
 
 Install the `moi-computer` package from npm and start the web UI:
 

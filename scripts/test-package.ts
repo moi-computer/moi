@@ -220,7 +220,7 @@ export default function Widget() { const me = useMe(); return <button className=
       [
         join(root, 'gateway-check.ts'),
         join(packageRoot, 'runtime/gateway-client.js'),
-        pkg.devDependencies.openclaw
+        pkg.devDependencies['@openclaw/gateway-client']
       ],
       root
     )
