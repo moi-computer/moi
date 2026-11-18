@@ -17,7 +17,7 @@ export function useClientEvent(handler: ClientEventHandler) {
 }
 
 // Listen to one workspace plus app-wide events.
-export function useWorkspaceScopedEvent(workspaceId: string, handler: ClientEventHandler) {
+export function useWorkspaceEvent(workspaceId: string, handler: ClientEventHandler) {
   useClientEvent(event => {
     if (
       'workspaceId' in event &&
@@ -50,8 +50,8 @@ export function useNavigationClient(
     }
   }, [events, workspaceId])
 
-  useClientEvent(async event => {
-    if (!events || event.type !== 'navigation:request' || event.workspaceId !== workspaceId) return
+  useWorkspaceEvent(workspaceId, async event => {
+    if (!events || event.type !== 'navigation:request') return
     try {
       if (events.navigationWorkspace !== workspaceId) {
         throw new Error('The browser switched workspaces.')

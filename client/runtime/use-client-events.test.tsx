@@ -11,7 +11,7 @@ import { parseHTML } from 'linkedom'
 
 import { AppProvider as EventsProvider } from '@/client/app/app-provider'
 
-import { useClientEvent, useWorkspaceScopedEvent } from './use-client-events'
+import { useClientEvent, useWorkspaceEvent } from './use-client-events'
 import { AppEventsClient } from './app-events'
 
 type AppProviderProps = { children: ReactNode }
@@ -173,7 +173,7 @@ test('scoped listeners isolate workspaces and share app connection events', asyn
   const { root } = installDom()
   const received: string[] = []
   function Listener({ id }: { id: string }) {
-    useWorkspaceScopedEvent(id, event => received.push(`${id}:${event.type}`))
+    useWorkspaceEvent(id, event => received.push(`${id}:${event.type}`))
     return null
   }
   await act(async () =>

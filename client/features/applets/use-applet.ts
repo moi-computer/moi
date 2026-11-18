@@ -18,7 +18,7 @@ import {
 import { attachAppletBridge } from '@/client/features/applets/applet-runtime'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
-import { type ClientEvent, useWorkspaceScopedEvent } from '@/client/runtime/use-client-events'
+import { type ClientEvent, useWorkspaceEvent } from '@/client/runtime/use-client-events'
 import type { AppletKind } from '@/lib/types'
 
 // Views receive URL query params. Widgets mount without params; applets must
@@ -143,7 +143,7 @@ function useApplet(kind: AppletKindSpec, name: string, revision?: string): Apple
   // unmounted case, but doing it here keeps this self-sufficient and
   // order-independent. The bumped version remounts the component and re-runs its
   // `rpc()` calls.
-  useWorkspaceScopedEvent(workspaceId, event => {
+  useWorkspaceEvent(workspaceId, event => {
     if (kind.shouldReload(event, name)) {
       invalidateApplet(kind.segment, workspaceId, name)
       load()
@@ -181,7 +181,7 @@ export function useView(name: string, revision?: string): AppletState {
 export function useAppletCacheInvalidation(): void {
   const workspaceId = useWorkspaceId()
   const queryClient = useQueryClient()
-  useWorkspaceScopedEvent(workspaceId, event => {
+  useWorkspaceEvent(workspaceId, event => {
     // Refresh the owner lists too, so new or removed applets become visible.
     if (
       isRemoteWorkspace(workspaceId, queryClient) &&

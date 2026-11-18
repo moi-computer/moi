@@ -24,7 +24,7 @@ import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import { useAppContext } from '@/client/runtime/app-context'
 import { persistScratchSession } from '@/client/features/scratchpad/scratch-session'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
-import { type ClientEvent, useClientEvent } from '@/client/runtime/use-client-events'
+import { useWorkspaceEvent } from '@/client/runtime/use-client-events'
 import type { ScratchOp, ScratchOpResult } from '@/lib/types'
 import {
   type ScratchpadFetch,
@@ -223,18 +223,26 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
     }).catch(() => {})
   }, [apiBase])
 
+  useWorkspaceEvent(workspaceId, async event => {
+    const editor = editorRef.current
+    if (event.type !== 'scratchpad:op' || !editor || !events) return
+    const reply = { type: 'scratchpad:op-result', opId: event.opId }
+    try {
+      const result = await runScratchOp(editor, event.op)
+      events.send({ ...reply, result })
+    } catch (error) {
+      events.send({ ...reply, error: error instanceof Error ? error.message : String(error) })
+    }
+  })
+
   // A remote save (another tab, or an agent draw landing in another tab) — pull
   // the new snapshot and load it into the live store. Skip our own echo. The
   // fetched document is pre-flighted like the initial load: if the server was
   // swapped for a newer Moi mid-session, `loadSnapshot` here would throw — flip
   // the skew notice instead (unmounting the editor, which also stops the
   // autosave timer) so this stale tab can't save over the newer file.
-  useClientEvent((e: ClientEvent) => {
-    if (
-      (e.type !== 'scratchpad:changed' && e.type !== 'workspace:connected') ||
-      e.workspaceId !== workspaceId
-    )
-      return
+  useWorkspaceEvent(workspaceId, e => {
+    if (e.type !== 'scratchpad:changed' && e.type !== 'workspace:connected') return
     if ('origin' in e && e.origin === BROWSER_TAB_ID) return
     if (!editorRef.current) return
     fetch(`${apiBase}/scratchpad`)
@@ -283,16 +291,6 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
         },
         { source: 'user', scope: 'document' }
       )
-      const unsubscribe = events?.subscribe(async event => {
-        if (event.type !== 'scratchpad:op' || event.workspaceId !== workspaceId) return
-        const reply = { type: 'scratchpad:op-result', opId: event.opId }
-        try {
-          const result = await runScratchOp(editor, event.op)
-          events.send({ ...reply, result })
-        } catch (error) {
-          events.send({ ...reply, error: error instanceof Error ? error.message : String(error) })
-        }
-      })
       // Focus management: tldraw only fires keyboard shortcuts while the editor's
       // instance `isFocused` is set, but with `autoFocus={false}` it never flips
       // that on its own. We drive it from where the pointer lands — a pointerdown
@@ -323,12 +321,11 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
         stopSessionSave()
         doc.removeEventListener('pointerdown', onPointerDown, true)
         if (saveTimer.current) clearTimeout(saveTimer.current)
-        unsubscribe?.()
         setEditor(null)
         editorRef.current = null
       }
     },
-    [workspaceId, save, events]
+    [workspaceId, save]
   )
 
   if (!loaded) return <div className="min-h-0 flex-1 bg-muted/40" />

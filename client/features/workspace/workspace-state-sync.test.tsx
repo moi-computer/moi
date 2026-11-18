@@ -9,7 +9,8 @@ import {
   usePinnedSession,
   useSelectedSession
 } from '@/client/features/chat/sessions/use-selected-session'
-import * as workspaceEvents from '@/client/runtime/use-client-events'
+import { AppContext } from '@/client/runtime/app-context'
+import { AppEventsClient } from '@/client/runtime/app-events'
 import type { ClientEvent } from '@/client/runtime/use-client-events'
 import type { CompiledView, WorkspaceState } from '@/lib/types'
 import { useViewActions } from '@/client/features/views/use-view-actions'
@@ -61,16 +62,7 @@ function mount(initial: WorkspaceState, respond: (request: Request) => Promise<u
       { preconnect: fetch.preconnect }
     )
   )
-  const handlers = new Set<(event: ClientEvent) => void>()
-  const eventsSpy = spyOn(workspaceEvents, 'useClientEvent').mockImplementation(handler => {
-    useLayoutEffect(() => {
-      handlers.add(handler)
-      return () => {
-        handlers.delete(handler)
-      }
-    }, [handler])
-  })
-
+  const events = new AppEventsClient('ws://localhost/api/events')
   const root = createRoot(document.getElementById('root')!)
   cleanup = async () => {
     await act(async () => {
@@ -80,7 +72,6 @@ function mount(initial: WorkspaceState, respond: (request: Request) => Promise<u
     })
     notifyManager.setNotifyFunction(callback => callback())
     fetchSpy.mockRestore()
-    eventsSpy.mockRestore()
     for (const [key, descriptor] of descriptors) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor)
       else Reflect.deleteProperty(globalThis, key)
@@ -90,7 +81,9 @@ function mount(initial: WorkspaceState, respond: (request: Request) => Promise<u
     act(async () => {
       root.render(
         <Workspace id={WORKSPACE_ID}>
-          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          <AppContext value={{ events }}>
+            <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          </AppContext>
         </Workspace>
       )
     })
@@ -101,7 +94,7 @@ function mount(initial: WorkspaceState, respond: (request: Request) => Promise<u
     cached: () => queryClient.getQueryData<WorkspaceState>(workspaceKeys.state(WORKSPACE_ID)),
     emit: (event: ClientEvent) =>
       act(() => {
-        for (const handler of [...handlers]) handler(event)
+        events.emit(event)
       }),
     settle: () =>
       act(async () => {

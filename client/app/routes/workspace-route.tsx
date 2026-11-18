@@ -22,7 +22,7 @@ import {
 import { WorkspaceScreen } from '@/client/features/workspace/workspace-screen'
 import { useViews } from '@/client/features/views/api'
 import { useWidgets } from '@/client/features/overview/api'
-import { useWorkspaceScopedEvent } from '@/client/runtime/use-client-events'
+import { useWorkspaceEvent } from '@/client/runtime/use-client-events'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 
 type WorkspaceRouteProps = {
@@ -80,7 +80,7 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
   const views = useViews(id)
   useAppletCacheInvalidation()
 
-  useWorkspaceScopedEvent(id, event => {
+  useWorkspaceEvent(id, event => {
     if (event.type === 'workspace-config:changed') {
       // Skip our own save: the cache already holds it, and the refetch could
       // land an older value over a newer optimistic change.

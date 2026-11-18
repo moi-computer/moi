@@ -17,7 +17,7 @@ import {
   useWorkspaceState,
   useWorkspaceStateWrite
 } from '@/client/features/workspace/workspace-state'
-import { useClientEvent } from '@/client/runtime/use-client-events'
+import { useWorkspaceEvent } from '@/client/runtime/use-client-events'
 
 // Compiled views from `.moi/views/`. Build and layout events refetch the list;
 // mounts within 30 s reuse it.
@@ -61,14 +61,14 @@ const selectPendingViews = (state: WorkspaceState) => state.pendingViews
 export function useViews(workspaceId: string) {
   const { apiBase } = useWorkspaceLayoutCtx()
   const queryClient = useQueryClient()
-  useClientEvent(event => {
-    if (event.type === 'views-list:changed' && event.workspaceId === workspaceId) {
+  useWorkspaceEvent(workspaceId, event => {
+    if (event.type === 'views-list:changed') {
       const queryKey = workspaceKeys.views(workspaceId)
       // A stale list request must not overwrite the owner’s update.
       void queryClient.cancelQueries({ queryKey })
       queryClient.setQueryData(queryKey, event.views)
     }
-    if (event.type === 'view:deleted' && event.workspaceId === workspaceId) {
+    if (event.type === 'view:deleted') {
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.views(workspaceId) })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })
     }
