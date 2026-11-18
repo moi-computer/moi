@@ -1,3 +1,4 @@
+import grokBotIcon from '@/client/assets/agents/grok-bot.png'
 import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { afterEach, expect, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
@@ -21,7 +22,7 @@ const alex = {
   email: 'alex@example.com',
   isAnonymous: false
 } as const
-const bot = { id: 'alex', type: 'agent', name: 'Bot' } as const
+const bot = { id: 'alex', type: 'agent', name: 'Bot', client: 'grok-bot' } as const
 afterEach(() => {
   setIdentity(null)
   queryClient.clear()
@@ -31,6 +32,9 @@ test('pre-mount snapshots are stored and separate user and agent ids', () => {
   setWorkspaceMembers('one', { members: [alex, bot], invitations: [] })
   expect(getWorkspaceMembers('one')).toEqual({ members: [alex, bot], invitations: [] })
   expect(getWorkspaceDirectory('one')?.map(user => user.id)).toEqual(['alex', 'agent:alex'])
+  expect(getWorkspaceDirectory('one')?.find(profile => profile.id === 'agent:alex')?.avatar).toBe(
+    grokBotIcon
+  )
   expect(getCurrentUser()?.id).toBe('alex')
 })
 test('per-workspace directory does not leak members or replace viewer', () => {

@@ -194,6 +194,10 @@ test(
     await expect(members.getByText('alex@example.com', { exact: true })).toBeVisible()
     await expect(members.getByText('Tony', { exact: true })).toBeVisible()
     await expect(members.getByText('tony@example.com', { exact: true })).toBeVisible()
+    await expect(
+      page.locator('li:has([aria-label="Alex"])').getByText('Owner', { exact: true })
+    ).toBeVisible()
+    await expect(members.getByText('Owner', { exact: true })).toHaveCount(1)
     await takeSnapshot('sharing from own avatar')
     await page.getByRole('button', { name: 'Alex (You), open sharing', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Email', exact: true })).not.toBeVisible()
@@ -301,9 +305,16 @@ test(
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
     await page.getByRole('button', { name: 'Agents', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible()
-    const remove = page.getByRole('button', { name: 'Remove Trip bot' })
-    await expect(remove).toBeVisible()
+    const menu = page.getByRole('dialog').getByRole('button', { name: 'More options', exact: true })
+    await expect(menu).toBeVisible()
+    await expect(page.locator('[aria-label="Trip bot"] img')).toBeVisible()
+    await expect(page.getByText('Trip bot', { exact: true })).toBeVisible()
+    await expect(page.getByText('Grok Bot', { exact: true })).toBeVisible()
     await takeSnapshot('connected workspace agents')
+    await menu.click()
+    const remove = page.getByRole('menuitem', { name: 'Remove from workspace', exact: true })
+    await expect(remove).toBeVisible()
+    await takeSnapshot('workspace agent options')
     await remove.click()
     await expect(page.getByText('No agents connected to this workspace.')).toBeVisible()
     expect(requests).toEqual(['DELETE'])
@@ -315,7 +326,13 @@ test(
         id: 'alice:owner-board',
         members: [
           sharingUser,
-          { type: 'agent', id: 'bot', name: 'Trip bot', membershipId: 'bot-membership' }
+          {
+            type: 'agent',
+            id: 'bot',
+            client: 'grok-bot',
+            name: 'Trip bot',
+            membershipId: 'bot-membership'
+          }
         ],
         invitations: []
       }

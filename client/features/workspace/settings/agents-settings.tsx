@@ -1,8 +1,11 @@
+import { User } from '@/client/features/collab/components/user'
+import { agentClientLabel } from '@/client/lib/agent-icon'
+import { identityProfile } from '@/client/features/collab/host-state'
 import { Spinner } from '@/client/components/ui/spinner'
 import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
-import { RemoveButton } from '@/client/features/collab/sharing/remove-button'
+import { MembershipMenu } from '@/client/features/collab/sharing/membership-menu'
 import { useWorkspaceId } from '../workspace-context'
-import { SettingsPage, SettingsRow, SettingsSection } from './settings-layout'
+import { SettingsPage, SettingsSection } from './settings-layout'
 
 export function AgentsSettings() {
   const workspaceId = useWorkspaceId()
@@ -17,19 +20,20 @@ export function AgentsSettings() {
       ) : (
         <SettingsSection>
           {agents.map(agent => (
-            <SettingsRow
-              key={agent.id}
-              title={agent.name || 'Unnamed agent'}
-              control={
-                agent.membershipId && (
-                  <RemoveButton
-                    workspaceId={workspaceId}
-                    label={`Remove ${agent.name || 'agent'}`}
-                    action={{ type: 'remove', membershipId: agent.membershipId }}
-                  />
-                )
-              }
-            />
+            <div key={agent.id} className="flex items-center gap-3 px-3.5 py-3">
+              <User
+                profile={identityProfile({ ...agent, name: agent.name || 'Unnamed agent' })}
+                description={agentClientLabel(agent.client)}
+                className="flex-1"
+              />
+              {agent.membershipId && (
+                <MembershipMenu
+                  removeLabel="Remove from workspace"
+                  workspaceId={workspaceId}
+                  action={{ type: 'remove', membershipId: agent.membershipId }}
+                />
+              )}
+            </div>
           ))}
         </SettingsSection>
       )}

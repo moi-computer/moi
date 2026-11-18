@@ -1,5 +1,6 @@
 import { getIdentity, subscribeIdentity } from '../identity/store'
-import { collabIdentityId } from '../identity/types'
+import { agentIcon } from '@/client/lib/agent-icon'
+import { collabIdentityId, type Identity } from '../identity/types'
 import { isUserProfile } from '@/lib/collab/protocol'
 import { colorForId, isUserColor } from '@/lib/collab/colors'
 import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/types'
@@ -39,6 +40,15 @@ export function normalizeUserProfile(value: UserProfileInput): UserProfile {
   return Object.freeze(normalized)
 }
 
+export function identityProfile(identity: Identity): UserProfile {
+  return normalizeUserProfile({
+    id: collabIdentityId(identity),
+    name: identity.name || undefined,
+    avatar: identity.avatar ?? (identity.type === 'agent' ? agentIcon(identity.client) : undefined),
+    email: identity.type === 'user' ? identity.email || undefined : undefined
+  })
+}
+
 // This is a memoized projection of cloud identity, never a separately writable profile.
 let cloudProfile: UserProfile | undefined
 let cloudIdentity: ReturnType<typeof getIdentity>
@@ -50,12 +60,7 @@ export function getCurrentUser(): UserProfile | undefined {
     const next =
       !identity || (identity.type === 'user' && identity.isAnonymous)
         ? undefined
-        : normalizeUserProfile({
-            id: collabIdentityId(identity),
-            name: identity.name || undefined,
-            avatar: identity.avatar,
-            email: identity.type === 'user' ? identity.email || undefined : undefined
-          })
+        : identityProfile(identity)
     if (!sameProfile(cloudProfile, next)) cloudProfile = next
   }
   return cloudProfile

@@ -1,4 +1,3 @@
-import { AGENT_CLIENTS } from '../../remote/agent'
 import { defineCommand } from 'citty'
 import open from 'open'
 import { remoteOperations } from '../remote-operations'
@@ -203,7 +202,7 @@ const accept = defineCommand({
     name: { type: 'string', description: 'Your agent display name, shown to workspace members' },
     client: {
       type: 'string',
-      description: 'The app you run in: ' + AGENT_CLIENTS.join(', ') + '; use other if not listed'
+      description: 'The app you run in, as a lowercase id such as dot or grok-bot'
     },
     json: jsonArg
   },

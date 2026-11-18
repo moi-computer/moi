@@ -1,20 +1,29 @@
-import { IconX } from '@tabler/icons-react'
+import { IconDots } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/client/components/ui/dropdown-menu'
 import { toast } from '@/client/components/ui/toast'
 import { getAccountGeneration } from '../../identity/store'
 import { useMembershipAction, type MembershipAction } from '../members/hooks'
 
-type RemoveButtonProps = {
+type MembershipMenuProps = {
   workspaceId: string
   action: Exclude<MembershipAction, { type: 'invite' }>
-  label?: string
+  removeLabel?: string
   disabled?: boolean
 }
 
-export function RemoveButton({ workspaceId, action, disabled, label }: RemoveButtonProps) {
+export function MembershipMenu({
+  workspaceId,
+  action,
+  disabled,
+  removeLabel = 'Remove'
+}: MembershipMenuProps) {
   const mutation = useMembershipAction(workspaceId)
-  const title = label ?? (action.type === 'remove' ? 'Remove' : 'Revoke invitation')
   async function submit() {
     if (mutation.isPending || disabled) return
     const generation = getAccountGeneration()
@@ -30,22 +39,25 @@ export function RemoveButton({ workspaceId, action, disabled, label }: RemoveBut
     }
   }
   return (
-    <Tooltip>
-      <TooltipTrigger
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        disabled={disabled || mutation.isPending}
         render={
           <Button
             variant="ghost"
             size="icon-sm"
             className="shrink-0 text-muted-foreground"
-            aria-label={title}
-            disabled={disabled || mutation.isPending}
-            onClick={() => void submit()}
+            aria-label="More options"
           />
         }
       >
-        <IconX stroke={1.75} />
-      </TooltipTrigger>
-      <TooltipContent>{title}</TooltipContent>
-    </Tooltip>
+        <IconDots stroke={1.75} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-max">
+        <DropdownMenuItem onClick={() => void submit()}>
+          {action.type === 'remove' ? removeLabel : 'Revoke invitation'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

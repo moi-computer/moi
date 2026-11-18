@@ -27,7 +27,48 @@ export function createMockRemoteInvitations() {
       isAnonymous: false,
       membershipId: 'member-jamie'
     },
-    { id: 'launch-bot', type: 'agent', name: 'Launch bot', membershipId: 'member-launch-bot' }
+    {
+      id: 'launch-bot',
+      type: 'agent',
+      name: 'Pip',
+      client: 'dot',
+      membershipId: 'member-launch-bot'
+    },
+    {
+      id: 'review-bot',
+      type: 'agent',
+      name: 'Cleo',
+      client: 'duet',
+      membershipId: 'member-review-bot'
+    },
+    {
+      id: 'research-bot',
+      type: 'agent',
+      name: 'Jamie’s Grok',
+      client: 'grok-bot',
+      membershipId: 'member-research-bot'
+    },
+    {
+      id: 'instinct',
+      type: 'agent',
+      name: 'Frankie',
+      client: 'instinct',
+      membershipId: 'member-instinct'
+    },
+    {
+      id: 'muse',
+      type: 'agent',
+      name: 'Peach',
+      client: 'muse',
+      membershipId: 'member-muse'
+    },
+    {
+      id: 'other',
+      type: 'agent',
+      name: 'Shipmate',
+      client: 'town-assistant',
+      membershipId: 'member-other'
+    }
   ]
   const invitations: { id: string; email: string; expiresAt: string }[] = []
   return async function (request: Request): Promise<Response> {

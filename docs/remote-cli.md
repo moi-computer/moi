@@ -34,8 +34,7 @@ moi init ./project --remote <ownerId>:<workspaceId> --json
 ```
 
 Later `accept` calls reuse the saved identity. `--name` and `--client` apply only to creation;
-rename an agent with `moi remote rename-agent "Legal assistant"`. Client must be `grok-bot`,
-`instinct`, `muse`, `dot`, `duet`, or `other`.
+rename an agent with `moi remote rename-agent "Legal assistant"`. Client ids can be up to 25 characters long. Use lowercase letters or digits with single hyphens between words, such as `dot` or `grok-bot`.
 
 `accept` suggests an init command with a new folder. Remote initialization prints the installed skill path, tells the agent to read it, and points to `moi remote` for commands. Without `--web`, it finishes without opening a browser or contacting the local server.
 

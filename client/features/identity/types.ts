@@ -2,7 +2,7 @@ import { isRecord } from '@/lib/collab/protocol'
 
 export type Identity =
   | { id: string; type: 'user'; name: string; email: string; avatar?: string; isAnonymous: boolean }
-  | { id: string; type: 'agent'; name: string; avatar?: string }
+  | { id: string; type: 'agent'; name: string; client?: string; avatar?: string }
 
 function text(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.length <= max && !value.includes('\0')
@@ -30,12 +30,19 @@ export function parseIdentity(value: unknown): Identity {
     name: value.name,
     ...(value.avatar !== undefined ? { avatar: value.avatar } : {})
   }
-  if (value.type === 'agent') return { ...common, type: 'agent' }
+  if (value.type === 'agent')
+    return { ...common, type: 'agent', ...(text(value.client, 256) && { client: value.client }) }
   if (value.type === 'user' && text(value.email, 320) && typeof value.isAnonymous === 'boolean')
     return { ...common, type: 'user', email: value.email, isAnonymous: value.isAnonymous }
   throw new Error('Invalid identity')
 }
 export const identityKey = (identity: Identity) => `${identity.type}:${identity.id}`
+const agentProfilePrefix = 'agent:'
+
+export function isAgentProfileId(id: string): boolean {
+  return id.startsWith(agentProfilePrefix)
+}
+
 // Existing human collaboration ids stay compatible; agent ids cannot collide.
 export const collabIdentityId = (identity: Identity) =>
-  identity.type === 'agent' ? `agent:${identity.id}` : identity.id
+  identity.type === 'agent' ? `${agentProfilePrefix}${identity.id}` : identity.id

@@ -16,8 +16,7 @@ import {
   agentAuthorization,
   agentJoinBody,
   createAgentKeys,
-  agentClientSchema,
-  AGENT_CLIENTS
+  agentClientSchema
 } from './agent'
 
 export type RemoteRequestOptions = {
@@ -540,8 +539,10 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
   })
   const acceptPath = (id: string) => cloudRoutes.acceptInvitation.path(id)
   async function accept(value: string, name?: string, client?: string) {
-    if (client !== undefined && !agentClientSchema.safeParse(client).success)
-      throw new Error(`Invalid client — choose ${AGENT_CLIENTS.join(', ')}`)
+    if (client !== undefined && !agentClientSchema.max(25).safeParse(client).success)
+      throw new Error(
+        'Invalid client — use up to 25 characters, with lowercase letters, digits, and single hyphens between words'
+      )
     ownDirectory()
     const config = await remoteConfig(),
       target = invitation(value, config)
@@ -611,8 +612,8 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
           throw new Error(
             'Create your agent identity with --name and --client\n' +
               '--name: your display name, shown to workspace members (for example, "Research assistant")\n' +
-              `--client: the app you run in (${AGENT_CLIENTS.join(', ')}); use "other" if yours is not listed\n` +
-              'Retry: moi remote accept "<invitation-url>" --name "Research assistant" --client other'
+              '--client: the app you run in (for example, dot or grok-bot)\n' +
+              'Retry: moi remote accept "<invitation-url>" --name "Research assistant" --client grok-bot'
           )
         pending = {
           fingerprint,

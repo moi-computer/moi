@@ -10,7 +10,7 @@ import { CloudApiError } from '../../account/api'
 import { useIdentity } from '../../identity/use-identity'
 import { collabIdentityId, identityKey } from '../../identity/types'
 import { getAccountGeneration } from '../../identity/store'
-import { RemoveButton } from './remove-button'
+import { MembershipMenu } from './membership-menu'
 import { User } from '../components/user'
 import { type useWorkspaceMembers, useMembershipAction } from '../members/hooks'
 import type { WorkspaceMember, WorkspaceInvitation } from '../members/types'
@@ -42,6 +42,7 @@ export function WorkspaceMembers({ workspaceId, users, membership }: WorkspaceMe
         workspaceId={workspaceId}
         users={users}
         membersById={membersById}
+        ownerId={membership.members?.[0]?.id}
         invitations={membership.invitations ?? []}
       />
       {membership.isPending && (
@@ -141,6 +142,7 @@ function InviteForm({ className, workspaceId, members, invitations }: InviteForm
 type MembersListProps = {
   className?: string
   workspaceId: string
+  ownerId?: string
   membersById?: Map<string, WorkspaceMember>
   invitations: WorkspaceInvitation[]
   users: WorkspaceUserInfo[]
@@ -150,6 +152,7 @@ function MembersList({
   className,
   workspaceId,
   membersById,
+  ownerId,
   invitations,
   users
 }: MembersListProps) {
@@ -162,6 +165,7 @@ function MembersList({
         <MemberRow
           key={user.profile.id}
           user={user}
+          isOwner={user.profile.id === ownerId}
           workspaceId={workspaceId}
           membershipId={membersById?.get(user.profile.id)?.membershipId}
         />
@@ -175,11 +179,12 @@ function MembersList({
 
 type MemberRowProps = {
   user: WorkspaceUserInfo
+  isOwner: boolean
   workspaceId: string
   membershipId?: string
 }
 
-function MemberRow({ user, workspaceId, membershipId }: MemberRowProps) {
+function MemberRow({ user, isOwner, workspaceId, membershipId }: MemberRowProps) {
   return (
     <li className="flex min-w-0 items-center gap-2 px-2 py-1">
       <User
@@ -189,8 +194,9 @@ function MemberRow({ user, workspaceId, membershipId }: MemberRowProps) {
         showYouLabel={user.self}
         description={user.profile.email}
       />
+      {isOwner && <span className="mr-1.5 shrink-0 text-xs text-muted-foreground">Owner</span>}
       {membershipId && (
-        <RemoveButton workspaceId={workspaceId} action={{ type: 'remove', membershipId }} />
+        <MembershipMenu workspaceId={workspaceId} action={{ type: 'remove', membershipId }} />
       )}
     </li>
   )
@@ -210,7 +216,7 @@ function InvitationRow({ workspaceId, invitation }: InvitationRowProps) {
         }}
         description={invitation.email}
       />
-      <RemoveButton
+      <MembershipMenu
         workspaceId={workspaceId}
         disabled={invitation.pending}
         action={{ type: 'revoke', invitationId: invitation.id }}

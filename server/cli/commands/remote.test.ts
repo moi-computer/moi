@@ -240,12 +240,15 @@ test('invalid or unauthenticated acceptance leaves credentials untouched', async
     await Bun.write(join(directory, 'config.json'), JSON.stringify({ remote: { url } }))
     const client = createRemoteClient(directory)
     for (const invite of ['invitation', `${url}/invite/id?token=${'A'.repeat(43)}`]) {
-      await expect(client.accept(invite, 'Agent', 'other')).rejects.toThrow('remote login')
+      await expect(client.accept(invite, 'Agent', 'a'.repeat(25))).rejects.toThrow('remote login')
     }
+    await expect(client.accept('invitation', 'Agent', 'a'.repeat(26))).rejects.toThrow(
+      '25 characters'
+    )
     await expect(client.accept(`${url}/agent-invite/id?token=${'A'.repeat(43)}`)).rejects.toThrow(
       '--name and --client'
     )
-    for (const invalid of ['Grok Bot', 'openclaw', 'unknown', ''])
+    for (const invalid of ['Grok Bot', 'town_assistant', 'town--assistant', '-town', 'town-', ''])
       await expect(
         client.accept(`${url}/agent-invite/id?token=${'A'.repeat(43)}`, 'Agent', invalid)
       ).rejects.toThrow('Invalid client')

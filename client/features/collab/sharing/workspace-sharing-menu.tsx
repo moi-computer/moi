@@ -12,7 +12,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/client/components/ui/
 import { UserAvatar } from '../components/user-avatar'
 import { AvatarGroup, AvatarGroupCount } from '@/ui-components/avatar'
 import { useWorkspaceMembers } from '../members/hooks'
-import { collabIdentityId } from '../../identity/types'
+import { collabIdentityId, isAgentProfileId } from '../../identity/types'
 import { pageFromPath } from '../presence/provider'
 import { useConnectionState, useWorkspaceUsers, useMe } from '../presence/hooks'
 import { summarizeWorkspaceUsers, type WorkspaceUserInfo } from '../presence/users'
@@ -36,9 +36,7 @@ export function WorkspaceSharingMenu({
   const router = useRouter()
   const page = pageFromPath(usePathname(router), workspaceId, router.base)
   const membership = useWorkspaceMembers(workspaceId)
-  const memberIds =
-    membership.members &&
-    new Set(membership.members.filter(member => member.type === 'user').map(collabIdentityId))
+  const memberIds = membership.members && new Set(membership.members.map(collabIdentityId))
   const members = memberIds
     ? workspaceUsers.filter(user => user.id === currentUser?.id || memberIds.has(user.id))
     : workspaceUsers
@@ -124,7 +122,11 @@ export function WorkspaceSharingMenu({
         align="end"
         className="w-96 max-w-[calc(100vw-2rem)] gap-2 bg-transparent p-0 shadow-none"
       >
-        <WorkspaceMembers workspaceId={workspaceId} users={users} membership={membership} />
+        <WorkspaceMembers
+          workspaceId={workspaceId}
+          users={users.filter(user => !isAgentProfileId(user.profile.id))}
+          membership={membership}
+        />
         {/* Enable once agent invitations are functional and the card is polished. */}
         {/* <AgentInvite /> */}
       </PopoverContent>

@@ -4,8 +4,8 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { getWorkspaceAddress } from '@/client/features/workspace/remote'
 import { getIdentity, getAccountGeneration } from '../../identity/store'
 import type { Identity } from '../../identity/types'
-import { collabIdentityId, identityKey } from '../../identity/types'
-import { normalizeUserProfile } from '../host-state'
+import { identityKey } from '../../identity/types'
+import { identityProfile } from '../host-state'
 import type { UserProfile } from '@/lib/collab/types'
 import { parseWorkspaceMembers, validWorkspaceAddress } from './types'
 import type { WorkspaceMembers, WorkspaceMembersSnapshot } from './types'
@@ -122,14 +122,7 @@ export function getWorkspaceDirectory(workspaceId: string): readonly UserProfile
   if (!data) return undefined
   let profiles = directoryCache.get(data)
   if (!profiles) {
-    profiles = data.members.map(member =>
-      normalizeUserProfile({
-        id: collabIdentityId(member),
-        name: member.name || undefined,
-        avatar: member.avatar,
-        email: member.type === 'user' ? member.email || undefined : undefined
-      })
-    )
+    profiles = data.members.map(identityProfile)
     directoryCache.set(data, profiles)
   }
   return profiles

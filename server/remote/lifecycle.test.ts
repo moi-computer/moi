@@ -36,6 +36,7 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
           agentPublicKey: JWK
           proof: { host: string; agent: string }
         }
+        expect(body.client).toBe('town-assistant')
         keys ??= { host: body.hostPublicKey, agent: body.agentPublicKey }
         const unsigned: Record<string, unknown> = {
           token: body.token,
@@ -91,7 +92,7 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
       used.add(payload.jti!)
       if (path.endsWith('/me')) {
         if (request.method === 'PATCH') name = JSON.parse(raw).name
-        return Response.json({ id: agentId, type: 'agent', name, client: 'muse' })
+        return Response.json({ id: agentId, type: 'agent', name, client: 'town-assistant' })
       }
       if (path.endsWith('/workspaces/shared'))
         return Response.json({
@@ -162,7 +163,7 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
     const guidance = (await cli(['accept', invite], 1)).stderr
     expect(guidance).toContain('moi remote accept "<invitation-url>"')
     expect(
-      (await cli(['accept', invite, '--name', 'Lawyer', '--client', 'muse'], 1)).stderr
+      (await cli(['accept', invite, '--name', 'Lawyer', '--client', 'town-assistant'], 1)).stderr
     ).toContain('keys kept')
     expect((await stat(join(dir, 'remote-agent-pending.json'))).mode & 0o777).toBe(0o600)
     const acceptance = JSON.parse((await cli(['accept', invite, '--json'])).stdout)

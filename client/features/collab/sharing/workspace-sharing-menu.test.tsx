@@ -526,6 +526,7 @@ describe('workspace sharing', () => {
       expect(list.textContent).toContain('sam@example.com')
       expect(list.children[0]!.querySelector('button')).toBeNull()
       ui.failures.mutation = true
+      await ui.click('More options', list.querySelector('li:has([aria-label="Tony"])')!)
       await ui.click('Remove')
       expect(list.textContent).toContain('Tony')
       expect(notification).toHaveBeenCalledWith({
@@ -534,10 +535,12 @@ describe('workspace sharing', () => {
         type: 'error'
       })
       ui.failures.mutation = false
+      await ui.click('More options', list.querySelector('li:has([aria-label="Tony"])')!)
       await ui.click('Remove')
       expect(ui.calls.some(call => call.path.endsWith('/members/member-tony'))).toBe(true)
       expect(list.textContent).not.toContain('Tony')
       expect(list.textContent).toContain('sam@example.com')
+      await ui.click('More options', list.lastElementChild!)
       await ui.click('Revoke invitation')
       expect(ui.calls.some(call => call.path.endsWith('/invitations/invite-sam'))).toBe(true)
       expect(list.textContent).not.toContain('sam@example.com')

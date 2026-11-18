@@ -259,8 +259,8 @@ export async function mountAccount({
     navigations,
     location,
     settle,
-    async click(label: string) {
-      const button = [...document.querySelectorAll<HTMLElement>('button, [role="menuitem"]')].find(
+    async click(label: string, within: ParentNode = document) {
+      const button = [...within.querySelectorAll<HTMLElement>('button, [role="menuitem"]')].find(
         button =>
           button.getAttribute('aria-label') === label || button.textContent?.trim() === label
       )
