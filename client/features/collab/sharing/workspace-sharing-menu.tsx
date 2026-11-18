@@ -36,7 +36,9 @@ export function WorkspaceSharingMenu({
   const router = useRouter()
   const page = pageFromPath(usePathname(router), workspaceId, router.base)
   const membership = useWorkspaceMembers(workspaceId)
-  const memberIds = membership.members && new Set(membership.members.map(collabIdentityId))
+  const memberIds =
+    membership.members &&
+    new Set(membership.members.filter(member => member.type === 'user').map(collabIdentityId))
   const members = memberIds
     ? workspaceUsers.filter(user => user.id === currentUser?.id || memberIds.has(user.id))
     : workspaceUsers

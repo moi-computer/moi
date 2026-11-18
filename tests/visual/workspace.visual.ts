@@ -283,6 +283,46 @@ test(
   remoteOptions
 )
 
+test(
+  'manage connected agents in shared workspace settings',
+  async page => {
+    const requests: string[] = []
+    await page.route(`**/cloud${ownerBase}/members/bot-membership`, route => {
+      requests.push(route.request().method())
+      return route.fulfill({ status: 204 })
+    })
+    await page.goto(remotePage)
+    const sharing = page.getByRole('button', { name: 'Alex (You), open sharing' })
+    await sharing.click()
+    const people = page.getByRole('list', { name: 'Who has access' })
+    await expect(people.getByText('Alex', { exact: true })).toBeVisible()
+    await expect(people.getByText('Trip bot')).toHaveCount(0)
+    await sharing.click()
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('button', { name: 'Agents', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible()
+    const remove = page.getByRole('button', { name: 'Remove Trip bot' })
+    await expect(remove).toBeVisible()
+    await takeSnapshot('connected workspace agents')
+    await remove.click()
+    await expect(page.getByText('No agents connected to this workspace.')).toBeVisible()
+    expect(requests).toEqual(['DELETE'])
+  },
+  {
+    ...remoteOptions,
+    members: [
+      {
+        id: 'alice:owner-board',
+        members: [
+          sharingUser,
+          { type: 'agent', id: 'bot', name: 'Trip bot', membershipId: 'bot-membership' }
+        ],
+        invitations: []
+      }
+    ]
+  }
+)
+
 for (const failure of [
   {
     name: 'missing local reference',

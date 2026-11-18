@@ -12,17 +12,12 @@ import { connect } from 'node:net'
 import { Readable } from 'node:stream'
 import envPaths from 'env-paths'
 
+import type { WorkspaceMember } from '../client/features/collab/members/types'
+
 // Local-only Cloud fixture. State resets when the mock owner restarts.
-type MockMember = {
-  id: string
-  type: 'user'
-  name: string
-  email: string
-  isAnonymous: boolean
-  membershipId?: string
-}
+type MockUser = Extract<WorkspaceMember, { type: 'user' }>
 export function createMockRemoteInvitations() {
-  const members: MockMember[] = [
+  const members: WorkspaceMember[] = [
     { id: 'alice', type: 'user', name: 'Alice', email: 'alice@example.com', isAnonymous: false },
     {
       id: 'jamie',
@@ -31,7 +26,8 @@ export function createMockRemoteInvitations() {
       email: 'jamie@example.com',
       isAnonymous: false,
       membershipId: 'member-jamie'
-    }
+    },
+    { id: 'launch-bot', type: 'agent', name: 'Launch bot', membershipId: 'member-launch-bot' }
   ]
   const invitations: { id: string; email: string; expiresAt: string }[] = []
   return async function (request: Request): Promise<Response> {
@@ -39,10 +35,10 @@ export function createMockRemoteInvitations() {
     const suffix = path.slice('/mock/sharing'.length)
     const viewerHeader = request.headers.get('x-moi-mock-viewer')
     if (!viewerHeader) return Response.json({ error: 'Sign in required' }, { status: 401 })
-    const viewer = JSON.parse(decodeURIComponent(viewerHeader)) as MockMember
+    const viewer = JSON.parse(decodeURIComponent(viewerHeader)) as MockUser
     if (path === '/mock/cloud/api/workspaces/invitations' && request.method === 'GET')
       return Response.json({
-        invitations: members.some(member => member.id === viewer.id)
+        invitations: members.some(member => member.type === 'user' && member.id === viewer.id)
           ? []
           : [
               {
@@ -56,7 +52,7 @@ export function createMockRemoteInvitations() {
       path === '/mock/cloud/api/invitations/mock-owner-invite/accept' &&
       request.method === 'POST'
     ) {
-      if (!members.some(member => member.id === viewer.id))
+      if (!members.some(member => member.type === 'user' && member.id === viewer.id))
         members.push({ ...viewer, membershipId: `member-${viewer.id}` })
       return Response.json({
         success: true,
@@ -66,13 +62,13 @@ export function createMockRemoteInvitations() {
     }
     if (path === '/mock/snapshot' && request.method === 'GET')
       return Response.json({
-        workspaces: members.some(member => member.id === viewer.id)
+        workspaces: members.some(member => member.type === 'user' && member.id === viewer.id)
           ? [{ id: 'alice:owner-board', members, invitations }]
           : []
       })
     if (path === '/mock/cloud/api/workspaces/shared' && request.method === 'GET')
       return Response.json({
-        workspaces: members.some(member => member.id === viewer.id)
+        workspaces: members.some(member => member.type === 'user' && member.id === viewer.id)
           ? [
               {
                 id: 'owner-board',
@@ -82,7 +78,7 @@ export function createMockRemoteInvitations() {
             ]
           : []
       })
-    if (!members.some(member => member.id === viewer.id))
+    if (!members.some(member => member.type === 'user' && member.id === viewer.id))
       return Response.json(
         { error: 'Workspace not available', code: 'WORKSPACE_NOT_AVAILABLE' },
         { status: 404 }
@@ -96,7 +92,9 @@ export function createMockRemoteInvitations() {
         return Response.json({ error: 'Enter an email address' }, { status: 400 })
       const normalized = email.trim().toLowerCase()
       if (
-        members.some(member => member.email.toLowerCase() === normalized) ||
+        members.some(
+          member => member.type === 'user' && member.email.toLowerCase() === normalized
+        ) ||
         invitations.some(invite => invite.email === normalized)
       )
         return Response.json({ error: 'Already a member or invited' }, { status: 409 })
@@ -162,7 +160,7 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
       redirect: 'manual'
     })
     if (!session.ok) throw new Error('Could not read the Batiok session')
-    const identity = (await session.json()) as { user?: MockMember } | null
+    const identity = (await session.json()) as { user?: MockUser } | null
     if (!identity?.user || identity.user.isAnonymous)
       return { response: Response.json({ error: 'Sign in required' }, { status: 401 }) }
     const headers = new Headers({

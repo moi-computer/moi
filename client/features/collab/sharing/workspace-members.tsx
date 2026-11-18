@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import { IconX } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { Spinner } from '@/client/components/ui/spinner'
 import { PopoverTitle } from '@/client/components/ui/popover'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { toast } from '@/client/components/ui/toast'
 import { cn } from '@/client/lib/cn'
 import { colorForId } from '@/lib/collab/colors'
@@ -12,12 +10,9 @@ import { CloudApiError } from '../../account/api'
 import { useIdentity } from '../../identity/use-identity'
 import { collabIdentityId, identityKey } from '../../identity/types'
 import { getAccountGeneration } from '../../identity/store'
+import { RemoveButton } from './remove-button'
 import { User } from '../components/user'
-import {
-  type useWorkspaceMembers,
-  useMembershipAction,
-  type MembershipAction
-} from '../members/hooks'
+import { type useWorkspaceMembers, useMembershipAction } from '../members/hooks'
 import type { WorkspaceMember, WorkspaceInvitation } from '../members/types'
 import type { WorkspaceUserInfo } from '../presence/users'
 
@@ -221,49 +216,5 @@ function InvitationRow({ workspaceId, invitation }: InvitationRowProps) {
         action={{ type: 'revoke', invitationId: invitation.id }}
       />
     </li>
-  )
-}
-
-type RemoveButtonProps = {
-  workspaceId: string
-  action: Exclude<MembershipAction, { type: 'invite' }>
-  disabled?: boolean
-}
-
-function RemoveButton({ workspaceId, action, disabled }: RemoveButtonProps) {
-  const mutation = useMembershipAction(workspaceId)
-  const label = action.type === 'remove' ? 'Remove' : 'Revoke invitation'
-  async function submit() {
-    if (mutation.isPending || disabled) return
-    const generation = getAccountGeneration()
-    try {
-      await mutation.mutateAsync(action)
-    } catch (error) {
-      if (generation !== getAccountGeneration()) return
-      toast.add({
-        title: action.type === 'remove' ? 'Couldn’t remove member' : 'Couldn’t revoke invitation',
-        description: error instanceof Error ? error.message : 'Try again',
-        type: 'error'
-      })
-    }
-  }
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0 text-muted-foreground"
-            aria-label={label}
-            disabled={disabled || mutation.isPending}
-            onClick={() => void submit()}
-          />
-        }
-      >
-        <IconX stroke={1.75} />
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
   )
 }

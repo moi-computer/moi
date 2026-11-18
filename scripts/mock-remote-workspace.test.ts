@@ -289,7 +289,7 @@ test('proxy supports invitation → accept → discovery and leaves registration
   })
   expect(
     (await (await request('/cloud/api/workspaces/alice:owner-board/members')).json()).members
-  ).toHaveLength(3)
+  ).toHaveLength(4)
   await request('/api/workspaces/other:board')
   expect(forwarded).toContain('/api/workspaces/other:board')
   const redirect = await request('/redirect')
@@ -481,6 +481,7 @@ test('mock membership supports invites, revocation and removal while keeping the
   expect(snapshot.members.map((member: { id: string }) => member.id)).toEqual([
     'alice',
     'jamie',
+    'launch-bot',
     'visitor'
   ])
   expect(
@@ -500,7 +501,11 @@ test('mock membership supports invites, revocation and removal while keeping the
   expect((await sharing('/members/alice', { method: 'DELETE' })).status).toBe(404)
   snapshot = await (await sharing('/members')).json()
   expect(snapshot.invitations).toEqual([])
-  expect(snapshot.members.map((member: { id: string }) => member.id)).toEqual(['alice', 'visitor'])
+  expect(snapshot.members.map((member: { id: string }) => member.id)).toEqual([
+    'alice',
+    'launch-bot',
+    'visitor'
+  ])
 })
 
 test('startup reset unregisters only the mock and deletes only unmodified generated references', async () => {
@@ -622,6 +627,7 @@ test('mock members join the initial page and every bootstrap snapshot', async ()
   expect(workspaces[1].members.map((member: { id: string }) => member.id)).toEqual([
     'alice',
     'jamie',
+    'launch-bot',
     'visitor'
   ])
   const html = await (await request('/page')).text()
@@ -633,11 +639,14 @@ test('mock members join the initial page and every bootstrap snapshot', async ()
   })
   workspaces = await snapshot()
   expect(workspaces[1].invitations[0].email).toBe('new@example.com')
-  await request('/cloud/api/workspaces/alice:owner-board/members/member-jamie', {
+  const agent = workspaces[1].members.find((member: { type: string }) => member.type === 'agent')
+  expect(agent.name).toBe('Launch bot')
+  await request(`/cloud/api/workspaces/alice:owner-board/members/${agent.membershipId}`, {
     method: 'DELETE'
   })
   expect((await snapshot())[1].members.map((member: { id: string }) => member.id)).toEqual([
     'alice',
+    'jamie',
     'visitor'
   ])
   await request('/cloud/api/workspaces/alice:owner-board/members/member-visitor', {
@@ -658,7 +667,7 @@ test('mock membership mutations notify connected browsers', async () => {
     await request('/cloud/api/invitations/mock-owner-invite/accept', { method: 'POST' })
     expect(new TextDecoder().decode((await reader.read()).value)).toContain('data: updated')
     const snapshot = await (await request('/mock/snapshot')).json()
-    expect(snapshot.workspaces[0].members).toHaveLength(3)
+    expect(snapshot.workspaces[0].members).toHaveLength(4)
   } finally {
     abort.abort()
     reader.releaseLock()
