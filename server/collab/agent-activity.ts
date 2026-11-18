@@ -2,38 +2,26 @@ import type { CollabServerMessage } from '@/lib/collab/types'
 import { agentProfileId } from '@/lib/ids'
 import { publishWorkspacePresence } from '../events'
 
-const minute = 60_000
-type Activity = { minutesAgo: number; timer: ReturnType<typeof setInterval> }
-const workspaces = new Map<string, Map<string, Activity>>()
+type AgentTimers = Map<string, ReturnType<typeof setTimeout>>
+const workspaces = new Map<string, AgentTimers>()
 
 export function agentActivitySnapshot(workspaceId: string) {
-  const minutesAgo: Record<string, number> = {}
-  for (const [id, activity] of workspaces.get(workspaceId) ?? []) {
-    minutesAgo[agentProfileId(id)] = activity.minutesAgo
-  }
-  return { type: 'agent-activity:changed', minutesAgo } satisfies CollabServerMessage
+  const agentIds = Array.from(workspaces.get(workspaceId)?.keys() ?? [], agentProfileId)
+  return { type: 'agent-activity:changed', agentIds } satisfies CollabServerMessage
 }
 
 export function recordAgentActivity(workspaceId: string, agentId: string) {
-  const agents = workspaces.get(workspaceId) ?? new Map<string, Activity>()
+  const agents = workspaces.get(workspaceId) ?? new Map<string, ReturnType<typeof setTimeout>>()
   const previous = agents.get(agentId)
-  clearInterval(previous?.timer)
-  const lastActive = Date.now()
-  const timer = setInterval(() => {
-    const minutesAgo = Math.floor((Date.now() - lastActive) / minute)
-    if (minutesAgo >= 5) {
-      clearInterval(timer)
-      agents.delete(agentId)
-      if (!agents.size) workspaces.delete(workspaceId)
-    } else {
-      agents.set(agentId, { minutesAgo, timer })
-    }
+  clearTimeout(previous)
+  const timer = setTimeout(() => {
+    agents.delete(agentId)
+    if (!agents.size) workspaces.delete(workspaceId)
     publishWorkspacePresence(workspaceId, agentActivitySnapshot(workspaceId))
-  }, minute).unref()
-  agents.set(agentId, { minutesAgo: 0, timer })
+  }, 60_000).unref()
+  agents.set(agentId, timer)
   workspaces.set(workspaceId, agents)
-  if (previous?.minutesAgo !== 0)
-    publishWorkspacePresence(workspaceId, agentActivitySnapshot(workspaceId))
+  if (!previous) publishWorkspacePresence(workspaceId, agentActivitySnapshot(workspaceId))
 }
 
 // Batiok overwrites this header on the managed gateway. Agent IDs are a_ + a JWK thumbprint.

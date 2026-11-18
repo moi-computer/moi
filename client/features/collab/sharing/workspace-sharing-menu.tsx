@@ -58,7 +58,7 @@ export function WorkspaceSharingMenu({
   const agents = users.filter(
     user =>
       isAgentProfileId(user.profile.id) &&
-      (Object.hasOwn(state.agentActivity, user.profile.id) || user.status === 'active')
+      (state.activeAgentIds.includes(user.profile.id) || user.status === 'active')
   )
   const people = users.filter(user => !isAgentProfileId(user.profile.id))
   const headerUsers = people.filter(
@@ -69,7 +69,7 @@ export function WorkspaceSharingMenu({
   const headerRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div className="flex shrink-0 items-center gap-2">
+    <div className="flex shrink-0 items-center gap-1">
       {agents.length > 0 && (
         <div
           className="flex h-7 items-center"
@@ -83,9 +83,7 @@ export function WorkspaceSharingMenu({
             label="Recently active agents"
             hovered={hoveredGroup === 'agents'}
           >
-            {agent => (
-              <AgentAvatar agent={agent} minutesAgo={state.agentActivity[agent.profile.id]} />
-            )}
+            {agent => <AgentAvatar agent={agent} describeTab={describeTab} />}
           </PresenceStack>
         </div>
       )}
@@ -205,12 +203,12 @@ function PresenceStack({ users, label, hovered, children }: PresenceStackProps) 
 
 type AgentAvatarProps = {
   agent: WorkspaceUserInfo
-  minutesAgo?: number
+  describeTab: WorkspaceSharingMenuProps['describeTab']
 }
 
-function AgentAvatar({ agent, minutesAgo }: AgentAvatarProps) {
-  const activity =
-    agent.status === 'active' ? 'Active now' : minutesAgo ? `${minutesAgo} min ago` : 'Just now'
+function AgentAvatar({ agent, describeTab }: AgentAvatarProps) {
+  const tab = agent.page ? tabFromPath(agent.page) : undefined
+  const info = tab ? describeTab(tab) : null
 
   return (
     <Tooltip disableHoverablePopup>
@@ -219,7 +217,11 @@ function AgentAvatar({ agent, minutesAgo }: AgentAvatarProps) {
       </TooltipTrigger>
       <TooltipContent className="flex-col gap-1 text-center">
         <div>{userDisplayName(agent.profile)}</div>
-        <div className="text-muted-foreground">{activity}</div>
+        {agent.status === 'active' ? (
+          <TabSubtitle info={info} />
+        ) : (
+          <div className="text-muted-foreground">Active now</div>
+        )}
       </TooltipContent>
     </Tooltip>
   )
@@ -262,13 +264,19 @@ function MemberAvatar({ user, page, describeTab, onOpenTab, onToggleSharing }: M
           {name}
           {user.self ? ' (You)' : ''}
         </div>
-        {info && (
-          <div className="flex items-center justify-center gap-0.5 text-muted-foreground">
-            <info.Icon size={12} stroke={1.75} />
-            {info.label}
-          </div>
-        )}
+        <TabSubtitle info={info} />
       </TooltipContent>
     </Tooltip>
+  )
+}
+
+function TabSubtitle({ info }: { info: TabInfo | null }) {
+  return (
+    info && (
+      <div className="flex items-center justify-center gap-0.5 text-muted-foreground">
+        <info.Icon size={12} stroke={1.75} />
+        {info.label}
+      </div>
+    )
   )
 }

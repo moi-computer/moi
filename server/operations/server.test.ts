@@ -32,26 +32,23 @@ test('binary upload, download, HEAD, overwrite and empty files', async () => {
   expect(await (await request('files/sub/file.bin')).text()).toBe('')
   expect((await request('files/sub/file.bin', { method: 'PUT' })).status).toBe(200)
 })
-test('workspace reads renew only the requesting agent’s five-minute activity window', async () => {
+test('workspace reads renew only the requesting agent’s one-minute activity window', async () => {
   const agentId = 'a_' + 'x'.repeat(43)
   const read = (id: string) => request('files/activity.txt', { headers: { 'x-moi-user-id': id } })
   await Bun.write(join(root, 'activity.txt'), 'test')
   jest.useFakeTimers()
   try {
     await read('human')
-    expect(agentActivitySnapshot('test').minutesAgo).toEqual({})
+    expect(agentActivitySnapshot('test').agentIds).toEqual([])
     expect((await read(agentId)).status).toBe(200)
-    expect(agentActivitySnapshot('test').minutesAgo).toEqual({ [`agent:${agentId}`]: 0 })
-    expect(agentActivitySnapshot('another-workspace').minutesAgo).toEqual({})
-    jest.advanceTimersByTime(60_000)
-    expect(agentActivitySnapshot('test').minutesAgo).toEqual({ [`agent:${agentId}`]: 1 })
+    expect(agentActivitySnapshot('test').agentIds).toEqual([`agent:${agentId}`])
+    expect(agentActivitySnapshot('another-workspace').agentIds).toEqual([])
+    jest.advanceTimersByTime(30_000)
     await read(agentId)
     jest.advanceTimersByTime(59_999)
-    expect(agentActivitySnapshot('test').minutesAgo).toEqual({ [`agent:${agentId}`]: 0 })
-    jest.advanceTimersByTime(240_000)
-    expect(agentActivitySnapshot('test').minutesAgo).toEqual({ [`agent:${agentId}`]: 4 })
+    expect(agentActivitySnapshot('test').agentIds).toEqual([`agent:${agentId}`])
     jest.advanceTimersByTime(1)
-    expect(agentActivitySnapshot('test').minutesAgo).toEqual({})
+    expect(agentActivitySnapshot('test').agentIds).toEqual([])
   } finally {
     jest.useRealTimers()
   }

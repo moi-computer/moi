@@ -38,7 +38,7 @@ export type CollabClientMessage =
   | { type: 'ping' }
 
 export type CollabServerMessage =
-  | { type: 'agent-activity:changed'; minutesAgo: Record<string, number> }
+  | { type: 'agent-activity:changed'; agentIds: string[] }
   | {
       type: 'welcome'
       version: 1

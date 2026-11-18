@@ -703,7 +703,7 @@ export default function LaunchPlan() {
   const heartbeat = setInterval(() => {
     if (socket.readyState === WebSocket.OPEN) socket.send('{"type":"ping"}')
   }, 15_000)
-  const commands = setInterval(simulateAgentCommands, 3 * 60_000)
+  const commands = setInterval(simulateAgentCommands, 30_000)
 
   const proxyPort = Number(process.env.MOCK_PROXY_PORT ?? 9898)
   const batiok = process.env.MOCK_BATIOK_ORIGIN ?? 'http://localhost:8787'

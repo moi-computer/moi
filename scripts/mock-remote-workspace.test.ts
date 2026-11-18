@@ -100,14 +100,14 @@ describe('owner startup', () => {
     const received: Record<string, unknown>[] = []
     const peersActive = Promise.withResolvers<void>()
     const rejected = Promise.withResolvers<void>()
-    const agentActivity = Promise.withResolvers<Record<string, number>>()
+    const agentActivity = Promise.withResolvers<string[]>()
     const changed = Promise.withResolvers<void>()
     socket.onmessage = event => {
       const message = JSON.parse(String(event.data))
       received.push(message)
       if (message.type === 'error') rejected.resolve()
       if (message.type === 'agent-activity:changed' && received.some(m => m.type === 'welcome'))
-        agentActivity.resolve(message.minutesAgo)
+        agentActivity.resolve(message.agentIds)
       if (message.type === 'welcome' || message.type === 'connections') {
         const active = message.connections
           .filter((connection: Connection) => connection.location?.status === 'active')
@@ -131,7 +131,7 @@ describe('owner startup', () => {
         })
       )
       await peersActive.promise
-      expect(await agentActivity.promise).toEqual({ 'agent:launch-bot': 0, 'agent:review-bot': 0 })
+      expect(await agentActivity.promise).toEqual(['agent:launch-bot', 'agent:review-bot'])
       const state = await fetch(origin + '/api/workspaces/owner-board/state/tabs', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

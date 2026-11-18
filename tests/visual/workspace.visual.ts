@@ -146,13 +146,13 @@ test(
                 new MessageEvent('message', {
                   data: JSON.stringify({
                     type: 'agent-activity:changed',
-                    minutesAgo: {
-                      'agent:pip': 1,
-                      'agent:cleo': 0,
-                      'agent:peach': 2,
-                      'agent:frankie': 3,
-                      'agent:shipmate': 4
-                    }
+                    agentIds: [
+                      'agent:pip',
+                      'agent:cleo',
+                      'agent:peach',
+                      'agent:frankie',
+                      'agent:shipmate'
+                    ]
                   })
                 })
               )
@@ -167,7 +167,7 @@ test(
                       { id: 'tony', name: 'Tony', email: 'tony@example.com', color: 'blue' }
                     ],
                     connections: [
-                      ...['lee', 'sam', 'pat'].map(id => ({
+                      ...['lee', 'sam', 'pat', 'agent:cleo'].map(id => ({
                         connectionId: id,
                         userId: id,
                         location: { page: 'overview', status: 'active' },
@@ -209,12 +209,16 @@ test(
     await expect(agents.getByLabel('Shipmate')).toBeVisible()
     await expect(agents.getByText('+1')).not.toBeVisible()
     const tooltip = page.locator('[data-slot="tooltip-content"]')
+    await agents.getByLabel('Pip').hover()
     await expect(tooltip.getByText('Pip', { exact: true })).toBeVisible()
-    await expect(tooltip.getByText('1 min ago', { exact: true })).toBeVisible()
+    await expect(tooltip.getByText('Active now', { exact: true })).toBeVisible()
     await takeSnapshot('recent agent tooltip')
-    await tooltip.getByText('1 min ago', { exact: true }).hover()
+    await tooltip.getByText('Active now', { exact: true }).hover()
     await expect(agents.getByText('+1')).toBeVisible()
     await expect(agents.getByLabel('Shipmate')).not.toBeVisible()
+    await agents.getByLabel('Cleo').hover()
+    await expect(tooltip.getByText('Overview', { exact: true })).toBeVisible()
+    await expect(tooltip.getByText('Active now', { exact: true })).not.toBeVisible()
     await agents.getByLabel('Pip').click()
     await expect(page.getByRole('textbox', { name: 'Email', exact: true })).not.toBeVisible()
     const users = page.getByRole('group', { name: 'Active users', exact: true })
