@@ -40,16 +40,7 @@ test('personal state, environment and settings stay on the machine event channel
 
 test('harness changes reach the app-wide harness connection', () => {
   const events: ServerEvent[] = [
-    {
-      type: 'harness-status:changed',
-      harness: 'codex',
-      status: { availability: { status: 'available' } }
-    },
-    {
-      type: 'workspace-harness-availability:changed',
-      workspaceId: 'visitor-board',
-      availability: { status: 'available' }
-    },
+    { type: 'harness:changed' },
     { type: 'workspace-harness:switched', workspaceId: 'visitor-board', harness: 'codex' }
   ]
   for (const event of events) publishEvent(event)

@@ -19,10 +19,7 @@ export function publishEvent(msg: ServerEvent) {
       publisher?.publish(EVENTS_TOPIC, JSON.stringify({ type: 'workspaces-list:changed' }))
     }
   } else {
-    const harness =
-      msg.type === 'harness-status:changed' ||
-      msg.type === 'workspace-harness-availability:changed' ||
-      msg.type === 'workspace-harness:switched'
+    const harness = msg.type === 'harness:changed' || msg.type === 'workspace-harness:switched'
     publisher?.publish(harness ? HARNESS_EVENTS_TOPIC : EVENTS_TOPIC, JSON.stringify(msg))
   }
 }

@@ -128,11 +128,7 @@ test('real socket routes isolate shared workspaces, personal state, harness even
       workspaceId: 'visitor',
       state: { revision: 4, selected: {}, sessions: {}, pendingViews: {} }
     })
-    send({
-      type: 'workspace-harness-availability:changed',
-      workspaceId: 'visitor',
-      availability: { status: 'available' }
-    })
+    send({ type: 'harness:changed' })
     send({ type: 'view:changed', workspaceId: 'one', name: 'plan' })
     send({ type: 'view:changed', workspaceId: 'two', name: 'other' })
     await until(() => connections.every(connection => connection.messages.length > 0))
@@ -143,13 +139,7 @@ test('real socket routes isolate shared workspaces, personal state, harness even
         state: { revision: 4, selected: {}, sessions: {}, pendingViews: {} }
       }
     ])
-    expect(harness!.messages).toEqual([
-      {
-        type: 'workspace-harness-availability:changed',
-        workspaceId: 'visitor',
-        availability: { status: 'available' }
-      }
-    ])
+    expect(harness!.messages).toEqual([{ type: 'harness:changed' }])
     expect(one!.messages).toEqual([{ type: 'view:changed', name: 'plan' }])
     expect(two!.messages).toEqual([{ type: 'view:changed', name: 'other' }])
 

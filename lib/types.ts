@@ -755,7 +755,7 @@ export type Model = {
 }
 
 // GET /api/workspaces/:id/harness. Model changes arrive on refetch;
-// `workspace-harness-availability:changed` events refresh availability.
+// `harness:changed` events refresh availability.
 export type WorkspaceHarness = {
   /** Credential overrides require workspace readiness instead of shared account status. */
   hasAuthOverrides?: boolean

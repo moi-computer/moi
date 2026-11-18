@@ -1,4 +1,3 @@
-import type { HarnessEvent } from '@/lib/events'
 import { pathHarnessAvailability } from './executable'
 // Login is global per harness. Workspace readiness is checked independently
 // using each workspace’s environment.
@@ -7,11 +6,6 @@ import type { HarnessLoginState, HarnessAvailability, HarnessLogin, HarnessType 
 import { publishEvent } from '../events'
 import { harnessFor } from './registry'
 import type { HarnessWorkspace, HarnessLoginAttempt } from './types'
-
-export type WorkspaceHarnessAvailabilityEvent = Extract<
-  HarnessEvent,
-  { type: 'workspace-harness-availability:changed' }
->
 
 // Readiness can target a harness account or an individual workspace.
 type HarnessTarget = HarnessType | HarnessWorkspace
@@ -23,8 +17,7 @@ function entryKey(context: HarnessTarget): string {
 export type HarnessStoreOptions = {
   probe: (ws: HarnessTarget) => Promise<HarnessAvailability>
   startLogin: (harness: HarnessType) => Promise<HarnessLoginAttempt>
-  publish: (event: WorkspaceHarnessAvailabilityEvent) => void
-  onAuthChanged?: (harness: HarnessType, availability: HarnessAvailability) => Promise<void>
+  publish: () => void
   availabilityTtlMs?: number
   loginPollMs?: number
   loginDeadlineMs?: number
@@ -77,15 +70,6 @@ export function createHarnessStore(options: HarnessStoreOptions) {
     return entry
   }
 
-  async function publish(context: HarnessTarget, availability: HarnessAvailability) {
-    if (typeof context === 'string') return options.onAuthChanged?.(context, availability)
-    options.publish({
-      type: 'workspace-harness-availability:changed',
-      workspaceId: context.id,
-      availability
-    })
-  }
-
   async function probeFresh(ws: HarnessTarget): Promise<HarnessAvailability> {
     const entry = entryFor(ws)
     if (!entry.probe) {
@@ -115,7 +99,7 @@ export function createHarnessStore(options: HarnessStoreOptions) {
   // out from outside moi — a `codex logout` in a terminal, say).
   async function refresh(ws: HarnessTarget): Promise<HarnessAvailability> {
     const value = await probeFresh(ws)
-    await publish(ws, value)
+    options.publish()
     return value
   }
 
@@ -144,7 +128,7 @@ export function createHarnessStore(options: HarnessStoreOptions) {
       const entry = entryFor(harness)
       if (value.status === 'available' && (!login.attempt?.completed || login.completed)) {
         entry.login = undefined
-        await publish(harness, value)
+        options.publish()
         return
       }
       if (Date.now() >= deadline) {
@@ -152,12 +136,12 @@ export function createHarnessStore(options: HarnessStoreOptions) {
         // startLogin replaces it.
         stopLogin(login)
         login.state = { state: 'failed', reason: 'Sign-in did not complete. Try again' }
-        await publish(harness, value)
+        options.publish()
         return
       }
       if (!sameAvailability(value, publishedAvailability)) {
         publishedAvailability = value
-        await publish(harness, value)
+        options.publish()
       }
       timer = setTimeout(tick, pollMs)
       timer.unref?.()
@@ -208,7 +192,7 @@ export function createHarnessStore(options: HarnessStoreOptions) {
         status: 'login-required',
         reason: 'Waiting for sign-in'
       }
-      await publish(harness, availability)
+      options.publish()
       if (login.state.state === 'pending') watch(harness, login, availability)
       return result
     } catch (err) {
@@ -284,12 +268,5 @@ export const harnessStore = createHarnessStore({
     if (!start) throw new Error('This agent requires terminal sign-in')
     return start()
   },
-  publish: publishEvent,
-  onAuthChanged: async (harness, availability) => {
-    publishEvent({
-      type: 'harness-status:changed',
-      harness: harness,
-      status: { availability, login: harnessStore.getLogin(harness) }
-    })
-  }
+  publish: () => publishEvent({ type: 'harness:changed' })
 })

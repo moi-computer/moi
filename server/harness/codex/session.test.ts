@@ -4,7 +4,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import type { BroadcastFrame, StreamEvent } from '@/lib/types'
 
 import { getClientFrameLog } from '../debug'
-import { createHarnessStore, harnessStore, type WorkspaceHarnessAvailabilityEvent } from '../auth'
+import { createHarnessStore, harnessStore } from '../auth'
 import { getCodexAuthReadiness } from './auth'
 import { addUpload } from '../../uploads'
 import * as clients from './client'
@@ -104,11 +104,11 @@ describe('Codex live session lifecycle', () => {
     '%s auth failure publishes login-required despite cached account metadata',
     async method => {
       const f = fixture()
-      const published = deferred<WorkspaceHarnessAvailabilityEvent>()
+      const published = deferred<void>()
       const store = createHarnessStore({
         probe: () => getCodexAuthReadiness(f.input.workspacePath),
         startLogin: async () => ({ id: 'attempt', url: 'https://example.com/login' }),
-        publish: event => published.resolve(event)
+        publish: () => published.resolve()
       })
       f.availabilitySpy.mockImplementation(context => store.refresh(context))
       const workspace = {
@@ -132,11 +132,7 @@ describe('Codex live session lifecycle', () => {
           ? { error, willRetry: false, turnId: 'turn-1' }
           : { turn: { id: 'turn-1', status: 'failed', error, items: [] } }
       )
-      expect(await published.promise).toMatchObject({
-        type: 'workspace-harness-availability:changed',
-        workspaceId: workspace.id,
-        availability: { status: 'login-required' }
-      })
+      await published.promise
       expect((await store.getAvailability(workspace)).status).toBe('login-required')
       expect((await store.refresh(workspace)).status).toBe('login-required')
       // Verified access restores the same workspace without resending its message.

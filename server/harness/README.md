@@ -235,7 +235,7 @@ code. The attempt ID rejects submissions from an older login. Startup reports
 
 During login, the server rechecks readiness until the provider confirms
 completion and readiness succeeds, or the attempt fails or reaches its
-ten-minute deadline. Shutdown cancels active attempts. Auth changes publish `harness-status:changed` once for all consumers. The client
+ten-minute deadline. Shutdown cancels active attempts. Auth changes publish `harness:changed` once for all consumers. The client
 shares one status query across onboarding and workspace navigation. It
 reads cached status on focus, reconnect, and authentication changes, and polls only during
 an active login.

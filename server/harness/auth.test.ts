@@ -1,19 +1,8 @@
-import { expect, spyOn, test } from 'bun:test'
+import { expect, mock, spyOn, test } from 'bun:test'
 
 import type { HarnessAvailability, HarnessLogin, WorkspaceEntry } from '@/lib/types'
 
-import type { WorkspaceHarnessAvailabilityEvent } from './auth'
-import { createHarnessStore as createStore, type HarnessStoreOptions } from './auth'
-
-function createHarnessStore(options: HarnessStoreOptions) {
-  const store = createStore({
-    ...options,
-    onAuthChanged: async () => {
-      await store.refresh(ws)
-    }
-  })
-  return store
-}
+import { createHarnessStore } from './auth'
 
 const ws: WorkspaceEntry = { id: 'w1', path: '/tmp/w1', addedAt: '2026-01-01T00:00:00.000Z' }
 
@@ -54,7 +43,7 @@ test('serves the cached availability within the TTL and re-probes after invalida
 })
 
 test('refresh bypasses the TTL and publishes even when nothing else asked', async () => {
-  const events: WorkspaceHarnessAvailabilityEvent[] = []
+  const publish = mock(() => {})
   let probes = 0
   let available = true
   const store = createHarnessStore({
@@ -63,7 +52,7 @@ test('refresh bypasses the TTL and publishes even when nothing else asked', asyn
       return available ? { status: 'available' } : { status: 'unavailable', reason: 'Signed out' }
     },
     startLogin: async () => instructions,
-    publish: event => events.push(event),
+    publish,
     availabilityTtlMs: 60_000
   })
 
@@ -77,7 +66,7 @@ test('refresh bypasses the TTL and publishes even when nothing else asked', asyn
 
   expect(await store.refresh(ws)).toEqual({ status: 'unavailable', reason: 'Signed out' })
   expect(probes).toBe(2)
-  expect(events.at(-1)?.availability).toEqual({ status: 'unavailable', reason: 'Signed out' })
+  expect(publish).toHaveBeenCalledTimes(1)
   expect(await store.getAvailability(ws)).toEqual({
     status: 'unavailable',
     reason: 'Signed out'
@@ -184,12 +173,12 @@ test('startup has no instructions until the shared provider call resolves', asyn
 })
 
 test('publishes the completed login and clears the ceremony', async () => {
-  const events: WorkspaceHarnessAvailabilityEvent[] = []
+  const publish = mock(() => {})
   let loggedIn = false
   const store = createHarnessStore({
     probe: async () => (loggedIn ? { status: 'available' } : signedOut),
     startLogin: async () => instructions,
-    publish: event => events.push(event),
+    publish,
     availabilityTtlMs: 0,
     loginPollMs: 10,
     loginDeadlineMs: 60_000
@@ -200,14 +189,14 @@ test('publishes the completed login and clears the ceremony', async () => {
   expect(store.getLogin('claude-code')).toEqual({ state: 'pending', ...instructions })
 
   loggedIn = true
-  await until(() => events.at(-1)?.availability.status === 'available')
-  expect(events.at(-1)).not.toHaveProperty('login')
+  await until(() => !store.getLogin('claude-code'))
+  expect(publish).toHaveBeenCalledTimes(2)
   expect(store.getLogin('claude-code')).toBeUndefined()
   expect(await store.getAvailability(ws)).toEqual({ status: 'available' })
 })
 
 test('publishes one unavailable transition during login and keeps watching for recovery', async () => {
-  const events: WorkspaceHarnessAvailabilityEvent[] = []
+  const publish = mock(() => {})
   let probes = 0
   let availability: HarnessAvailability = signedOut
   const store = createHarnessStore({
@@ -216,7 +205,7 @@ test('publishes one unavailable transition during login and keeps watching for r
       return availability
     },
     startLogin: async () => instructions,
-    publish: event => events.push(event),
+    publish,
     availabilityTtlMs: 0,
     loginPollMs: 5,
     loginDeadlineMs: 60_000
@@ -227,25 +216,24 @@ test('publishes one unavailable transition during login and keeps watching for r
   availability = { status: 'unavailable', reason: 'Codex app-server exited' }
 
   await until(() => probes >= 4)
-  const unavailableEvents = events.filter(event => event.availability.status === 'unavailable')
-  expect(unavailableEvents).toHaveLength(1)
+  expect(publish).toHaveBeenCalledTimes(2)
   expect(store.getLogin('claude-code')).toEqual({
     state: 'pending',
     ...instructions
   })
 
   availability = { status: 'available' }
-  await until(() => events.at(-1)?.availability.status === 'available')
-  expect(events.at(-1)).not.toHaveProperty('login')
+  await until(() => !store.getLogin('claude-code'))
+  expect(publish).toHaveBeenCalledTimes(3)
   expect(store.getLogin('claude-code')).toBeUndefined()
 })
 
 test('a ceremony that never lands fails at the deadline', async () => {
-  const events: WorkspaceHarnessAvailabilityEvent[] = []
+  const publish = mock(() => {})
   const store = createHarnessStore({
     probe: async () => signedOut,
     startLogin: async () => instructions,
-    publish: event => events.push(event),
+    publish,
     availabilityTtlMs: 0,
     loginPollMs: 10,
     loginDeadlineMs: 30
@@ -337,10 +325,10 @@ test('invalidating a context during login startup prevents a stale watcher', asy
 test('one global login updates multiple workspaces without sharing their readiness', async () => {
   const first = { ...ws, harness: 'codex' as const }
   const second = { ...first, id: 'w2', path: '/tmp/w2' }
-  const events: WorkspaceHarnessAvailabilityEvent[] = []
+  const publish = mock(() => {})
   let loggedIn = false
   let starts = 0
-  const store = createStore({
+  const store = createHarnessStore({
     probe: async context => {
       if (typeof context !== 'string' && context.id === second.id) return signedOut
       return loggedIn ? { status: 'available' } : signedOut
@@ -349,31 +337,25 @@ test('one global login updates multiple workspaces without sharing their readine
       starts++
       return instructions
     },
-    publish: event => events.push(event),
-    onAuthChanged: async () => {
-      await Promise.all([store.refresh(first), store.refresh(second)])
-    },
+    publish,
     loginPollMs: 5
   })
   await Promise.all([store.startLogin('codex'), store.startLogin('codex')])
   expect(starts).toBe(1)
-  expect(events.map(event => event.workspaceId)).toEqual([first.id, second.id])
+  expect(publish).toHaveBeenCalledTimes(1)
   expect(store.getLogin('codex')?.state).toBe('pending')
   loggedIn = true
-  await until(() =>
-    events.some(
-      event => event.workspaceId === first.id && event.availability.status === 'available'
-    )
-  )
+  await until(() => !store.getLogin('codex'))
+  expect(await store.getAvailability(first)).toEqual({ status: 'available' })
   expect(store.getLogin('codex')).toBeUndefined()
   expect(await store.getAvailability(second)).toEqual(signedOut)
-  expect(events.at(-1)).not.toHaveProperty('login')
+  expect(publish).toHaveBeenCalledTimes(2)
 })
 
 test('keeps device instructions, rejects stale codes, and cancels on invalidation', async () => {
   let cancelled = 0
   let submitted = ''
-  const store = createStore({
+  const store = createHarnessStore({
     probe: async () => signedOut,
     startLogin: async () => ({
       id: 'attempt-1',
@@ -413,7 +395,7 @@ test('keeps device instructions, rejects stale codes, and cancels on invalidatio
 
 test('provider failure stops the login and allows a fresh attempt', async () => {
   let cancelled = 0
-  const store = createStore({
+  const store = createHarnessStore({
     probe: async () => signedOut,
     startLogin: async () => ({
       id: 'attempt',
@@ -437,7 +419,7 @@ test('provider failure stops the login and allows a fresh attempt', async () => 
 
 test('deadline cancels the provider process', async () => {
   let cancelled = 0
-  const store = createStore({
+  const store = createHarnessStore({
     probe: async () => signedOut,
     startLogin: async () => ({
       id: 'attempt',
@@ -464,7 +446,7 @@ test('does not confuse existing credentials with completion of a new login', asy
   const completed = new Promise<void>(resolve => {
     finish = resolve
   })
-  const store = createStore({
+  const store = createHarnessStore({
     probe: async () => ({ status: 'available' }),
     startLogin: async () => ({ id: 'attempt', url: 'https://example.com', completed }),
     publish: () => {},

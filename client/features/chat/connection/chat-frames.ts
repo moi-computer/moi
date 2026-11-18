@@ -1,4 +1,3 @@
-import type { HarnessStatuses, WorkspaceHarness } from '@/lib/types'
 import type { ClientEvent } from '@/lib/events'
 import { receiveWorkspaceHarness } from '@/client/features/workspace/harness-transition'
 import type { QueryClient } from '@tanstack/react-query'
@@ -25,26 +24,9 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
   const { queryClient } = context
   const store = liveStore.getState()
 
-  if (data.type === 'harness-status:changed') {
-    const event = data as Extract<ClientEvent, { type: 'harness-status:changed' }>
-    const queryKey = ['harness-status']
-    void queryClient?.cancelQueries({ queryKey })
-    queryClient?.setQueryData<HarnessStatuses>(queryKey, previous =>
-      previous ? { ...previous, [event.harness]: event.status } : undefined
-    )
-    if (!queryClient?.getQueryData(queryKey)) void queryClient?.invalidateQueries({ queryKey })
-    if (event.status.availability.status === 'available')
-      void queryClient?.invalidateQueries({ queryKey: ['workspaces', 'harness'] })
-    return
-  }
-  if (data.type === 'workspace-harness-availability:changed') {
-    const event = data as Extract<ClientEvent, { type: 'workspace-harness-availability:changed' }>
-    const queryKey = workspaceKeys.harness(event.workspaceId)
-    void queryClient?.cancelQueries({ queryKey })
-    queryClient?.setQueryData<WorkspaceHarness>(queryKey, previous =>
-      previous ? { ...previous, availability: event.availability } : previous
-    )
+  if (data.type === 'harness:changed') {
     void queryClient?.invalidateQueries({ queryKey: ['harness-status'] })
+    void queryClient?.invalidateQueries({ queryKey: ['workspaces', 'harness'] })
     return
   }
   if (data.type === 'workspace-harness:switched') {

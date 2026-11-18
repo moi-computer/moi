@@ -121,6 +121,9 @@ test('workspaces and onboarding share status; auth events and harness switches u
   expect(requests.filter(path => path.includes('/harnesses/'))).toHaveLength(1)
   expect(document.querySelector('[data-workspace]')?.textContent).toBe('claude-code:available')
 
+  const workspaceReads = requests.filter(
+    path => path.endsWith('/two/harness') || path.endsWith('/one/harness')
+  ).length
   const old = Promise.withResolvers<Response>()
   pending = old.promise
   await act(async () => {
@@ -128,11 +131,9 @@ test('workspaces and onboarding share status; auth events and harness switches u
     await Bun.sleep(10)
   })
   await act(async () => {
-    handleFrame({
-      type: 'harness-status:changed',
-      harness: 'claude-code',
-      status: { availability: { status: 'login-required', reason: 'Signed out' } }
-    })
+    pending = undefined
+    signedOut = true
+    handleFrame({ type: 'harness:changed' })
     old.resolve(
       Response.json({
         'claude-code': { availability: { status: 'available' } },
@@ -143,13 +144,13 @@ test('workspaces and onboarding share status; auth events and harness switches u
   })
   expect(document.querySelector('[data-onboarding]')?.textContent).toBe('login-required')
   expect(document.querySelector('[data-workspace]')?.textContent).toBe('claude-code:login-required')
-  pending = undefined
+  expect(
+    requests.filter(path => path.endsWith('/two/harness') || path.endsWith('/one/harness')).length
+  ).toBeGreaterThan(workspaceReads)
   await act(async () => {
-    handleFrame({
-      type: 'harness-status:changed',
-      harness: 'claude-code',
-      status: { availability: { status: 'available' } }
-    })
+    pending = undefined
+    signedOut = false
+    handleFrame({ type: 'harness:changed' })
     await Bun.sleep(20)
   })
   expect(document.querySelector('[data-onboarding]')?.textContent).toBe('available')
@@ -209,11 +210,9 @@ test('workspaces and onboarding share status; auth events and harness switches u
     await Bun.sleep(10)
   })
   await act(async () => {
-    handleFrame({
-      type: 'harness-status:changed',
-      harness: 'claude-code',
-      status: { availability: { status: 'available' } }
-    })
+    pending = undefined
+    signedOut = false
+    handleFrame({ type: 'harness:changed' })
     retryResponse.resolve(
       Response.json({
         'claude-code': { availability: { status: 'login-required' } },

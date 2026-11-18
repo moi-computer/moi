@@ -2,8 +2,6 @@ import type { NavigationRequest } from './navigation'
 import type {
   AppSettings,
   CompiledView,
-  HarnessAvailability,
-  HarnessStatus,
   HarnessType,
   WidgetInfo,
   ScratchpadOpMessage,
@@ -23,12 +21,7 @@ export type SharedWorkspaceEvent =
   | { type: 'scratchpad:changed'; origin?: string }
 
 export type HarnessEvent =
-  | { type: 'harness-status:changed'; harness: HarnessType; status: HarnessStatus }
-  | {
-      type: 'workspace-harness-availability:changed'
-      workspaceId: string
-      availability: HarnessAvailability
-    }
+  | { type: 'harness:changed' }
   | { type: 'workspace-harness:switched'; workspaceId: string; harness: HarnessType }
 
 export type AppEvent =
