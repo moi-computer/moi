@@ -63,3 +63,6 @@ dist/
 
 # visual tests (bun run test:visual)
 uiverify-archive/
+
+# Generated release JavaScript and third-party notices
+/runtime/

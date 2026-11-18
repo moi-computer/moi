@@ -1,3 +1,4 @@
+import { packagePath } from '../package-paths'
 import { mkdir, rename, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -119,7 +120,7 @@ export function createOnboardingJobs(overrides: Partial<typeof defaults> = {}) {
           const dates = `Research dates (UTC): today ${dateAgo(0)}; last 30 days start ${dateAgo(30)}; last 60 days start ${dateAgo(60)}.`
           return harness.runAction!({
             model: 'fast',
-            prompt: `${dates}\n\n${await Bun.file(new URL('./prompt.md', import.meta.url)).text()}`,
+            prompt: `${dates}\n\n${await Bun.file(packagePath('server', 'onboarding', 'prompt.md')).text()}`,
             resultSchema: ideasSchema,
             progressSchema: discoveryProgressSchema,
             onProgress: update =>

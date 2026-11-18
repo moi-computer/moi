@@ -1,5 +1,4 @@
-import { join } from 'node:path'
-import { PACKAGE_ROOT } from '../version'
+import { serverEntry } from '../package-paths'
 import { OperationError } from './files'
 
 export const workspaceCommands = [
@@ -32,15 +31,12 @@ export function commandArguments(command: string, args: string[]): string[] {
 }
 
 export function spawnWorkspaceCommand(root: string, command: string, args: string[]) {
-  return Bun.spawn(
-    [process.execPath, join(PACKAGE_ROOT, 'server/cli.ts'), ...commandArguments(command, args)],
-    {
-      cwd: root,
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
-      detached: true,
-      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' }
-    }
-  )
+  return Bun.spawn([process.execPath, serverEntry('cli.ts'), ...commandArguments(command, args)], {
+    cwd: root,
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+    detached: true,
+    env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' }
+  })
 }

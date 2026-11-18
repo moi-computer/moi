@@ -1,9 +1,10 @@
+import { isBundled, serverEntry } from '../package-paths'
 import { join } from 'path'
 import { packageManager } from '../../package.json'
-import { PACKAGE_ROOT } from '../version'
 import pc from './pc'
 
 export function assertDevRuntime(version = Bun.version): void {
+  if (isBundled) throw new Error('Development mode requires a Moi source checkout')
   // Reuse CI's baseline; packageManager does not select the local executable.
   const requiredVersion = packageManager.slice('bun@'.length)
   if (!Bun.semver.satisfies(version, `>=${requiredVersion}`)) {
@@ -24,7 +25,7 @@ export function spawnServer(
   args: string[] = []
 ): ReturnType<typeof Bun.spawn> {
   // Keep the checked runtime instead of resolving a different Bun on PATH.
-  const argv = [process.execPath, join(PACKAGE_ROOT, 'server', 'cli.ts'), 'start', ...args]
+  const argv = [process.execPath, serverEntry('cli.ts'), 'start', ...args]
   return Bun.spawn(argv, {
     stdin: 'inherit',
     stdout: 'inherit',

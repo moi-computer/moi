@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { packagePath } from './package-paths'
 
 // Production (published/global install) ships a prebuilt client in `dist/`
 // (see scripts/build-client.ts). When present we serve it as static files,
@@ -8,7 +9,7 @@ import { join } from 'node:path'
 // imported HTML route + Bun.serve's live bundler (HMR). `import.meta.dir` is
 // server/, so `dist/` sits one level up. The Hono API serves files from here
 // via `serveStatic` (see api/index.ts).
-export const DIST_DIR = join(import.meta.dir, '..', 'dist')
+export const DIST_DIR = packagePath('dist')
 const DIST_INDEX = join(DIST_DIR, 'index.html')
 
 // Whether to serve the prebuilt client from `dist/`: true in production, but

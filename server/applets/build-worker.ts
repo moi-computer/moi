@@ -1,3 +1,4 @@
+import { serverEntry } from '../package-paths'
 // Out-of-process applet compiler.
 //
 // `Bun.build` shares one process-wide resolver cache with the runtime module
@@ -65,7 +66,7 @@ export type BuildResponse = {
   results: BuildJobResult[]
 }
 
-const WORKER_PATH = join(import.meta.dir, 'build-worker.ts')
+const WORKER_PATH = serverEntry('applets/build-worker-entry.ts')
 
 // Children currently compiling a batch, for `killBuildWorkers()`.
 const liveWorkers = new Set<ReturnType<typeof Bun.spawn>>()
@@ -160,7 +161,7 @@ export function buildAppletsInChild(req: Omit<BuildRequest, 'type'>): Promise<Bu
   })
 }
 
-if (import.meta.main) {
+export function startBuildWorker(): void {
   // Orphan guards — the only ways the child ends itself. See the lifecycle
   // note at the top: the parent kills us after it has read the result.
   const parentPid = process.ppid

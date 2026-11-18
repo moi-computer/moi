@@ -1,6 +1,7 @@
+import { serverEntry } from '../package-paths'
 import { realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 
 import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/protocol'
 import type { CollabClientMessage, CollabServerMessage, UserProfile } from '@/lib/collab/types'
@@ -166,7 +167,7 @@ export class CollabManager {
     }
     try {
       slot.child = Bun.spawn(
-        [process.execPath, this.options.workerPath ?? join(import.meta.dir, 'worker.ts')],
+        [process.execPath, this.options.workerPath ?? serverEntry('collab/worker.ts')],
         {
           cwd: tmpdir(),
           env: {

@@ -1,3 +1,4 @@
+import { packagePath } from '../package-paths'
 import { accessSync, constants, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
@@ -7,7 +8,7 @@ import type { HarnessAvailability, HarnessInstallations, HarnessType } from '@/l
 
 import { cachedLoginShellPath, loginShellPath, mergeSearchPaths } from './shell-path'
 
-const MOI_BIN_DIR = join(import.meta.dir, '..', '..', 'node_modules', '.bin')
+const MOI_BIN_DIR = packagePath('node_modules', '.bin')
 
 type ExecutableConfig = {
   command: string

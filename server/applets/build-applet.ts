@@ -1,3 +1,4 @@
+import { appletRuntime, isBundled, packagePath } from '../package-paths'
 import type { BunPlugin } from 'bun'
 import tailwind from 'bun-plugin-tailwind'
 import { realpathSync } from 'node:fs'
@@ -30,9 +31,9 @@ const EXTERNAL_MODULES = [
   'react-dom/client'
 ]
 
-const RPC_MODULE_PATH = join(import.meta.dir, 'runtime', 'rpc.ts')
-const MOI_MODULE_PATH = join(import.meta.dir, 'runtime', 'moi.ts')
-const COLLAB_MODULE_PATH = join(import.meta.dir, 'runtime', 'collab.ts')
+const RPC_MODULE_PATH = appletRuntime('rpc')
+const MOI_MODULE_PATH = appletRuntime('moi')
+const COLLAB_MODULE_PATH = appletRuntime('collab')
 
 type ServerModule = {
   name: string
@@ -208,7 +209,7 @@ function appletRuntimePlugin(
 
 // Shared Tailwind input for applet bundles. It maps semantic tokens and
 // provides the same texture utilities available to host components.
-const HOST_THEME_PATH = join(import.meta.dir, '..', '..', 'client', 'theme.css')
+const HOST_THEME_PATH = packagePath('client', 'theme.css')
 
 // The shadcn styling vocabulary, text-inlined from Moi's OWN node_modules the
 // same way theme.css is. Tailwind v4 only emits utilities it can resolve:
@@ -221,14 +222,19 @@ const HOST_THEME_PATH = join(import.meta.dir, '..', '..', 'client', 'theme.css')
 // use none of the vocabulary pay nothing.
 // (`tw-animate-css` exposes its css only under the `style` export condition,
 // which Bun.resolveSync doesn't match — locate it via its package.json.)
-const SHADCN_VOCABULARY_PATHS = [
-  join(
-    dirname(Bun.resolveSync('tw-animate-css/package.json', import.meta.dir)),
-    'dist',
-    'tw-animate.css'
-  ),
-  Bun.resolveSync('shadcn/tailwind.css', import.meta.dir)
-]
+const SHADCN_VOCABULARY_PATHS = isBundled
+  ? [
+      packagePath('runtime', 'assets', 'tw-animate.css'),
+      packagePath('runtime', 'assets', 'shadcn.css')
+    ]
+  : [
+      join(
+        dirname(Bun.resolveSync('tw-animate-css/package.json', import.meta.dir)),
+        'dist',
+        'tw-animate.css'
+      ),
+      Bun.resolveSync('shadcn/tailwind.css', import.meta.dir)
+    ]
 
 // Three things matter for applet styling:
 //   1. The umbrella `@import 'tailwindcss'` brings in @layer theme + base +

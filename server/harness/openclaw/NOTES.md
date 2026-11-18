@@ -689,9 +689,12 @@ Important: **always wrap `connect` in your own timeout**. `GatewayClient`
 doesn't enforce one on the initial handshake (only on individual RPCs), so a
 silent gateway will hang forever. We race a 2–5 s timer.
 
-The package is **big** (~300+ transitive deps — channel plugins, provider
-SDKs, the full CLI). For our case (the server already has lots of deps) the
-subpath import wins over rolling a minimal client.
+The package is a pinned **development dependency**. Release builds bundle only
+this client implementation and its dependencies; the full OpenClaw application
+is not installed with Moi. The build follows the public export to its generated
+implementation module and preserves upstream behavior. See
+[package builds](../../../docs/package-build.md) for the artifact layout and
+required upgrade checks.
 
 ## 11. What our code does
 

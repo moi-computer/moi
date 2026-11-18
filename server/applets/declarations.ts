@@ -1,9 +1,20 @@
+import { packagePath } from '../package-paths'
 import { mkdir, stat } from 'node:fs/promises'
 import { getAppConfig } from '../app-config'
 import { dirname, join } from 'node:path'
 
-export const BASE_DECLARATION_SOURCE_PATH = join(import.meta.dir, 'declarations', 'base.d.ts')
-export const COLLAB_DECLARATION_SOURCE_PATH = join(import.meta.dir, 'declarations', 'collab.d.ts')
+export const BASE_DECLARATION_SOURCE_PATH = packagePath(
+  'server',
+  'applets',
+  'declarations',
+  'base.d.ts'
+)
+export const COLLAB_DECLARATION_SOURCE_PATH = packagePath(
+  'server',
+  'applets',
+  'declarations',
+  'collab.d.ts'
+)
 
 export type AppletDeclarationFile = 'base.d.ts' | 'collab.d.ts'
 
@@ -15,7 +26,7 @@ async function writeDeclaration(
   workspacePath: string,
   file: AppletDeclarationFile
 ): Promise<boolean> {
-  const sourcePath = join(import.meta.dir, 'declarations', file)
+  const sourcePath = packagePath('server', 'applets', 'declarations', file)
   const targetPath = appletDeclarationPath(workspacePath, file)
   const contents = await Bun.file(sourcePath).text()
   const target = Bun.file(targetPath)

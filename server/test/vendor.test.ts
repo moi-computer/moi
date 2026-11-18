@@ -7,7 +7,7 @@ import reactPkg from 'react/package.json'
 import pkg from '../../package.json'
 import { serveVendorEmojibase, serveVendorReact } from '../vendor'
 
-const VERSION = pkg.dependencies.react
+const VERSION = pkg.devDependencies.react
 const VENDOR = join(import.meta.dir, '..', '..', 'client', 'vendor', 'react', VERSION)
 const ENTRIES = [
   'react.js',
@@ -127,7 +127,7 @@ describe('serveVendorEmojibase route', () => {
 // committed artifacts without anyone noticing. Bumping React is deliberate:
 // change both pins, `bun install`, `bun run vendor:react`, commit the result.
 describe('React version is pinned and vendored consistently', () => {
-  const pinned = { react: pkg.dependencies.react, 'react-dom': pkg.dependencies['react-dom'] }
+  const pinned = { react: pkg.devDependencies.react, 'react-dom': pkg.devDependencies['react-dom'] }
 
   test('react and react-dom are pinned to the same exact version', () => {
     expect(pinned.react).toMatch(/^\d/)

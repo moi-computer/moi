@@ -1,3 +1,4 @@
+import { serverEntry } from '../package-paths'
 // Per-workspace pool of functions worker subprocesses.
 //
 // Each entry in the LRU cache owns one child process running
@@ -23,7 +24,7 @@ import { join } from 'path'
 import { agentCommand } from '../agent-launcher'
 import { resolveWorkspaceEnv } from '../workspaces/env'
 
-const WORKER_PATH = join(import.meta.dir, 'functions-worker.ts')
+const WORKER_PATH = serverEntry('applets/functions-worker.ts')
 const CALL_TIMEOUT_MS = 30_000
 const WORKER_IDLE_TTL_MS = 10 * 60_000
 const MAX_WORKERS = 8

@@ -13,8 +13,10 @@
 // resolves in a global install too.
 import { join } from 'node:path'
 
-const VENDOR_DIR = join(import.meta.dir, '..', 'client', 'vendor', 'react')
-const EMOJIBASE_DIR = join(import.meta.dir, '..', 'client', 'vendor', 'emojibase')
+import { packagePath } from './package-paths'
+
+const VENDOR_DIR = packagePath('client', 'vendor', 'react')
+const EMOJIBASE_DIR = packagePath('client', 'vendor', 'emojibase')
 
 // `<version>/<mode>/<file>`: a version folder, the build mode, then a single
 // flat file (`react.js`) or one nested under `_impl/` — all `.js`, no

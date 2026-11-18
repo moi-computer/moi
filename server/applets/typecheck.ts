@@ -1,3 +1,4 @@
+import { packagePath } from '../package-paths'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import ts from 'typescript'
@@ -20,7 +21,7 @@ export type AppletTypecheckResult = {
 // same root serves the `bun-types` and `@types/node` references inside, so
 // the workspace's own `node_modules` never takes part. `from` is injectable
 // for tests.
-export function resolvePackageTypeRoot(from: string = join(import.meta.dir, '..')): string {
+export function resolvePackageTypeRoot(from: string = packagePath('server')): string {
   try {
     return dirname(dirname(Bun.resolveSync('@types/bun/package.json', from)))
   } catch {

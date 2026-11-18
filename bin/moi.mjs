@@ -35,4 +35,10 @@ if (!Bun.which('moi')) {
   console.error('  bun i -g moi-computer\n')
 }
 
-await import('../server/cli.ts')
+// Prefer source in a checkout, including after packing for a release test.
+const source = new URL('../server/cli.ts', import.meta.url)
+await import(
+  (await Bun.file(source).exists())
+    ? source.href
+    : new URL('../runtime/cli.js', import.meta.url).href
+)

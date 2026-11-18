@@ -85,6 +85,8 @@ jobs:
             echo "::error::tarball contains sensitive files"
             exit 1
           fi
+          grep -q '^package/runtime/cli.js$' "$RUNNER_TEMP/package-files.txt"
+          bun scripts/test-package.ts "$RUNNER_TEMP/moi-computer.tgz"
 
       - name: Upload verified package
         uses: actions/upload-artifact@v4

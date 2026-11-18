@@ -5,9 +5,10 @@
 import { cp, lstat, mkdir, readFile, readdir, readlink } from 'node:fs/promises'
 import { getAppConfig } from '../app-config'
 import { join } from 'node:path'
+import { packagePath } from '../package-paths'
 
 // Resolve relative to this file so source checkouts and published installs agree.
-const BUNDLED_SKILL_DIR = join(import.meta.dir, '..', '..', 'skill')
+const BUNDLED_SKILL_DIR = packagePath('skill')
 
 export function bundledSkillDirectory(name: string): string {
   if (name !== 'moi-workspace') throw new Error(`Unknown bundled skill: ${name}`)

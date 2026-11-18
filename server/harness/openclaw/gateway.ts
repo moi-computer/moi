@@ -242,11 +242,11 @@ async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayIn
   if (!cfg) throw new Error('openclaw config missing or invalid')
   let GatewayClient: ClientCtor
   try {
-    ;({ GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime'))
+    ;({ GatewayClient } = await import('./gateway-client'))
   } catch {
-    // Optional dependency absent — callers surface the rejection as a chat
+    // A damaged install — callers surface the rejection as a chat
     // error; keep the category visible in /status.
-    const err = new Error('openclaw package is not installed')
+    const err = new Error('Could not load the OpenClaw gateway client')
     lastFailure = { kind: 'unreachable', message: err.message }
     throw err
   }
@@ -415,11 +415,11 @@ export async function getGateway(): Promise<GatewayHandle> {
 export async function withOneShotGateway<T>(fn: (rpc: Rpc) => Promise<T>): Promise<T | null> {
   const cfg = await readGatewayConfig()
   if (!cfg) return null
-  // `openclaw` is an optionalDependency — a missing package must degrade to
+  // A missing client bundle must degrade to
   // the silent-null path (no agents discovered), never a rejected promise.
   let GatewayClient: ClientCtor
   try {
-    ;({ GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime'))
+    ;({ GatewayClient } = await import('./gateway-client'))
   } catch {
     return null
   }
