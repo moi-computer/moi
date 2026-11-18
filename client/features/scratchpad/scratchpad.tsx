@@ -21,7 +21,7 @@ import {
 import 'tldraw/tldraw.css'
 
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
-import { setScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
+import { useAppContext } from '@/client/runtime/app-context'
 import { persistScratchSession } from '@/client/features/scratchpad/scratch-session'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { type ClientEvent, useClientEvent } from '@/client/runtime/use-client-events'
@@ -49,20 +49,18 @@ const LICENSE_KEY = process.env.PUBLIC_TLDRAW_LICENSE_KEY || undefined
 // canvas to a PNG needs the browser (`editor.toImageDataUrl`); every mutation runs
 // server-side against the disk snapshot (see server/scratchpad/executor.ts), so a
 // non-view op arriving here is unexpected.
-function makeExecutor(editor: Editor) {
-  return async (op: ScratchOp): Promise<ScratchOpResult> => {
-    if (op.kind !== 'view') {
-      throw new Error(`Scratchpad op "${op.kind}" runs on the server, not the browser.`)
-    }
-    const ids = [...editor.getCurrentPageShapeIds()]
-    if (ids.length === 0) throw new Error('Canvas is empty — nothing to view.')
-    const { url } = await editor.toImageDataUrl(ids, {
-      format: 'png',
-      background: true,
-      padding: 32
-    })
-    return { image: url }
+async function runScratchOp(editor: Editor, op: ScratchOp): Promise<ScratchOpResult> {
+  if (op.kind !== 'view') {
+    throw new Error(`Scratchpad op "${op.kind}" runs on the server, not the browser.`)
   }
+  const ids = [...editor.getCurrentPageShapeIds()]
+  if (ids.length === 0) throw new Error('Canvas is empty — nothing to view.')
+  const { url } = await editor.toImageDataUrl(ids, {
+    format: 'png',
+    background: true,
+    padding: 32
+  })
+  return { image: url }
 }
 
 // File-backed assets: without this, tldraw inlines every pasted/dropped image as
@@ -190,6 +188,7 @@ export function Scratchpad() {
 
 function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
   const { apiBase } = useWorkspaceLayoutCtx()
+  const events = useAppContext()?.events
   const editorRef = useRef<Editor | null>(null)
   // The whole scratchpad region (canvas + tool bar + style bar). Focus is driven
   // off whether a pointerdown lands inside this, so clicking a tool keeps the
@@ -284,7 +283,16 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
         },
         { source: 'user', scope: 'document' }
       )
-      setScratchExecutor(workspaceId, makeExecutor(editor))
+      const unsubscribe = events?.subscribe(async event => {
+        if (event.type !== 'scratchpad:op' || event.workspaceId !== workspaceId) return
+        const reply = { type: 'scratchpad:op-result', opId: event.opId }
+        try {
+          const result = await runScratchOp(editor, event.op)
+          events.send({ ...reply, result })
+        } catch (error) {
+          events.send({ ...reply, error: error instanceof Error ? error.message : String(error) })
+        }
+      })
       // Focus management: tldraw only fires keyboard shortcuts while the editor's
       // instance `isFocused` is set, but with `autoFocus={false}` it never flips
       // that on its own. We drive it from where the pointer lands — a pointerdown
@@ -315,12 +323,12 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
         stopSessionSave()
         doc.removeEventListener('pointerdown', onPointerDown, true)
         if (saveTimer.current) clearTimeout(saveTimer.current)
-        setScratchExecutor(workspaceId, null)
+        unsubscribe?.()
         setEditor(null)
         editorRef.current = null
       }
     },
-    [workspaceId, save]
+    [workspaceId, save, events]
   )
 
   if (!loaded) return <div className="min-h-0 flex-1 bg-muted/40" />

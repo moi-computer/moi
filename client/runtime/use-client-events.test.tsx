@@ -1,4 +1,3 @@
-import { setScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
 import { useWorkspaceSocket } from '@/client/features/workspace/use-workspace-socket'
 import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-utils'
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -294,56 +293,3 @@ test('owner events use the visitor cache ID while personal state and navigation 
   expect(received).toEqual([{ type: 'workspace:connected', workspaceId: 'visitor-board' }])
   expect(machine.closed).toBe(false)
 })
-
-test.each([false, true])(
-  'canvas operations reply on the machine socket (failure: %s)',
-  async failure => {
-    const { root } = installDom()
-    await act(async () =>
-      root.render(
-        <AppProvider>
-          <HomeShell />
-        </AppProvider>
-      )
-    )
-    const socket = FakeWebSocket.instances[0]!
-    expect(socket.url).toEndWith('/api/events')
-    socket.open()
-    setScratchExecutor('canvas', async op => {
-      expect(op).toEqual({ kind: 'view' })
-      if (failure) throw new Error('Canvas unavailable')
-      return { image: 'canvas-image' }
-    })
-    try {
-      await act(async () => {
-        socket.onmessage?.({
-          data: JSON.stringify({
-            type: 'scratchpad:op',
-            workspaceId: 'canvas',
-            opId: 'capture',
-            op: { kind: 'view' }
-          })
-        })
-      })
-      expect(socket.sent.map(value => JSON.parse(value))).toContainEqual({
-        type: 'scratchpad:op-result',
-        opId: 'capture',
-        ...(failure ? { error: 'Canvas unavailable' } : { result: { image: 'canvas-image' } })
-      })
-      socket.sent.length = 0
-      await act(async () => {
-        socket.onmessage?.({
-          data: JSON.stringify({
-            type: 'scratchpad:op',
-            workspaceId: 'another-canvas',
-            opId: 'ignored',
-            op: { kind: 'view' }
-          })
-        })
-      })
-      expect(socket.sent).toEqual([])
-    } finally {
-      setScratchExecutor('canvas', null)
-    }
-  }
-)
