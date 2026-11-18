@@ -43,7 +43,7 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <SidebarLayout>
       <Workspace id={id}>
-        <WorkspaceLayoutProvider id={id}>
+        <WorkspaceLayoutProvider key={id} id={id}>
           <WorkspaceLive id={id}>
             <WorkspaceContent id={id} />
           </WorkspaceLive>

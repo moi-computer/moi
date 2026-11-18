@@ -11,6 +11,8 @@ import type { SpeedMode } from '@/lib/types'
 import { isSpeedMode } from '@/lib/speed-mode'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
+import { z } from 'zod'
+import { AGENT_THEMES, COLOR_THEMES, FONT_THEMES, RADIUS_THEMES } from '@/lib/themes'
 import { serveStatic } from 'hono/bun'
 import { createMiddleware } from 'hono/factory'
 import { existsSync } from 'node:fs'
@@ -42,12 +44,7 @@ import { applyEnvChanged } from '../workspaces/env-apply'
 import { publishEvent } from '../events'
 import { callFunction, parseFunctionPath } from '../applets/functions'
 import { processIcon } from '../workspaces/icon'
-import {
-  getWorkspacePreview,
-  loadLayout,
-  mergeLayoutForSave,
-  saveLayout
-} from '../workspaces/layout'
+import { getWorkspacePreview, mergeLayoutForSave, updateLayout } from '../workspaces/layout'
 import {
   getAppletThumbnailRecords,
   isValidAppletId,
@@ -996,6 +993,33 @@ one.put('/applet-thumbnails', ownerWorkspace, async c => {
   return c.body(null, 204)
 })
 
+function themePreset<T extends string>(presets: Record<T, unknown>) {
+  return z.custom<T>(value => typeof value === 'string' && Object.hasOwn(presets, value))
+}
+
+const layoutPatchSchema = z
+  .strictObject({
+    theme: z
+      .strictObject({
+        font: themePreset(FONT_THEMES),
+        color: themePreset(COLOR_THEMES),
+        radius: themePreset(RADIUS_THEMES),
+        agent: themePreset(AGENT_THEMES)
+      })
+      .optional(),
+    widgetGrid: z
+      .array(
+        z.object({
+          i: z.string().min(1),
+          x: z.int().nonnegative(),
+          y: z.int().nonnegative()
+        })
+      )
+      .optional(),
+    origin: z.string().optional()
+  })
+  .refine(patch => patch.theme !== undefined || patch.widgetGrid !== undefined)
+
 one.put('/', personalWorkspace, async c => {
   const ws = c.get('ws')
   if (ws.remote) {
@@ -1004,20 +1028,15 @@ one.put('/', personalWorkspace, async c => {
       403
     )
   }
-  const body = await c.req.json()
-  if (!body || body.version !== 2) return c.text('Bad request', 400)
-  // `origin` is the writing tab's id, echoed so that tab skips its own event.
-  const { origin } = body
-  // Only widgets and theme are taken from the body, so a grid/theme save can't
-  // erase a `moi config`-set name or icon. See mergeLayoutForSave.
-  const existing = await loadLayout(ws.path)
-  const next = mergeLayoutForSave(existing, body)
-  await saveLayout(next, ws.path)
-  if (JSON.stringify(existing) !== JSON.stringify(next)) {
+  const patch = layoutPatchSchema.safeParse(await c.req.json().catch(() => null))
+  if (!patch.success) return c.text('Invalid layout patch', 400)
+  const { origin, ...layout } = patch.data
+  const { changed } = await updateLayout(ws.path, current => mergeLayoutForSave(current, layout))
+  if (changed) {
     publishEvent({
       type: 'workspace-config:changed',
       workspaceId: ws.id,
-      origin: eventOrigin(origin)
+      origin
     })
   }
   return c.body(null, 204)

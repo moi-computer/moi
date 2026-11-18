@@ -175,7 +175,6 @@ test('real socket routes isolate shared workspaces, personal state, harness even
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        version: 2,
         widgetGrid: [{ i: '_moi_views', x: 2, y: 3 }],
         origin: 'editing-tab'
       })
@@ -186,6 +185,25 @@ test('real socket routes isolate shared workspaces, personal state, harness even
     expect(machine!.messages).toEqual([{ type: 'workspaces-list:changed' }])
     expect(two!.messages).toEqual([])
     expect(harness!.messages).toEqual([])
+
+    // A CLI theme edit can arrive while a browser is moving a widget.
+    const workspaceUrl = `http://127.0.0.1:${port}/api/workspaces/one`
+    const widgetGrid = [{ i: '_moi_views', x: 0, y: 1 }]
+    control.socket.send(JSON.stringify({ type: 'theme', path: join(root, 'one'), color: 'rose' }))
+    const gridSave = await fetch(workspaceUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ widgetGrid })
+    })
+    expect(gridSave.status).toBe(204)
+    await until(() =>
+      control.messages.some(message => message.ok === true && message.color === 'rose')
+    )
+    expect(await (await fetch(workspaceUrl)).json()).toMatchObject({
+      widgetGrid,
+      theme: { color: 'rose' }
+    })
+    await until(() => one!.messages.length === 3 && machine!.messages.length === 3)
 
     for (const connection of connections) connection.messages.length = 0
     send({ type: 'workspace:open-requested', workspaceId: 'one' })

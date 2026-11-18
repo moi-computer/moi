@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import {
   parseRemoteWorkspaceConfig,
   parseRemoteWorkspaceTarget,
@@ -7,7 +7,12 @@ import {
 } from '@/lib/workspace-config'
 import { join } from 'path'
 
-import type { AppletKind, WorkspaceLayout, WorkspacePreview } from '@/lib/types'
+import type {
+  AppletKind,
+  WorkspaceLayout,
+  WorkspaceLayoutPatch,
+  WorkspacePreview
+} from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { isWorkspaceIcon } from '@/lib/workspace-icon'
 
@@ -49,17 +54,45 @@ export async function loadLayout(workspacePath: string): Promise<WorkspaceLayout
   return config
 }
 
+const pendingWrites = new Map<string, Promise<unknown>>()
+
+export async function updateLayout(
+  workspacePath: string,
+  update: (current: WorkspaceLayout) => WorkspaceLayout
+) {
+  const path = getLayoutPath(workspacePath)
+  const write = async () => {
+    const current = await loadWorkspaceFileConfig(workspacePath)
+    if (current.remote)
+      throw new Error('Cannot replace a remote workspace reference with a local layout')
+    const layout = update(current)
+    const temporary = `${path}.${crypto.randomUUID()}.tmp`
+    try {
+      await Bun.write(temporary, JSON.stringify(layout, null, 2))
+      await rename(temporary, path)
+    } finally {
+      await rm(temporary, { force: true })
+    }
+    return { layout, changed: JSON.stringify(current) !== JSON.stringify(layout) }
+  }
+  const previous = pendingWrites.get(path) ?? Promise.resolve()
+  const run = previous.then(write, write)
+  pendingWrites.set(path, run)
+  try {
+    return await run
+  } finally {
+    if (pendingWrites.get(path) === run) pendingWrites.delete(path)
+  }
+}
+
 export async function saveLayout(layout: WorkspaceLayout, workspacePath: string): Promise<void> {
-  const existing = await loadWorkspaceFileConfig(workspacePath)
-  if (existing.remote)
-    throw new Error('Cannot replace a remote workspace reference with a local layout')
-  await Bun.write(getLayoutPath(workspacePath), JSON.stringify(layout, null, 2))
+  await updateLayout(workspacePath, () => layout)
 }
 
 // The editor owns widgets and theme; identity changes use the config API.
 export function mergeLayoutForSave(
   existing: WorkspaceLayout,
-  body: WorkspaceLayout
+  body: WorkspaceLayoutPatch
 ): WorkspaceLayout {
   return normalizeLayout({
     ...existing,

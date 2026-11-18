@@ -13,7 +13,7 @@ import type {
   WorkspaceHarness,
   WorkspaceLayoutResponse,
   WorkspaceInfoResponse,
-  WorkspaceLayout,
+  WorkspaceLayoutPatch,
   WorkspaceSkillsStatus,
   WorkspaceSkillsUpdateFailure,
   HarnessType
@@ -138,7 +138,7 @@ export function useUpdateWorkspaceSkills(workspaceId: string) {
 
 export function useSaveLayout(workspaceId: string) {
   const queryClient = useQueryClient()
-  return useMutation<void, Error, WorkspaceLayout>({
+  return useMutation<void, Error, WorkspaceLayoutPatch>({
     mutationFn: layout =>
       requestVoid(
         getWorkspaceApiBase(workspaceId, queryClient),
@@ -158,6 +158,7 @@ export function useSaveLayout(workspaceId: string) {
         void queryClient.invalidateQueries({
           queryKey: workspaceInfoOptions(getWorkspaceApiBase(workspaceId, queryClient)).queryKey
         })
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
       queryClient.invalidateQueries({ queryKey: workspaceKeys.previews })
     }

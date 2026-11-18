@@ -124,7 +124,8 @@ test('visitor API returns the reference, folder and resolved routing', async () 
 test('local workspace info includes routing without persisting response metadata', async () => {
   const info = await (await api.request(base)).json()
   expect(info).toMatchObject({ apiBase: base, isRemote: false, name: 'Owner board' })
-  expect((await api.request(base, put(info))).status).toBe(204)
+  expect((await api.request(base, put(info))).status).toBe(400)
+  expect((await api.request(base, put({ widgetGrid: [] }))).status).toBe(204)
   const saved = await Bun.file(join(owner, '.moi/.workspace.json')).json()
   expect(saved).not.toHaveProperty('apiBase')
   expect(saved).not.toHaveProperty('isRemote')
@@ -133,12 +134,7 @@ test('local workspace info includes routing without persisting response metadata
 test('visitor layout writes cannot add preferences or overwrite the reference', async () => {
   const before = await Bun.file(join(visitor, '.moi/.workspace.json')).text()
   const ownerBefore = await loadLayout(owner)
-  const response = await api.request(
-    local,
-    put({
-      version: 2
-    })
-  )
+  const response = await api.request(local, put({ widgetGrid: [] }))
   expect(response.status).toBe(403)
   expect(await Bun.file(join(visitor, '.moi/.workspace.json')).text()).toBe(before)
   expect(await loadLayout(owner)).toEqual(ownerBefore)

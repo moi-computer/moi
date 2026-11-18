@@ -631,6 +631,8 @@ export type WorkspaceLayout = {
   theme?: WorkspaceTheme
 }
 
+export type WorkspaceLayoutPatch = Partial<Pick<WorkspaceLayout, 'widgetGrid' | 'theme'>>
+
 // GET /api/workspaces/:id returns either a complete local layout or a remote reference.
 type WorkspaceRouting = { apiBase: string; cwd: string }
 type WorkspaceMetadata = { name: string; harness?: HarnessType; agentId?: string }

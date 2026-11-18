@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useSaveLayout, useWorkspaceLayout, workspaceInfoOptions } from './api'
-import type { WorkspaceLayout } from '@/lib/types'
+import type { WorkspaceLayoutPatch } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
 test.each([false, true])(
@@ -61,7 +61,7 @@ test.each([false, true])(
       )
     )
     let loaded: ReturnType<typeof useWorkspaceLayout>['data']
-    let save: (value: WorkspaceLayout) => Promise<void> = async () => {}
+    let save: (value: WorkspaceLayoutPatch) => Promise<void> = async () => {}
     function Probe() {
       const cards = useWorkspaceMetadata([{ remote, name: 'Fallback' }])
       const layout = useWorkspaceLayout('visitor')
@@ -100,9 +100,11 @@ test.each([false, true])(
       reads.length = 0
       owner.name = 'Updated board'
       await act(async () => {
-        await save(owner)
+        await save({ widgetGrid: [] })
       })
-      expect(writes.map(write => write.url)).toEqual(['/api/workspaces/alice:board'])
+      expect(writes).toEqual([
+        { url: visitor.apiBase, body: { widgetGrid: [], origin: expect.any(String) } }
+      ])
       for (let i = 0; i < 20 && !document.body.textContent?.includes('Updated board'); i++)
         await act(async () => {
           await Bun.sleep(10)
@@ -112,7 +114,7 @@ test.each([false, true])(
       failSave = true
       owner.name = 'Changed by owner'
       await act(async () => {
-        await expect(save(owner)).rejects.toThrow('Save failed')
+        await expect(save({ widgetGrid: [] })).rejects.toThrow('Save failed')
       })
       for (let i = 0; i < 20 && loaded?.name !== 'Changed by owner'; i++)
         await act(async () => {

@@ -15,7 +15,7 @@ import { CONTROL_HOST, CONTROL_PORT, PORT } from './constants'
 import { applyEnvChanged } from './workspaces/env-apply'
 import { callFunctionEphemeral, parseFunctionPath } from './applets/functions'
 import { processIcon } from './workspaces/icon'
-import { loadLayout, saveLayout } from './workspaces/layout'
+import { loadLayout, updateLayout } from './workspaces/layout'
 import { publishEvent } from './events'
 import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './workspaces/registry'
 import { requiredEnvFor } from './workspaces/required-env'
@@ -433,11 +433,10 @@ export const control = Bun.serve({
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
           const workspacePath = match.path
-          const layout = await loadLayout(workspacePath)
 
           // Listing mode — no theme setting requested
           if (!data.font && !data.color && !data.radius && !data.agent) {
-            const theme = resolveWorkspaceTheme(layout.theme)
+            const theme = resolveWorkspaceTheme((await loadLayout(workspacePath)).theme)
             ws.send(
               JSON.stringify({
                 currentFont: theme.font,
@@ -449,7 +448,7 @@ export const control = Bun.serve({
             return
           }
 
-          const result = applyThemeUpdate(layout.theme, {
+          const result = applyThemeUpdate(undefined, {
             font: data.font,
             color: data.color,
             radius: data.radius,
@@ -460,7 +459,10 @@ export const control = Bun.serve({
             return
           }
 
-          await saveLayout({ ...layout, theme: result.theme }, workspacePath)
+          await updateLayout(workspacePath, layout => ({
+            ...layout,
+            theme: resolveWorkspaceTheme({ ...layout.theme, ...result.applied })
+          }))
           publishEvent({ type: 'workspace-config:changed', workspaceId: match.id })
           ws.send(JSON.stringify({ ok: true, ...result.applied }))
           return

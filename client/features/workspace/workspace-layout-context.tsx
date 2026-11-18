@@ -11,7 +11,7 @@ import {
 } from '@/client/features/workspace/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { WorkspaceLayout, HarnessType } from '@/lib/types'
+import type { WorkspaceLayout, WorkspaceLayoutPatch, HarnessType } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
 import { useWorkspaceState } from './workspace-state'
@@ -22,7 +22,7 @@ export type WorkspaceLayoutContextValue = {
   layout: WorkspaceLayout
   // Merge a partial update into the layout: updates the query cache immediately
   // (optimistic) then debounces a PUT to the server via the save mutation.
-  setLayout: (update: Partial<WorkspaceLayout>) => void
+  setLayout: (update: WorkspaceLayoutPatch) => void
   // Workspace metadata that rides along on the layout endpoint.
   name: string | null
   cwd: string | null
@@ -56,8 +56,7 @@ export function useWorkspaceThemeSetting(): WorkspaceLayout['theme'] {
   return useContext(WorkspaceLayoutContext)?.layout.theme
 }
 
-// Strip the server-only metadata so what we PUT back (and expose as `layout`)
-// is just the persisted `WorkspaceLayout`.
+// Expose the layout separately from its routing metadata.
 function stripMeta(data: WorkspaceLayoutResponse): WorkspaceLayout {
   const {
     cwd: _cwd,
@@ -88,10 +87,10 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
   // reconcile), so reach the latest mutate via a ref instead of closing over it.
   const saveRef = useLatestRef(save.mutate)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingSave = useRef<WorkspaceLayout | null>(null)
+  const pendingSave = useRef<WorkspaceLayoutPatch | null>(null)
 
   const setLayout = useCallback(
-    (update: Partial<WorkspaceLayout>) => {
+    (update: WorkspaceLayoutPatch) => {
       const key = workspaceKeys.layout(id)
       const prev = qc.getQueryData<WorkspaceLayoutResponse>(key)
       if (!prev) return
@@ -100,15 +99,9 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       // Optimistic: the grid/theme reflects the change before the PUT lands.
       const next = { ...prev, ...update }
       qc.setQueryData<WorkspaceLayoutResponse>(key, next)
-      pendingSave.current = stripMeta(next)
+      pendingSave.current = { ...pendingSave.current, ...update }
 
       if (timer.current) clearTimeout(timer.current)
-      // Persist the value captured at call time, NOT the cache at fire time: a
-      // `workspace-config:changed` broadcast can invalidate + refetch this query inside
-      // the debounce window, and reading the cache then would PUT the server's
-      // pre-change layout back (reverting the user's edit on disk). Rapid calls
-      // still coalesce — each call's `prev` already includes the previous
-      // optimistic write.
       timer.current = setTimeout(() => {
         timer.current = null
         const payload = pendingSave.current
