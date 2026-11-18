@@ -1,3 +1,4 @@
+import { recordGatewayActivity } from '../collab/agent-activity'
 import { openSharedWorkspace } from '../workspaces/shared'
 import { executeScratchOp } from '../scratchpad/executor'
 import type { ScratchOp, WorkspaceInfoResponse } from '@/lib/types'
@@ -180,6 +181,7 @@ function workspaceAccess(
       if (ws.remote && getAppConfig().environment !== 'cloud')
         return c.text('Remote workspaces require Cloud mode', 403)
       if (ws.remote && scope === 'owner') return c.text('Use the owner workspace address', 404)
+      if (scope === 'owner' && getAppConfig().unixSocket) recordGatewayActivity(id, c.req.raw)
       c.set('ws', ws)
       await next()
     } catch (error) {

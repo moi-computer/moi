@@ -1,3 +1,4 @@
+import type { Connection } from '../lib/collab/types'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdtemp, mkdir, rm, cp, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -97,12 +98,22 @@ describe('owner startup', () => {
       origin.replace('http:', 'ws:') + '/api/workspaces/owner-board/events'
     )
     const received: Record<string, unknown>[] = []
-    const welcome = Promise.withResolvers<void>()
+    const peersActive = Promise.withResolvers<void>()
+    const rejected = Promise.withResolvers<void>()
+    const agentActivity = Promise.withResolvers<Record<string, number>>()
     const changed = Promise.withResolvers<void>()
     socket.onmessage = event => {
       const message = JSON.parse(String(event.data))
       received.push(message)
-      if (message.type === 'welcome') welcome.resolve()
+      if (message.type === 'error') rejected.resolve()
+      if (message.type === 'agent-activity:changed' && received.some(m => m.type === 'welcome'))
+        agentActivity.resolve(message.minutesAgo)
+      if (message.type === 'welcome' || message.type === 'connections') {
+        const active = message.connections
+          .filter((connection: Connection) => connection.location?.status === 'active')
+          .map((connection: Connection) => connection.userId)
+        if (active.includes('alice')) peersActive.resolve()
+      }
       if (message.type === 'workspace-config:changed') changed.resolve()
     }
     try {
@@ -110,6 +121,8 @@ describe('owner startup', () => {
         socket.onopen = () => resolve()
         socket.onerror = reject
       })
+      socket.send(JSON.stringify({ type: 'join' }))
+      await rejected.promise
       socket.send(
         JSON.stringify({
           type: 'join',
@@ -117,7 +130,8 @@ describe('owner startup', () => {
           profile: { id: 'visitor', name: 'Visitor', color: 'blue' }
         })
       )
-      await welcome.promise
+      await peersActive.promise
+      expect(await agentActivity.promise).toEqual({ 'agent:launch-bot': 0, 'agent:review-bot': 0 })
       const state = await fetch(origin + '/api/workspaces/owner-board/state/tabs', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

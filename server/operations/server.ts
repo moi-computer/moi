@@ -1,3 +1,4 @@
+import { recordGatewayActivity } from '../collab/agent-activity'
 import { chmod, rm } from 'node:fs/promises'
 import { z } from 'zod'
 import { getWorkspace } from '../workspaces/registry'
@@ -70,6 +71,7 @@ export function createOperationsHandler(resolveWorkspace = getWorkspace) {
       const workspace = await resolveWorkspace(match[1]!)
       if (!workspace || workspace.remote)
         return Response.json({ error: 'Workspace unavailable' }, { status: 404 })
+      recordGatewayActivity(workspace.id, request)
       const root = workspace.path
       if (match[3]) {
         const path = decodeURIComponent(match[3])

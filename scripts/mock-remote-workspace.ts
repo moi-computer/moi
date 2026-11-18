@@ -12,64 +12,67 @@ import { connect } from 'node:net'
 import { Readable } from 'node:stream'
 import envPaths from 'env-paths'
 
+import { colorForId } from '../lib/collab/colors'
+import { COLLAB_PROTOCOL_VERSION } from '../lib/collab/protocol'
 import type { WorkspaceMember } from '../client/features/collab/members/types'
 
 // Local-only Cloud fixture. State resets when the mock owner restarts.
 type MockUser = Extract<WorkspaceMember, { type: 'user' }>
+const initialMembers: WorkspaceMember[] = [
+  { id: 'alice', type: 'user', name: 'Alice', email: 'alice@example.com', isAnonymous: false },
+  {
+    id: 'jamie',
+    type: 'user',
+    name: 'Jamie',
+    email: 'jamie@example.com',
+    isAnonymous: false,
+    membershipId: 'member-jamie'
+  },
+  {
+    id: 'launch-bot',
+    type: 'agent',
+    name: 'Pip',
+    client: 'dot',
+    membershipId: 'member-launch-bot'
+  },
+  {
+    id: 'review-bot',
+    type: 'agent',
+    name: 'Cleo',
+    client: 'duet',
+    membershipId: 'member-review-bot'
+  },
+  {
+    id: 'research-bot',
+    type: 'agent',
+    name: 'Jamie’s Grok',
+    client: 'grok-bot',
+    membershipId: 'member-research-bot'
+  },
+  {
+    id: 'instinct',
+    type: 'agent',
+    name: 'Frankie',
+    client: 'instinct',
+    membershipId: 'member-instinct'
+  },
+  {
+    id: 'muse',
+    type: 'agent',
+    name: 'Peach',
+    client: 'muse',
+    membershipId: 'member-muse'
+  },
+  {
+    id: 'other',
+    type: 'agent',
+    name: 'Shipmate',
+    client: 'town-assistant',
+    membershipId: 'member-other'
+  }
+]
 export function createMockRemoteInvitations() {
-  const members: WorkspaceMember[] = [
-    { id: 'alice', type: 'user', name: 'Alice', email: 'alice@example.com', isAnonymous: false },
-    {
-      id: 'jamie',
-      type: 'user',
-      name: 'Jamie',
-      email: 'jamie@example.com',
-      isAnonymous: false,
-      membershipId: 'member-jamie'
-    },
-    {
-      id: 'launch-bot',
-      type: 'agent',
-      name: 'Pip',
-      client: 'dot',
-      membershipId: 'member-launch-bot'
-    },
-    {
-      id: 'review-bot',
-      type: 'agent',
-      name: 'Cleo',
-      client: 'duet',
-      membershipId: 'member-review-bot'
-    },
-    {
-      id: 'research-bot',
-      type: 'agent',
-      name: 'Jamie’s Grok',
-      client: 'grok-bot',
-      membershipId: 'member-research-bot'
-    },
-    {
-      id: 'instinct',
-      type: 'agent',
-      name: 'Frankie',
-      client: 'instinct',
-      membershipId: 'member-instinct'
-    },
-    {
-      id: 'muse',
-      type: 'agent',
-      name: 'Peach',
-      client: 'muse',
-      membershipId: 'member-muse'
-    },
-    {
-      id: 'other',
-      type: 'agent',
-      name: 'Shipmate',
-      client: 'town-assistant',
-      membershipId: 'member-other'
-    }
-  ]
+  const members = [...initialMembers]
   const invitations: { id: string; email: string; expiresAt: string }[] = []
   return async function (request: Request): Promise<Response> {
     const path = new URL(request.url).pathname
@@ -552,6 +555,7 @@ if (import.meta.main) {
   process.env.MOI_DATA_DIR = root
   process.env.MOI_SECRET_BACKEND = 'file'
   process.env.MOI_ENVIRONMENT = 'cloud'
+  const { recordAgentActivity } = await import('../server/collab/agent-activity')
   const { collabManager } = await import('../server/collab/manager')
   const { setEventServer, workspaceEventsTopic } = await import('../server/events')
   const { api } = await import('../server/api')
@@ -670,7 +674,7 @@ export default function LaunchPlan() {
         if (!present.has(socket)) {
           if (String(message) === '{"type":"ping"}') return void socket.send('{"type":"pong"}')
           present.add(socket)
-          collabManager.open(socket, owner)
+          collabManager.open(socket, owner, { workspaceId: 'owner-board' })
         }
         collabManager.message(socket, message)
       },
@@ -678,6 +682,29 @@ export default function LaunchPlan() {
     }
   })
   setEventServer(ownerServer)
+  const alice = initialMembers.find(member => member.id === 'alice')!
+  const socket = new WebSocket(
+    `ws://127.0.0.1:${ownerServer.port}/api/workspaces/owner-board/events`
+  )
+  socket.onopen = () =>
+    socket.send(
+      JSON.stringify({
+        type: 'join',
+        version: COLLAB_PROTOCOL_VERSION,
+        profile: { id: alice.id, name: alice.name, color: colorForId(alice.id) },
+        location: { page: 'overview', status: 'active' }
+      })
+    )
+  function simulateAgentCommands() {
+    recordAgentActivity('owner-board', 'launch-bot')
+    recordAgentActivity('owner-board', 'review-bot')
+  }
+  simulateAgentCommands()
+  const heartbeat = setInterval(() => {
+    if (socket.readyState === WebSocket.OPEN) socket.send('{"type":"ping"}')
+  }, 15_000)
+  const commands = setInterval(simulateAgentCommands, 3 * 60_000)
+
   const proxyPort = Number(process.env.MOCK_PROXY_PORT ?? 9898)
   const batiok = process.env.MOCK_BATIOK_ORIGIN ?? 'http://localhost:8787'
   const proxy = createMockRemoteProxy(batiok, ownerServer.url.origin)
@@ -686,6 +713,9 @@ export default function LaunchPlan() {
   })
   console.log(`Mock owner: ${ownerServer.url}; Batiok: ${batiok}`)
   const stop = async () => {
+    clearInterval(commands)
+    clearInterval(heartbeat)
+    socket.close()
     await collabManager.shutdown()
     proxy.close()
     proxy.closeAllConnections()

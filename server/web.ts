@@ -229,8 +229,12 @@ export const app = Bun.serve<WsData>({
         if (!ws.data.presence && String(message) === '{"type":"ping"}') {
           ws.send('{"type":"pong"}')
         } else if (getAppConfig().environment === 'cloud' && ws.data.workspacePath) {
-          if (!ws.data.presence)
-            collabManager.open(ws, ws.data.workspacePath, ws.data.verifiedProfile)
+          if (!ws.data.presence) {
+            collabManager.open(ws, ws.data.workspacePath, {
+              workspaceId: ws.data.workspaceId,
+              verifiedProfile: ws.data.verifiedProfile
+            })
+          }
           ws.data.presence = true
           collabManager.message(ws, message)
         }

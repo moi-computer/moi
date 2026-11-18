@@ -11,6 +11,7 @@ import type {
 export type ClientState = {
   status: 'connecting' | 'connected' | 'disconnected'
   connectionId: string | null
+  agentActivity: Record<string, number>
   connections: Connection[]
   // Current live profiles only. The host owns the full workspace directory.
   users: readonly UserProfile[]
@@ -20,6 +21,7 @@ export type ClientState = {
 export const DISCONNECTED_STATE: ClientState = {
   status: 'disconnected',
   connectionId: null,
+  agentActivity: {},
   connections: [],
   users: [],
   error: null
@@ -87,6 +89,9 @@ export class CollabStore {
   }
   receive(message: CollabServerMessage): void {
     switch (message.type) {
+      case 'agent-activity:changed':
+        this.publish({ agentActivity: message.minutesAgo })
+        break
       case 'welcome':
         this.publish({
           status: 'connected',

@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path'
 import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/protocol'
 import type { CollabClientMessage, CollabServerMessage, UserProfile } from '@/lib/collab/types'
 
+import { agentActivitySnapshot } from './agent-activity'
 import { getAppConfig } from '../app-config'
 import type { ParentMessage, WorkerMessage } from './worker-messages'
 
@@ -17,6 +18,7 @@ export type ClientSocket = {
 type Binding = {
   socket: ClientSocket
   workspacePaths: Set<string>
+  workspaceId?: string
   connectionId: string
   closed: boolean
   lastSeen: number
@@ -198,7 +200,11 @@ export class CollabManager {
     }
     if (message.type === 'client') {
       const binding = slot.clients.get(message.connectionId)
-      if (binding) this.emit(binding, message.message)
+      if (binding) {
+        this.emit(binding, message.message)
+        if (message.message.type === 'welcome' && binding.workspaceId)
+          this.emit(binding, agentActivitySnapshot(binding.workspaceId))
+      }
       return
     }
   }
@@ -253,7 +259,11 @@ export class CollabManager {
     binding.socket.close(1012, reason.slice(0, 120))
   }
 
-  open(socket: ClientSocket, workspacePath: string, verifiedProfile?: UserProfile) {
+  open(
+    socket: ClientSocket,
+    workspacePath: string,
+    options: { workspaceId?: string; verifiedProfile?: UserProfile } = {}
+  ) {
     const binding: Binding = {
       socket,
       workspacePaths: new Set([resolve(workspacePath)]),
@@ -261,7 +271,7 @@ export class CollabManager {
       closed: false,
       lastSeen: Date.now(),
       joined: false,
-      verifiedProfile,
+      ...options,
       queue: Promise.resolve()
     }
     this.bindings.set(socket, binding)

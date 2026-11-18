@@ -245,3 +245,10 @@
   corner-shape: superellipse(1.2);
   z-index: 0;
 }
+
+/* One animated length keeps each presence cutout centered on the next avatar. */
+@property --presence-gap {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}

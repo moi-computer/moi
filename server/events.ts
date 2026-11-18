@@ -1,3 +1,4 @@
+import type { CollabServerMessage } from '@/lib/collab/types'
 import { isSharedWorkspaceEvent, type ServerEvent } from '@/lib/events'
 
 export const EVENTS_TOPIC = 'events'
@@ -9,6 +10,10 @@ let publisher: EventPublisher | null = null
 
 export function setEventServer(server: EventPublisher) {
   publisher = server
+}
+
+export function publishWorkspacePresence(workspaceId: string, message: CollabServerMessage) {
+  publisher?.publish(workspaceEventsTopic(workspaceId), JSON.stringify(message))
 }
 
 export function publishEvent(msg: ServerEvent) {

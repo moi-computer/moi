@@ -303,11 +303,11 @@ describe('collab process and socket integration', () => {
     const workspace = directory()
     const verified = { id: 'cf-user-1', color: 'blue', email: 'alex@example.com' } as const
     const [client, peer, other] = [localSocket(), localSocket(), localSocket()]
-    runtime.open(other.socket, workspace, verified)
+    runtime.open(other.socket, workspace, { verifiedProfile: verified })
     joinLocal(runtime, other.socket, 'host-user')
     expect(other.messages).toContainEqual(expect.objectContaining({ code: 'user_mismatch' }))
     expect(other.reason).toContain('Cloudflare Access')
-    runtime.open(client.socket, workspace, verified)
+    runtime.open(client.socket, workspace, { verifiedProfile: verified })
     joinLocal(runtime, client.socket, 'cf-user-1')
     const renamed = { type: 'profile', profile: { ...verified, name: 'Boris' } }
     runtime.message(client.socket, JSON.stringify(renamed))

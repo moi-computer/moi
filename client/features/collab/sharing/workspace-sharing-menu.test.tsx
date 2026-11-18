@@ -120,9 +120,10 @@ test('header limits active avatars to four and puts the overflow on the left', (
     users: [...peers, self],
     otherConnections: peers.map(p => connection(p, 'overview'))
   })
-  expect(html).toContain('aria-label="2 more active users"')
-  expect(html).not.toContain('aria-label="Peer 3"')
-  const labels = ['2 more active users', 'Peer 2', 'Peer 1', 'Peer 0', 'Self']
+  expect(html.indexOf('+2')).toBeGreaterThan(-1)
+  expect(html.indexOf('+2')).toBeLessThan(html.indexOf('aria-label="Peer 2"'))
+  expect(html).toMatch(/<div[^>]*inert=""[^>]*><button[^>]*aria-label="Peer 3"/)
+  const labels = ['Peer 2', 'Peer 1', 'Peer 0', 'Self']
   for (let i = 1; i < labels.length; i++) {
     expect(html.indexOf(`aria-label="${labels[i - 1]}"`)).toBeLessThan(
       html.indexOf(`aria-label="${labels[i]}"`)
@@ -288,10 +289,11 @@ describe('workspace sharing', () => {
     expect(ui.document.querySelector('form')).not.toBeNull()
     await ui.click('Self (You), open sharing')
     expect(ui.document.querySelector('form')).toBeNull()
-    await ui.click('2 more active users')
-    expect(ui.document.querySelector('form')).not.toBeNull()
-    await ui.click('2 more active users')
-    expect(ui.document.querySelector('form')).toBeNull()
+    const users = ui.document.querySelector('[aria-label="Active users"]')!
+    expect(users.textContent).toContain('+2')
+    expect(
+      Array.from(users.querySelectorAll('button, [tabindex]')).some(el => el.textContent === '+2')
+    ).toBe(false)
     await act(async () => {
       engine.setOtherConnections([])
       engine.setLocation({ page: 'overview', status: 'away' })

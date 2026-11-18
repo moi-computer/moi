@@ -145,6 +145,20 @@ test(
               socket.onmessage?.(
                 new MessageEvent('message', {
                   data: JSON.stringify({
+                    type: 'agent-activity:changed',
+                    minutesAgo: {
+                      'agent:pip': 1,
+                      'agent:cleo': 0,
+                      'agent:peach': 2,
+                      'agent:frankie': 3,
+                      'agent:shipmate': 4
+                    }
+                  })
+                })
+              )
+              socket.onmessage?.(
+                new MessageEvent('message', {
+                  data: JSON.stringify({
                     type: 'welcome',
                     version: 2,
                     connectionId: 'self',
@@ -153,6 +167,12 @@ test(
                       { id: 'tony', name: 'Tony', email: 'tony@example.com', color: 'blue' }
                     ],
                     connections: [
+                      ...['lee', 'sam', 'pat'].map(id => ({
+                        connectionId: id,
+                        userId: id,
+                        location: { page: 'overview', status: 'active' },
+                        presence: []
+                      })),
                       {
                         connectionId: 'self',
                         userId: message.profile.id,
@@ -181,6 +201,27 @@ test(
       })
     })
     await page.goto(WORKSPACE_PAGE)
+    const agents = page.getByRole('group', { name: 'Recently active agents' })
+    await expect(agents.getByLabel('Pip')).toBeVisible()
+    await expect(agents.getByLabel('Cleo')).toBeVisible()
+    await expect(agents.getByText('+1')).toBeVisible()
+    await agents.getByLabel('Pip').hover()
+    await expect(agents.getByLabel('Shipmate')).toBeVisible()
+    await expect(agents.getByText('+1')).not.toBeVisible()
+    const tooltip = page.locator('[data-slot="tooltip-content"]')
+    await expect(tooltip.getByText('Pip', { exact: true })).toBeVisible()
+    await expect(tooltip.getByText('1 min ago', { exact: true })).toBeVisible()
+    await takeSnapshot('recent agent tooltip')
+    await tooltip.getByText('1 min ago', { exact: true }).hover()
+    await expect(agents.getByText('+1')).toBeVisible()
+    await expect(agents.getByLabel('Shipmate')).not.toBeVisible()
+    await agents.getByLabel('Pip').click()
+    await expect(page.getByRole('textbox', { name: 'Email', exact: true })).not.toBeVisible()
+    const users = page.getByRole('group', { name: 'Active users', exact: true })
+    await expect(users.getByText('+1')).toBeVisible()
+    await page.getByRole('button', { name: 'Users in this workspace' }).locator('svg').hover()
+    await expect(users.getByText('+1')).not.toBeVisible()
+    await expect(users.getByRole('button', { name: 'pat', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Tony', exact: true }).hover()
     await expect(
       page.locator('[data-slot="tooltip-content"]').getByText('Scratchpad', { exact: true })
@@ -216,7 +257,19 @@ test(
         id: WORKSPACE,
         members: [
           sharingUser,
-          { id: 'tony', type: 'user', name: 'Tony', email: 'tony@example.com', isAnonymous: false }
+          { id: 'pip', type: 'agent', name: 'Pip', client: 'dot' },
+          { id: 'cleo', type: 'agent', name: 'Cleo', client: 'duet' },
+          { id: 'peach', type: 'agent', name: 'Peach', client: 'muse' },
+          { id: 'frankie', type: 'agent', name: 'Frankie', client: 'instinct' },
+          { id: 'shipmate', type: 'agent', name: 'Shipmate', client: 'town-assistant' },
+          { id: 'tony', type: 'user', name: 'Tony', email: 'tony@example.com', isAnonymous: false },
+          ...['lee', 'sam', 'pat'].map(id => ({
+            id,
+            type: 'user' as const,
+            name: id,
+            email: id + '@example.com',
+            isAnonymous: false
+          }))
         ],
         invitations: []
       }
