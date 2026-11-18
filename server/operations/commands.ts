@@ -40,7 +40,7 @@ export function spawnWorkspaceCommand(root: string, command: string, args: strin
       stdout: 'pipe',
       stderr: 'pipe',
       detached: true,
-      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0', MOI_REMOTE_WORKSPACE: root }
+      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' }
     }
   )
 }

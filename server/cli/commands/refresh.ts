@@ -1,4 +1,3 @@
-import { currentRemoteWorkspace } from '../../remote/workspace'
 import { defineCommand } from 'citty'
 import { CONTROL_URL } from '../../constants'
 import { staleSkillNotice } from '../../skills/version'
@@ -9,8 +8,7 @@ import pc from '../pc'
 export const refresh = defineCommand({
   meta: {
     name: 'refresh',
-    description:
-      'Refresh widget and view data without rebuilding. Use after the agent mutates underlying data.'
+    description: 'Refresh widget and view data in your tabs for the current workspace.'
   },
   args: {
     only: appletOnlyArg
@@ -18,7 +16,6 @@ export const refresh = defineCommand({
   async run({ args }) {
     const only = readAppletSelector(args.only)
     const notice = await staleSkillNotice(process.cwd())
-    const linked = await currentRemoteWorkspace()
     const ws = new WebSocket(CONTROL_URL)
 
     ws.onopen = () =>
@@ -26,7 +23,7 @@ export const refresh = defineCommand({
         JSON.stringify({
           type: 'applets:refresh',
           only,
-          path: linked?.path ?? process.env.MOI_REMOTE_WORKSPACE
+          path: process.cwd()
         })
       )
 

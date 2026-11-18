@@ -51,7 +51,10 @@ test('refreshes stay workspace-scoped and configuration changes refresh the loca
   publishEvent({ type: 'applets:refresh', workspaceId: 'owner-board', only: 'views' })
   publishEvent({ type: 'workspace-config:changed', workspaceId: 'owner-board', origin: 'tab' })
   expect(sent).toEqual([
-    { topic: 'workspace-events:owner-board', event: { type: 'applets:refresh', only: 'views' } },
+    {
+      topic: 'events',
+      event: { type: 'applets:refresh', workspaceId: 'owner-board', only: 'views' }
+    },
     {
       topic: 'workspace-events:owner-board',
       event: { type: 'workspace-config:changed', origin: 'tab' }

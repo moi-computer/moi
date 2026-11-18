@@ -48,7 +48,7 @@ const WIDGET_KIND: AppletKindSpec = {
   segment: 'widgets',
   shouldReload: (e, name) =>
     (e.type === 'widget:changed' && e.name === name) ||
-    (e.type === 'applets:refresh' && e.only !== 'views')
+    (e.type === 'applets:refresh' && e.only !== 'views' && (!e.name || e.name === name))
 }
 
 const VIEW_KIND: AppletKindSpec = {
@@ -56,7 +56,7 @@ const VIEW_KIND: AppletKindSpec = {
   segment: 'views',
   shouldReload: (e, name) =>
     (e.type === 'view:changed' && e.name === name) ||
-    (e.type === 'applets:refresh' && e.only !== 'widgets')
+    (e.type === 'applets:refresh' && e.only !== 'widgets' && (!e.name || e.name === name))
 }
 
 function loadApplet(
@@ -199,9 +199,10 @@ export function useAppletCacheInvalidation(): void {
     if (event.type === 'view:changed') invalidateApplet('views', workspaceId, event.name)
     else if (event.type === 'widget:changed') invalidateApplet('widgets', workspaceId, event.name)
     else if (event.type === 'applets:refresh') {
-      // Segment-wide: `moi refresh` names no applet, so every cached module in
-      // the targeted kind(s) is stale — including ones whose tabs are
-      // backgrounded right now.
+      if (event.only && event.name) {
+        invalidateApplet(event.only, workspaceId, event.name)
+        return
+      }
       if (event.only !== 'views') invalidateAppletSegment('widgets', event.workspaceId)
       if (event.only !== 'widgets') invalidateAppletSegment('views', event.workspaceId)
     }

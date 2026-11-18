@@ -13,7 +13,6 @@ import type {
 export type SharedWorkspaceEvent =
   | { type: 'widget:changed'; name: string }
   | { type: 'widgets-list:changed'; widgets: WidgetInfo[] }
-  | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
   | { type: 'view:changed'; name: string }
   | { type: 'views-list:changed'; views: CompiledView[] }
   | { type: 'view:deleted'; name: string }
@@ -27,6 +26,7 @@ export type HarnessEvent =
 export type AppEvent =
   | WorkspaceOpenRequestMessage
   | ScratchpadOpMessage
+  | { type: 'applets:refresh'; workspaceId: string; only?: 'widgets' | 'views'; name?: string }
   | {
       type: 'personal-state:changed'
       workspaceId: string
@@ -49,7 +49,6 @@ export function isSharedWorkspaceEvent(event: { type?: unknown }): event is Shar
   switch (event.type) {
     case 'widget:changed':
     case 'widgets-list:changed':
-    case 'applets:refresh':
     case 'view:changed':
     case 'views-list:changed':
     case 'view:deleted':

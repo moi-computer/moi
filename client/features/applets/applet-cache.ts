@@ -80,8 +80,7 @@ export function invalidateApplet(segment: AppletSegment, workspaceId: string, na
   disposeAppletBridge(key)
 }
 
-// Invalidate every applet of one kind in this workspace — the
-// `applets:refresh` path, which names no specific applet. Only keys that have
+// Invalidate every applet of one kind in this workspace. Only keys that have
 // ever been loaded (or bumped) exist in the maps; anything else already loads
 // fresh on first mount.
 export function invalidateAppletSegment(segment: AppletSegment, workspaceId?: string): void {

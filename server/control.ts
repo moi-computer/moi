@@ -374,37 +374,24 @@ export const control = Bun.serve({
           return
         }
 
-        // Tell every connected applet to re-import its module (cache-bust) and
-        // re-run its data fetches. No rebuild, no page reload — `useApplet`
-        // handles `applets:refresh` like `*:updated` (invalidate + reload).
-        // `only` narrows to one kind or applet; default is both kinds.
-        // `widget:refresh` is the pre-filter message name older CLIs send.
-        if (data.type === 'applets:refresh' || data.type === 'widget:refresh') {
-          const match = data.path ? await resolveWorkspace(ws, data.path) : undefined
-          if (data.path && !match) return
+        if (data.type === 'applets:refresh') {
+          if (typeof data.path !== 'string' || !data.path) {
+            ws.send(JSON.stringify({ error: 'Refresh requires a workspace path' }))
+            return
+          }
+          const workspace = await resolveWorkspace(ws, data.path)
+          if (!workspace) return
           const only = typeof data.only === 'string' ? parseAppletSelector(data.only) : undefined
-          if (data.only && !only) {
+          if (data.only !== undefined && !only) {
             ws.send(JSON.stringify({ error: `Invalid applet selector "${data.only}"` }))
             return
           }
-          const workspaces = match
-            ? [match]
-            : (await listWorkspaces()).filter(workspace => !workspace.remote)
-          for (const workspace of workspaces) {
-            if (only?.id) {
-              publishEvent({
-                type: only.segment === 'widgets' ? 'widget:changed' : 'view:changed',
-                workspaceId: workspace.id,
-                name: only.id
-              })
-            } else {
-              publishEvent({
-                type: 'applets:refresh',
-                workspaceId: workspace.id,
-                only: only?.segment
-              })
-            }
-          }
+          publishEvent({
+            type: 'applets:refresh',
+            workspaceId: workspace.id,
+            only: only?.segment,
+            name: only?.id
+          })
           ws.send(JSON.stringify({ ok: true }))
           return
         }

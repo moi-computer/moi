@@ -146,16 +146,28 @@ test('real socket routes isolate shared workspaces, personal state, harness even
     for (const connection of connections) connection.messages.length = 0
     const control = await connect(`ws://127.0.0.1:${controlPort}`)
     sockets.push(control.socket)
-    control.socket.send(JSON.stringify({ type: 'applets:refresh', only: 'views' }))
-    await until(
-      () =>
-        control.messages.some(message => message.ok === true) &&
-        one!.messages.length > 0 &&
-        two!.messages.length > 0
-    )
-    expect(one!.messages).toEqual([{ type: 'applets:refresh', only: 'views' }])
-    expect(two!.messages).toEqual([{ type: 'applets:refresh', only: 'views' }])
-    expect(machine!.messages).toEqual([])
+    for (const [index, [path, only]] of [
+      [join(root, 'one', '.moi'), 'views'],
+      [join(root, 'visitor'), 'widgets/counter'],
+      [root, undefined],
+      [undefined, undefined]
+    ].entries()) {
+      control.socket.send(JSON.stringify({ type: 'applets:refresh', path, only }))
+      await until(() => control.messages.length > index)
+    }
+    expect(control.messages).toEqual([
+      { ok: true },
+      { ok: true },
+      { error: expect.stringContaining('not inside a registered Moi workspace') },
+      { error: expect.stringContaining('workspace path') }
+    ])
+    await until(() => machine!.messages.length >= 2)
+    expect(machine!.messages).toEqual([
+      { type: 'applets:refresh', workspaceId: 'one', only: 'views' },
+      { type: 'applets:refresh', workspaceId: 'visitor', only: 'widgets', name: 'counter' }
+    ])
+    expect(one!.messages).toEqual([])
+    expect(two!.messages).toEqual([])
     expect(harness!.messages).toEqual([])
 
     for (const connection of connections) connection.messages.length = 0
