@@ -695,19 +695,8 @@ The full OpenClaw application is not installed during Moi development or with Mo
 releases. To run the optional metadata-stripper parity test, set
 `OPENCLAW_TEST_DIST` to a separate gateway installation’s `dist` directory.
 
-The isolated package test uses a real gateway and a local model HTTP fixture,
-including a streamed chat and resuming the chat after a gateway restart. From
-the repo root (no credentials or host state are mounted):
-
-```sh
-bun pm pack --filename /tmp/moi-package.tgz
-docker build -t moi-package-test - < scripts/package-test.dockerfile
-docker run --rm -v /tmp/moi-package.tgz:/test/moi.tgz:ro -v "$PWD/scripts:/test/scripts:ro" moi-package-test
-```
-
-Use `--build-arg OPENCLAW_VERSION=<version>` or `--build-arg BUN_VERSION=<version>`
-to check another gateway or Bun release. The standalone client needs Bun 1.4+;
-Bun 1.3 fails its Node WebSocket upgrade path.
+The standalone client needs Bun 1.4+; Bun 1.3 fails its Node WebSocket
+upgrade path.
 
 ## 11. What our code does
 
