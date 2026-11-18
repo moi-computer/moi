@@ -58,7 +58,8 @@ The build writes third-party licenses and notices to
 ## Verification
 
 Run `bun scripts/test-package.ts /absolute/path/to/moi-computer.tgz` after packing.
-CI and release verification run this against the exact artifact they retain.
+Release verification runs this against the exact artifact it will publish, for
+both preview and stable releases. Regular CI only packs and inspects the tarball.
 It installs only production dependencies outside the checkout, disables Bun's
 automatic dependency installation for commands, and checks the CLI, mock Cloud
 invitation flow, skills, typechecking, server startup, applet compilation,

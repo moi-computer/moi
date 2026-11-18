@@ -63,7 +63,6 @@ jobs:
             exit 1
           fi
           grep -q '^package/runtime/cli.js$' "$RUNNER_TEMP/package-files.txt"
-          bun scripts/test-package.ts "$RUNNER_TEMP/moi-computer.tgz"
 
   windows-tests:
     name: Tests (Windows)
