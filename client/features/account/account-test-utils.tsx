@@ -159,11 +159,14 @@ export async function mountAccount({
           }
           return new Response(null, { status: 204 })
         }
-        if (path.endsWith('/agent-invitations/link') && init?.method === 'POST')
-          return new Response('https://example.com/invite/test', {
-            status: 201,
-            headers: { 'Content-Type': 'text/plain' }
-          })
+        if (path.endsWith('/agent-invitations') && init?.method === 'POST')
+          return Response.json(
+            {
+              invitationUrl: 'https://example.com/invite/test',
+              expiresAt: '2030-01-01T00:15:00.000Z'
+            },
+            { status: 201 }
+          )
         if (path.endsWith('/invitations')) {
           membership = {
             ...membership,

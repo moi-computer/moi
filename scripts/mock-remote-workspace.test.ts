@@ -266,18 +266,21 @@ async function setup() {
 
 test('members can copy a fresh agent invite prompt for the mock workspace', async () => {
   const { origin, request } = await setup()
-  const path = '/cloud/api/workspaces/alice:owner-board/agent-invitations/link'
+  const path = '/cloud/api/workspaces/alice:owner-board/agent-invitations'
   const post = { method: 'POST' }
   expect((await fetch(origin + path, post)).status).toBe(401)
   expect((await request(path, post)).status).toBe(404)
   await request('/cloud/api/invitations/mock-owner-invite/accept', post)
+  const started = Date.now()
   const response = await request(path, post)
   expect(response.status).toBe(201)
-  expect(response.headers.get('content-type')).toContain('text/plain')
-  const link = await response.text()
+  expect(response.headers.get('content-type')).toContain('application/json')
+  const { invitationUrl: link, expiresAt } = await response.json()
+  expect(Date.parse(expiresAt)).toBeGreaterThanOrEqual(started + 15 * 60_000)
+  expect(Date.parse(expiresAt)).toBeLessThanOrEqual(Date.now() + 15 * 60_000)
   expect(link.startsWith(origin + '/mock/agent-invites/')).toBe(true)
   expect((await fetch(link)).status).toBe(200)
-  expect(await (await request(path, post)).text()).not.toBe(link)
+  expect((await (await request(path, post)).json()).invitationUrl).not.toBe(link)
 })
 
 test('proxy supports invitation → accept → discovery and leaves registration on the visitor', async () => {

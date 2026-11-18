@@ -199,7 +199,7 @@ describe('workspace sharing', () => {
       }
     })
     try {
-      const path = '/cloud/api/workspaces/alice:board/agent-invitations/link'
+      const path = '/cloud/api/workspaces/alice:board/agent-invitations'
       expect(ui.calls.some(call => call.path === path)).toBe(false)
       ui.failures.mutation = true
       await ui.click('Copy prompt')

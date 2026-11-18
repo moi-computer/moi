@@ -18,10 +18,15 @@ export const revokeWorkspaceInvitation = (id: string, invitationId: string) =>
 
 export async function createAgentInviteLink(workspaceId: string, workspaceName?: string) {
   const response = await cloudRequest(
-    `${getWorkspaceApiBase(workspaceId)}/agent-invitations/link`,
+    `${getWorkspaceApiBase(workspaceId)}/agent-invitations`,
     jsonRequest('POST', { workspaceName })
   )
-  if (response.status !== 201 || !response.headers.get('content-type')?.startsWith('text/plain'))
+  const invite: { invitationUrl?: unknown } | null = await response.json()
+  if (
+    response.status !== 201 ||
+    typeof invite?.invitationUrl !== 'string' ||
+    !invite.invitationUrl.trim()
+  )
     throw new Error('The workspace did not return an invitation')
-  return response.text()
+  return invite.invitationUrl
 }

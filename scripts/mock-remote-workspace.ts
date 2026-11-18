@@ -232,7 +232,7 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
     ].includes(path)
     try {
       if (
-        path === '/cloud/api/workspaces/alice:owner-board/agent-invitations/link' &&
+        path === '/cloud/api/workspaces/alice:owner-board/agent-invitations' &&
         req.method === 'POST'
       ) {
         const access = await ownerAccess(req)
@@ -243,12 +243,18 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
         }
         const invitePath = `/mock/agent-invites/${crypto.randomUUID()}`
         agentInvitePaths.add(invitePath)
-        setTimeout(() => agentInvitePaths.delete(invitePath), 15 * 60_000).unref()
+        const ttl = 15 * 60_000
+        setTimeout(() => agentInvitePaths.delete(invitePath), ttl).unref()
         res.writeHead(201, {
-          'content-type': 'text/plain; charset=utf-8',
+          'content-type': 'application/json',
           'cache-control': 'no-store'
         })
-        res.end(`http://${req.headers.host}${invitePath}`)
+        res.end(
+          JSON.stringify({
+            invitationUrl: `http://${req.headers.host}${invitePath}`,
+            expiresAt: new Date(Date.now() + ttl).toISOString()
+          })
+        )
         return
       }
       if (path.startsWith('/mock/agent-invites/') && req.method === 'GET') {
