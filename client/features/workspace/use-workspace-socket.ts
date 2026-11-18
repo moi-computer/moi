@@ -2,23 +2,19 @@ import { useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { wsUrl } from '@/client/lib/ws-url'
 import { useAppContext } from '@/client/runtime/app-context'
-import { WorkspaceSocket } from '@/client/runtime/workspace-socket'
+import type { ReconnectingSocket } from '@/client/runtime/reconnecting-socket'
 import { isSharedWorkspaceEvent } from '@/lib/events'
 
-import { getWorkspaceAddress, getWorkspaceApiBase } from './remote'
+import { createWorkspaceSocket, getWorkspaceAddress } from './remote'
 
 // The owner's live connection for the shown workspace. Shared updates join the
 // app's event stream under this browser's workspace ID, so listeners treat
 // local and remote workspaces alike.
-export function useWorkspaceSocket(workspaceId: string): WorkspaceSocket {
+export function useWorkspaceSocket(workspaceId: string): ReconnectingSocket {
   const events = useAppContext()?.events
   const queryClient = useQueryClient()
-  const socket = useMemo(
-    () => new WorkspaceSocket(() => wsUrl(`${getWorkspaceApiBase(workspaceId)}/events`)),
-    [workspaceId]
-  )
+  const socket = useMemo(() => createWorkspaceSocket(workspaceId), [workspaceId])
   useEffect(() => {
     if (!events) return
     // Mark the owner's snapshot stale before the visitor's layout refetch reads it.

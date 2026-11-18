@@ -1,13 +1,21 @@
-export type WorkspaceSocketListener = {
+export type SocketListener = {
   open?: () => void
   message?: (message: { type?: unknown }) => void
   close?: () => void
 }
 
-// One connection to a workspace's owner, carrying shared updates and presence.
+export type ReconnectingSocketOptions = {
+  // Ping the server and drop a connection that has gone silent.
+  ping?: boolean
+  // Delay before reopening after a drop. It doubles on repeated drops, up to
+  // ten seconds, and resets once a socket opens.
+  baseDelayMs?: number
+}
+
+// The one WebSocket wrapper for the app, harness and workspace connections.
 // It stays open while anything holds it and reopens on its own after a drop.
-export class WorkspaceSocket {
-  private readonly listeners = new Set<WorkspaceSocketListener>()
+export class ReconnectingSocket {
+  private readonly listeners = new Set<SocketListener>()
   private socket: WebSocket | undefined
   private holders = 0
   private attempts = 0
@@ -15,14 +23,17 @@ export class WorkspaceSocket {
   private retry: ReturnType<typeof setTimeout> | undefined
   private heartbeat: ReturnType<typeof setInterval> | undefined
 
-  // The address is read on every connect: a remote workspace resolves to its owner.
-  constructor(private readonly url: () => string) {}
+  // The address is read on every connect.
+  constructor(
+    private readonly url: () => string,
+    private readonly options: ReconnectingSocketOptions = {}
+  ) {}
 
   get isOpen(): boolean {
     return this.socket?.readyState === WebSocket.OPEN
   }
 
-  subscribe(listener: WorkspaceSocketListener): () => void {
+  subscribe(listener: SocketListener): () => void {
     this.listeners.add(listener)
     return () => {
       this.listeners.delete(listener)
@@ -62,10 +73,11 @@ export class WorkspaceSocket {
       if (socket !== this.socket) return
       this.attempts = 0
       this.lastMessageAt = Date.now()
-      this.heartbeat = setInterval(() => {
-        if (Date.now() - this.lastMessageAt > 45_000) socket.close()
-        else this.send({ type: 'ping' })
-      }, 15_000)
+      if (this.options.ping)
+        this.heartbeat = setInterval(() => {
+          if (Date.now() - this.lastMessageAt > 45_000) socket.close()
+          else this.send({ type: 'ping' })
+        }, 15_000)
       for (const listener of this.listeners) listener.open?.()
     }
     socket.onmessage = event => {
@@ -85,7 +97,7 @@ export class WorkspaceSocket {
       clearInterval(this.heartbeat)
       this.socket = undefined
       for (const listener of this.listeners) listener.close?.()
-      const delay = Math.min(500 * 2 ** this.attempts++, 10_000)
+      const delay = Math.min((this.options.baseDelayMs ?? 500) * 2 ** this.attempts++, 10_000)
       this.retry = setTimeout(() => this.open(), delay)
     }
   }

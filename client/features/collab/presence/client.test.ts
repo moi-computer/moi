@@ -6,7 +6,7 @@ import { COLLAB_MAX_CONNECTIONS, isCollabClientMessage } from '@/lib/collab/prot
 import type { CollabClientMessage } from '@/lib/collab/types'
 import { CollabService } from '@/server/collab/service'
 
-import { WorkspaceSocket } from '@/client/runtime/workspace-socket'
+import { ReconnectingSocket } from '@/client/runtime/reconnecting-socket'
 import { CollabClient, NO_ENGINE } from './client'
 import { getCurrentUser } from '../host-state'
 import { setIdentity } from '../../identity/store'
@@ -437,7 +437,9 @@ test('remote presence connects to the owner with the same membership rules', () 
 })
 
 test('presence joins a shared workspace socket and leaving keeps it for shared updates', async () => {
-  const socket = new WorkspaceSocket(() => 'ws://localhost/api/workspaces/workspace/events')
+  const socket = new ReconnectingSocket(() => 'ws://localhost/api/workspaces/workspace/events', {
+    ping: true
+  })
   const updates: unknown[] = []
   socket.subscribe({ message: message => updates.push(message) })
   const release = socket.start()

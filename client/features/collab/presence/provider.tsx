@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useRouter } from 'wouter'
 import { usePathname } from 'wouter/use-browser-location'
 
-import type { WorkspaceSocket } from '@/client/runtime/workspace-socket'
+import type { ReconnectingSocket } from '@/client/runtime/reconnecting-socket'
 import { tabFromPath } from '@/lib/workspace-tabs'
 
 import { CollabClient, NO_ENGINE } from './client'
@@ -23,7 +23,7 @@ export type CollabProviderProps = {
   workspaceId: string
   enabled: boolean
   // The workspace's live connection; presence opens its own when none is shared.
-  socket?: WorkspaceSocket
+  socket?: ReconnectingSocket
   children: ReactNode
 }
 export function CollabProvider({ workspaceId, enabled, socket, children }: CollabProviderProps) {

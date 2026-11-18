@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 
 import { wsUrl } from '@/client/lib/ws-url'
+import { ReconnectingSocket } from '@/client/runtime/reconnecting-socket'
 import { liveStore } from '@/client/features/chat/chat-store'
 import { reduceChatFrame } from '@/client/features/chat/connection/chat-frames'
 import type { ClientMessage } from '@/lib/types'
@@ -10,52 +11,16 @@ import type { ClientMessage } from '@/lib/types'
 // `workspaceId`, so a single socket serves every workspace and the client routes
 // each frame to the right `(workspaceId, sessionId)` slice — live transcript
 // deltas into the React Query cache, status/error/rename into the live store.
-//
-// Socket identity is tracked by a monotonic `generation`: each socket captures
-// the generation at creation and every callback bails if it's no longer current,
-// so a delayed close/open from a superseded socket can't corrupt live state.
 
 let qc: QueryClient | null = null
-let socket: WebSocket | null = null
-let generation = 0
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let started = false
+// Messages sent while disconnected, delivered on the next open.
 const queue: ClientMessage[] = []
-let sweepTimer: ReturnType<typeof setInterval> | null = null
 
-// TTL backstop for live previews. Every clear path (turn arrival, run end,
-// reconnect) is exact and should fire first; this only reaps a preview whose
-// clear was somehow missed, so it can be generous.
-const PREVIEW_TTL_MS = 15_000
-
-export function initConnection(queryClient: QueryClient) {
-  qc = queryClient
-  if (!sweepTimer) {
-    sweepTimer = setInterval(
-      () => liveStore.getState().sweepPreviews(PREVIEW_TTL_MS, Date.now()),
-      5_000
-    )
-  }
-  if (socket) return // already connected (mount/StrictMode re-invoke safety)
-  connect()
-}
-
-function connect() {
-  const myGen = ++generation
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer)
-    reconnectTimer = null
-  }
-
-  const s = new WebSocket(wsUrl('/api/harness/events'))
-  socket = s
-
-  s.onopen = () => {
-    if (generation !== myGen) {
-      s.close()
-      return
-    }
-    for (const m of queue) s.send(JSON.stringify(m))
-    queue.length = 0
+const socket = new ReconnectingSocket(() => wsUrl('/api/harness/events'))
+socket.subscribe({
+  open: () => {
+    for (const message of queue.splice(0)) socket.send(message)
     // Heal any deltas missed while disconnected: refetch every live transcript.
     // No-op on the first connect (nothing cached yet).
     qc?.invalidateQueries({ queryKey: ['workspaces', 'events'] })
@@ -65,26 +30,21 @@ function connect() {
     // (which returns the authoritative disk state) — drop them all so a frozen
     // half-streamed preview can't linger over the healed transcript.
     liveStore.getState().clearAllPreviews()
-  }
+  },
+  message: message => handleFrame(message as Record<string, unknown>)
+})
 
-  s.onmessage = e => {
-    if (generation !== myGen) return
-    let data: unknown
-    try {
-      data = JSON.parse(e.data)
-    } catch {
-      return
-    }
-    handleFrame(data as Record<string, unknown>)
-  }
+// TTL backstop for live previews. Every clear path (turn arrival, run end,
+// reconnect) is exact and should fire first; this only reaps a preview whose
+// clear was somehow missed, so it can be generous.
+const PREVIEW_TTL_MS = 15_000
 
-  s.onclose = () => {
-    if (generation !== myGen) return
-    socket = null
-    reconnectTimer = setTimeout(connect, 1000)
-  }
-
-  s.onerror = () => s.close()
+export function initConnection(queryClient: QueryClient) {
+  qc = queryClient
+  if (started) return // mount/StrictMode re-invoke safety
+  started = true
+  setInterval(() => liveStore.getState().sweepPreviews(PREVIEW_TTL_MS, Date.now()), 5_000)
+  socket.start()
 }
 
 export function handleFrame(data: Record<string, unknown>) {
@@ -92,12 +52,12 @@ export function handleFrame(data: Record<string, unknown>) {
 }
 
 export function sendMessage(msg: ClientMessage) {
-  if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg))
+  if (socket.isOpen) socket.send(msg)
   else queue.push(msg)
 }
 
 // Test seam: inject the QueryClient the frame handler reads, without opening a
-// socket (the browser-only `connect()` path). Production always goes through
+// socket. Production always goes through
 // `initConnection`.
 export function __setQueryClientForTests(client: QueryClient | null) {
   qc = client

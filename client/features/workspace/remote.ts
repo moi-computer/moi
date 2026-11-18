@@ -1,5 +1,7 @@
 import { queryClient as appQueryClient } from '@/client/api/query-client'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { wsUrl } from '@/client/lib/ws-url'
+import { ReconnectingSocket } from '@/client/runtime/reconnecting-socket'
 import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspaceLayoutResponse } from '@/lib/types'
 
@@ -22,4 +24,11 @@ export function getWorkspaceApiBase(localId: string, client: QueryClient = appQu
 export function getWorkspaceAddress(localId: string, client: QueryClient = appQueryClient) {
   const apiBase = workspaceInfo(localId, client)?.apiBase
   return apiBase ? decodeURIComponent(apiBase.slice('/api/workspaces/'.length)) : localId
+}
+
+// The address is read on every connect: a remote workspace resolves to its owner.
+export function createWorkspaceSocket(workspaceId: string): ReconnectingSocket {
+  return new ReconnectingSocket(() => wsUrl(`${getWorkspaceApiBase(workspaceId)}/events`), {
+    ping: true
+  })
 }

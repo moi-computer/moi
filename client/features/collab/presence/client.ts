@@ -1,8 +1,6 @@
 import { isSharedWorkspaceEvent } from '@/lib/events'
-import { WorkspaceSocket } from '@/client/runtime/workspace-socket'
-import { getWorkspaceApiBase } from '@/client/features/workspace/remote'
+import { createWorkspaceSocket } from '@/client/features/workspace/remote'
 import { getWorkspaceDirectory, subscribeWorkspaceDirectory } from '../members/store'
-import { wsUrl } from '@/client/lib/ws-url'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type {
   CollabClientMessage,
@@ -79,9 +77,7 @@ export class CollabClient implements CollabEngineApi {
   constructor(
     readonly workspaceId: string,
     readonly enabled = true,
-    private readonly socket = new WorkspaceSocket(() =>
-      wsUrl(`${getWorkspaceApiBase(workspaceId)}/events`)
-    )
+    private readonly socket = createWorkspaceSocket(workspaceId)
   ) {
     this.store.setSender(message => this.send(message))
   }
