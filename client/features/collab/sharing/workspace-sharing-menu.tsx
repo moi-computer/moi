@@ -173,7 +173,7 @@ function PresenceStack({ users, label, hovered, children }: PresenceStackProps) 
   const overflow = Math.max(0, users.length - 4)
   const slotClass = cn(
     'relative grid size-5 shrink-0 items-center justify-items-start rounded-full not-last:me-(--presence-gap)',
-    'not-last:mask-[radial-gradient(circle_at_calc(100%_+_var(--presence-gap)_+_var(--avatar-radius))_50%,transparent_calc(var(--avatar-radius)_+_1.5px),black_calc(var(--avatar-radius)_+_2px))]',
+    'not-last:mask-[radial-gradient(circle_at_calc(100%_+_var(--presence-gap)_+_var(--avatar-radius))_50%,transparent_calc(var(--avatar-radius)_+_2px),black_calc(var(--avatar-radius)_+_2.5px))]',
     'transition-[width,opacity] duration-100 ease-in-out inert:invisible inert:me-0 inert:w-0 inert:overflow-hidden inert:opacity-0 motion-reduce:transition-none'
   )
   return (
@@ -196,7 +196,7 @@ function PresenceStack({ users, label, hovered, children }: PresenceStackProps) 
       )}
       {users.toReversed().map((user, index) => (
         <div key={user.profile.id} inert={!expanded && index < overflow} className={slotClass}>
-          <TooltipProvider delay={200}>{children(user)}</TooltipProvider>
+          <TooltipProvider delay={300}>{children(user)}</TooltipProvider>
         </div>
       ))}
     </div>
