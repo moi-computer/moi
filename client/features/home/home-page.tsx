@@ -116,22 +116,21 @@ export function HomePage() {
           </div>
         </section>
       ) : (
-        <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
-          <IconEggCracked size={56} stroke={0.75} className="text-muted-foreground" />
-          <div className="flex flex-col gap-1.5">
-            <h2 className="font-medium">Create your first workspace</h2>
-            <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-              Workspace is a place for all views and widgets that share the same context. Create a
-              new one or import an existing folder you&rsquo;ve worked in before.
-            </p>
+        (appConfig.environment !== 'cloud' || sharedQuery.isSuccess) && (
+          <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
+            <IconEggCracked size={56} stroke={0.75} className="text-muted-foreground" />
+            <div className="flex flex-col gap-1.5">
+              <h2 className="font-medium">Create your first workspace</h2>
+              <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+                Workspace is a place for all views and widgets that share the same context. Create a
+                new one or import an existing folder you&rsquo;ve worked in before.
+              </p>
+            </div>
+            <CreateWorkspaceDialog trigger={<Button>New workspace</Button>} />
           </div>
-          <CreateWorkspaceDialog trigger={<Button>New workspace</Button>} />
-        </div>
+        )
       )}
 
-      {appConfig.environment === 'cloud' && sharedQuery.isPending && (
-        <p className="mb-12 text-sm text-muted-foreground">Loading shared workspaces…</p>
-      )}
       {appConfig.environment === 'cloud' && sharedQuery.isError && (
         <div className="mb-12" role="alert">
           <p className="text-sm text-muted-foreground">{sharedQuery.error.message}</p>
@@ -143,7 +142,7 @@ export function HomePage() {
 
       <WorkspaceInvitations />
 
-      {(discoveredQuery.isError || discovered.length > 0) && (
+      {discovered.length > 0 && (
         <section>
           <Collapsible
             open={discoveredWorkspacesOpen}
@@ -168,21 +167,11 @@ export function HomePage() {
               />
             </CollapsibleTrigger>
             <CollapsibleContent>
-              {discoveredQuery.isError && (
-                <div role="alert">
-                  <p className="text-sm text-muted-foreground">Couldn’t load folders</p>
-                  <Button variant="ghost" onClick={() => void discoveredQuery.refetch()}>
-                    Retry
-                  </Button>
-                </div>
-              )}
-              {discovered.length > 0 && (
-                <ul className="border-t border-border">
-                  {discovered.map(item => (
-                    <SuggestedRow key={item.path} suggestion={item} onAdd={handleAdd} />
-                  ))}
-                </ul>
-              )}
+              <ul className="border-t border-border">
+                {discovered.map(item => (
+                  <SuggestedRow key={item.path} suggestion={item} onAdd={handleAdd} />
+                ))}
+              </ul>
             </CollapsibleContent>
           </Collapsible>
         </section>

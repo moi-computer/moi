@@ -493,9 +493,10 @@ for (const state of ['loading', 'error'] as const) {
           route.fulfill({ status: 503, json: { error: 'Cloud unavailable' } })
         )
       await page.goto('/#/')
-      if (state === 'loading')
-        await expect(page.getByText('Loading shared workspaces…')).toBeVisible()
-      else await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+      if (state === 'loading') {
+        await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
+        await expect(page.getByText('Loading shared workspaces…')).toHaveCount(0)
+      } else await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
     },
     {
       api: {
