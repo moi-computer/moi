@@ -44,6 +44,13 @@ describe('Workspace', () => {
     expect(cloudRequests).toEqual([])
   })
 
+  test('home shows workspace cards while import folders load', async page => {
+    await page.route('**/api/workspaces/discover', () => new Promise(() => {}))
+    await page.goto('/#/')
+    await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
+    await expect(page.getByText('Looking for folders…')).toBeVisible()
+  })
+
   test(
     'onboarding',
     async page => {

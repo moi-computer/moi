@@ -63,15 +63,15 @@ export function HomePage() {
     )
   )
 
-  if (workspacesQuery.isPending || discoveredQuery.isPending) {
+  if (workspacesQuery.isPending) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex min-h-full items-center justify-center">
         <IconLoader2 size={20} stroke={1.5} className="animate-spin text-muted-foreground" />
       </div>
     )
   }
 
-  if (workspacesQuery.isError || discoveredQuery.isError) {
+  if (workspacesQuery.isError) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <p className="text-sm text-muted-foreground">Could not load spaces.</p>
@@ -79,7 +79,7 @@ export function HomePage() {
     )
   }
 
-  const discovered = discoveredQuery.data
+  const discovered = discoveredQuery.data ?? []
   const count = workspaces.length
 
   function handleAdd(suggestion: DiscoveredWorkspace) {
@@ -143,7 +143,7 @@ export function HomePage() {
 
       <WorkspaceInvitations />
 
-      {discovered.length > 0 && (
+      {(discoveredQuery.isPending || discoveredQuery.isError || discovered.length > 0) && (
         <section>
           <Collapsible
             open={discoveredWorkspacesOpen}
@@ -168,11 +168,26 @@ export function HomePage() {
               />
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <ul className="border-t border-border">
-                {discovered.map(item => (
-                  <SuggestedRow key={item.path} suggestion={item} onAdd={handleAdd} />
-                ))}
-              </ul>
+              {discoveredQuery.isPending && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Looking for folders…
+                </p>
+              )}
+              {discoveredQuery.isError && (
+                <div role="alert">
+                  <p className="text-sm text-muted-foreground">Couldn’t load folders</p>
+                  <Button variant="ghost" onClick={() => void discoveredQuery.refetch()}>
+                    Retry
+                  </Button>
+                </div>
+              )}
+              {discovered.length > 0 && (
+                <ul className="border-t border-border">
+                  {discovered.map(item => (
+                    <SuggestedRow key={item.path} suggestion={item} onAdd={handleAdd} />
+                  ))}
+                </ul>
+              )}
             </CollapsibleContent>
           </Collapsible>
         </section>
