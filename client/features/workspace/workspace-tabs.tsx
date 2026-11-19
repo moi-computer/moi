@@ -52,7 +52,8 @@ const workspaceTabVariants = cva(
         true: 'invisible'
       },
       preview: {
-        true: 'cursor-grabbing ring-1 ring-border'
+        // Matches the dragged workspace in the sidebar: opaque and lifted.
+        true: 'pointer-events-none bg-background shadow-lg'
       }
     },
     compoundVariants: [{ preview: true }]
@@ -119,7 +120,6 @@ function WorkspaceTab(props: WorkspaceTabProps) {
       type="button"
       aria-hidden={preview || undefined}
       aria-label={tab.needsAttention && !tab.loading ? `${tab.label}: needs attention` : tab.label}
-      disabled={preview}
       tabIndex={preview ? -1 : undefined}
       onClick={props.preview ? undefined : () => props.onSelect(tab.key)}
       className={workspaceTabVariants({
@@ -230,9 +230,9 @@ export function WorkspaceTabs({
               onReorder([...fixedTabs.map(tab => tab.key), ...(ordered as WorkspaceTabId[])])
             }
             renderPlaceholder={() => (
-              <div className="pointer-events-none absolute inset-0 rounded-md bg-muted" />
+              <div className="pointer-events-none absolute inset-0 rounded-md bg-accent" />
             )}
-            renderOverlay={tab => <WorkspaceTab tab={tab} active={active === tab.key} preview />}
+            renderOverlay={tab => <WorkspaceTab tab={tab} active={false} preview />}
             renderItem={(tab, state) => (
               <WorkspaceTab
                 tab={tab}
