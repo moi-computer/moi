@@ -143,7 +143,7 @@ export function HomePage() {
 
       <WorkspaceInvitations />
 
-      {(discoveredQuery.isPending || discoveredQuery.isError || discovered.length > 0) && (
+      {(discoveredQuery.isError || discovered.length > 0) && (
         <section>
           <Collapsible
             open={discoveredWorkspacesOpen}
@@ -168,11 +168,6 @@ export function HomePage() {
               />
             </CollapsibleTrigger>
             <CollapsibleContent>
-              {discoveredQuery.isPending && (
-                <p role="status" className="text-sm text-muted-foreground">
-                  Looking for folders…
-                </p>
-              )}
               {discoveredQuery.isError && (
                 <div role="alert">
                   <p className="text-sm text-muted-foreground">Couldn’t load folders</p>

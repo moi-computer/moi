@@ -44,12 +44,18 @@ describe('Workspace', () => {
     expect(cloudRequests).toEqual([])
   })
 
-  test('home shows workspace cards while import folders load', async page => {
-    await page.route('**/api/workspaces/discover', () => new Promise(() => {}))
-    await page.goto('/#/')
-    await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
-    await expect(page.getByText('Looking for folders…')).toBeVisible()
-  })
+  test(
+    'home hides pending invitations and import folders while showing workspace cards',
+    async page => {
+      await page.route('**/api/workspaces/discover', () => new Promise(() => {}))
+      await page.route('**/cloud/api/workspaces/invitations', () => new Promise(() => {}))
+      await page.goto('/#/')
+      await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Invitations' })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Import other workspaces' })).toHaveCount(0)
+    },
+    { api: { '/api/config': { environment: 'cloud', demo: false } } }
+  )
 
   test(
     'onboarding',
