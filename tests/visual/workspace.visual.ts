@@ -2,7 +2,7 @@ import { expect, takeSnapshot } from '@uiverify/bun'
 
 import type { Identity } from '@/client/features/identity/types'
 import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
-import type { ClientAppConfig } from '@/lib/types'
+import type { ClientAppConfig, WorkspaceLayoutResponse } from '@/lib/types'
 
 import { API, suite, WORKSPACE } from './fixtures'
 
@@ -71,6 +71,24 @@ describe('Workspace', () => {
     await page.getByRole('button', { name: 'Theme' }).click()
     await expect(page.getByRole('button', { name: 'Close panel' })).toBeVisible()
   })
+
+  test(
+    'workspace menu keeps the themed icon tile on hover',
+    async page => {
+      await page.goto(WORKSPACE_PAGE)
+      const trigger = page.getByRole('button', { name: WORKSPACE + ' menu', exact: true })
+      await trigger.hover()
+      await expect(trigger.locator('svg.tabler-icon-dots')).toBeVisible()
+    },
+    {
+      api: {
+        [`/api/workspaces/${WORKSPACE}`]: {
+          ...(API[`/api/workspaces/${WORKSPACE}`] as WorkspaceLayoutResponse),
+          icon: { type: 'glyph', value: 'book', background: 'theme' }
+        }
+      }
+    }
+  )
 
   test(
     'demo home',

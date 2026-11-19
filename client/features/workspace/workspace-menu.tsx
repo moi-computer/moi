@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { IconDots, IconLetterCase, IconSettings } from '@tabler/icons-react'
+import { IconLetterCase, IconSettings } from '@tabler/icons-react'
 
 import { WorkspaceIcon } from '@/client/components/shared/workspace-icon'
 import {
@@ -33,16 +33,12 @@ export function WorkspaceMenu({ onOpenTheme }: WorkspaceMenuProps) {
           onPointerEnter={() => setIconHovered(true)}
           onPointerLeave={() => setIconHovered(false)}
         >
-          {iconHovered ? (
-            <IconDots size={20} stroke={1.5} className="shrink-0" aria-hidden="true" />
-          ) : (
-            <WorkspaceIcon
-              icon={layout.icon}
-              harness={harness}
-              workspaceTheme={layout.theme}
-              className="size-5 rounded-sm"
-            />
-          )}
+          <WorkspaceIcon
+            icon={iconHovered ? { ...layout.icon, type: 'glyph', value: 'dots' } : layout.icon}
+            harness={harness}
+            workspaceTheme={layout.theme}
+            className="size-5 rounded-sm"
+          />
           {name && <span className="truncate text-sm font-medium text-foreground">{name}</span>}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" sideOffset={6} className="w-36">
