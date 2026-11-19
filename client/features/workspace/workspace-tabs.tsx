@@ -55,8 +55,7 @@ const workspaceTabVariants = cva(
         // Matches the dragged workspace in the sidebar: opaque and lifted.
         true: 'pointer-events-none bg-background shadow-lg'
       }
-    },
-    compoundVariants: [{ preview: true }]
+    }
   }
 )
 
@@ -105,7 +104,8 @@ type WorkspaceTabProps = WorkspaceTabBaseProps &
       }
     | {
         preview?: false
-        state: ReorderableRenderState
+        // Absent for a tab that takes no part in reordering (Overview).
+        state?: ReorderableRenderState
         onSelect: (tab: WorkspaceTabId) => void
         onClose: (tab: WorkspaceTabId) => void
       }
@@ -124,10 +124,10 @@ function WorkspaceTab(props: WorkspaceTabProps) {
       onClick={props.preview ? undefined : () => props.onSelect(tab.key)}
       className={workspaceTabVariants({
         active,
-        dragging: props.preview ? false : props.state.isDragging,
+        dragging: props.state?.isDragging,
         preview
       })}
-      {...(props.preview ? {} : props.state.dragHandleProps)}
+      {...props.state?.dragHandleProps}
     >
       <div
         className={cn(
@@ -193,9 +193,6 @@ function WorkspaceTab(props: WorkspaceTabProps) {
   )
 }
 
-// A tab that takes no part in reordering: Overview always stays first.
-const FIXED_TAB_STATE: ReorderableRenderState = { isDragging: false, dragHandleProps: {} }
-
 export function WorkspaceTabs({
   tabs,
   active,
@@ -216,7 +213,6 @@ export function WorkspaceTabs({
               key={tab.key}
               tab={tab}
               active={active === tab.key}
-              state={FIXED_TAB_STATE}
               onSelect={onSelect}
               onClose={onClose}
             />

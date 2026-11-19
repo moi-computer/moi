@@ -86,14 +86,8 @@ export function ReorderableList<T>({
   // The dropped order is shown right away and held until the owner's `items`
   // change, so a drop never flashes the old order while the owner saves it.
   const ids = items.map(getId)
-  const [syncedIds, setSyncedIds] = useState(ids)
-  const [order, setOrder] = useState(ids)
-  let displayedIds = order
-  if (!sameOrder(syncedIds, ids)) {
-    setSyncedIds(ids)
-    setOrder(ids)
-    displayedIds = ids
-  }
+  const [dropped, setDropped] = useState<{ from: ReorderableId[]; to: ReorderableId[] }>()
+  const displayedIds = dropped && sameOrder(dropped.from, ids) ? dropped.to : ids
 
   const itemById = new Map(items.map(item => [getId(item), item]))
   const displayedItems = displayedIds
@@ -121,7 +115,7 @@ export function ReorderableList<T>({
     const to = displayedIds.indexOf(String(over.id))
     if (from < 0 || to < 0) return
     const next = arrayMove(displayedIds, from, to)
-    setOrder(next)
+    setDropped({ from: ids, to: next })
     onReorder(next)
   }
 
