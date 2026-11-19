@@ -193,6 +193,9 @@ function WorkspaceTab(props: WorkspaceTabProps) {
   )
 }
 
+// A tab that takes no part in reordering: Overview always stays first.
+const FIXED_TAB_STATE: ReorderableRenderState = { isDragging: false, dragHandleProps: {} }
+
 export function WorkspaceTabs({
   tabs,
   active,
@@ -201,30 +204,46 @@ export function WorkspaceTabs({
   onClose,
   onReorder
 }: WorkspaceTabsProps) {
+  const fixedTabs = tabs.filter(tab => tab.reorderable === false)
+  const reorderableTabs = tabs.filter(tab => tab.reorderable !== false)
+
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
       <div className="no-scrollbar min-w-0 scroll-fade-x overflow-x-auto overflow-y-hidden [--scroll-fade-reveal:16px]">
-        <ReorderableList
-          items={tabs}
-          getId={tab => tab.key}
-          axis="x"
-          isItemDragDisabled={tab => tab.reorderable === false}
-          className="flex w-max items-center gap-1"
-          onReorder={ordered => onReorder(ordered as WorkspaceTabId[])}
-          renderPlaceholder={() => (
-            <div className="pointer-events-none absolute inset-0 rounded-md bg-muted" />
-          )}
-          renderOverlay={tab => <WorkspaceTab tab={tab} active={active === tab.key} preview />}
-          renderItem={(tab, state) => (
+        <div className="flex w-max items-center gap-1">
+          {fixedTabs.map(tab => (
             <WorkspaceTab
+              key={tab.key}
               tab={tab}
               active={active === tab.key}
-              state={state}
+              state={FIXED_TAB_STATE}
               onSelect={onSelect}
               onClose={onClose}
             />
-          )}
-        />
+          ))}
+          <ReorderableList
+            items={reorderableTabs}
+            getId={tab => tab.key}
+            axis="x"
+            className="flex items-center gap-1"
+            onReorder={ordered =>
+              onReorder([...fixedTabs.map(tab => tab.key), ...(ordered as WorkspaceTabId[])])
+            }
+            renderPlaceholder={() => (
+              <div className="pointer-events-none absolute inset-0 rounded-md bg-muted" />
+            )}
+            renderOverlay={tab => <WorkspaceTab tab={tab} active={active === tab.key} preview />}
+            renderItem={(tab, state) => (
+              <WorkspaceTab
+                tab={tab}
+                active={active === tab.key}
+                state={state}
+                onSelect={onSelect}
+                onClose={onClose}
+              />
+            )}
+          />
+        </div>
       </div>
       <div className="shrink-0">
         {createItems.length > 0 && <CreateTabMenu items={createItems} />}

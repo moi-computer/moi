@@ -41,7 +41,6 @@ type ReorderableListProps<T> = {
   getId: (item: T) => ReorderableId
   axis: 'x' | 'y'
   className?: string
-  isItemDragDisabled?: (item: T) => boolean
   onReorder: (orderedIds: ReorderableId[]) => void
   renderItem: (item: T, state: ReorderableRenderState) => ReactNode
   renderPlaceholder?: (item: T) => ReactNode
@@ -57,13 +56,15 @@ function sameOrder(a: ReorderableId[], b: ReorderableId[]) {
  * order while dragging and are shifted with transforms, the dragged item leaves
  * its slot behind (`renderPlaceholder`) and follows the pointer in a
  * `DragOverlay` (`renderOverlay`).
+ *
+ * Every item is sortable. Render an item that must stay put next to the list,
+ * not in it: a sortable item that is only disabled is still a drop target.
  */
 export function ReorderableList<T>({
   items,
   getId,
   axis,
   className,
-  isItemDragDisabled,
   onReorder,
   renderItem,
   renderPlaceholder,
@@ -99,10 +100,7 @@ export function ReorderableList<T>({
     .map(id => itemById.get(id))
     .filter((item): item is T => item !== undefined)
   const draggingItem = draggingId === undefined ? undefined : itemById.get(draggingId)
-  const reorderableCount = isItemDragDisabled
-    ? items.filter(item => !isItemDragDisabled(item)).length
-    : items.length
-  const disabled = reorderableCount < 2
+  const disabled = items.length < 2
 
   const handleDragStart = ({ active, activatorEvent }: DragStartEvent) => {
     setDraggingId(String(active.id))
@@ -145,7 +143,7 @@ export function ReorderableList<T>({
               key={getId(item)}
               id={getId(item)}
               item={item}
-              disabled={disabled || isItemDragDisabled?.(item) === true}
+              disabled={disabled}
               renderItem={renderItem}
               renderPlaceholder={renderPlaceholder}
             />
