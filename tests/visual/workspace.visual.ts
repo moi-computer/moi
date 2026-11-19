@@ -47,8 +47,8 @@ describe('Workspace', () => {
   test(
     'onboarding',
     async page => {
-      await page.goto('/#/onboarding')
-      await expect(page.getByRole('button').first()).toBeVisible()
+      await page.goto('/#/')
+      await expect(page.getByRole('heading', { name: 'Choose your agent' })).toBeVisible()
     },
     { api: { '/api/settings': { showOnboarding: true, autoUpdateSkills: false } } }
   )
