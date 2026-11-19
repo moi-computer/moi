@@ -39,18 +39,32 @@ describe('Workspace', () => {
       cloudRequests.push(route.request().url())
       return route.fulfill({ status: 500, body: 'Unexpected Cloud request' })
     })
+    const requested = Promise.withResolvers<void>()
+    const settings = Promise.withResolvers<void>()
+    await page.route('**/api/settings', async route => {
+      requested.resolve()
+      await settings.promise
+      await route.fallback()
+    })
     await page.goto('/#/')
+    await requested.promise
+    await expect(page.getByRole('status', { name: 'Loading onboarding' })).toHaveCount(0)
+    await takeSnapshot('waiting for settings')
+    settings.resolve()
     await expect(page.getByText('acme-store').first()).toBeVisible()
+    await takeSnapshot()
     expect(cloudRequests).toEqual([])
   })
 
   test(
-    'home hides pending invitations and import folders while showing workspace cards',
+    'home shows workspace cards while optional lists load',
     async page => {
+      await page.route('**/cloud/api/workspaces/shared', () => new Promise(() => {}))
       await page.route('**/api/workspaces/discover', () => new Promise(() => {}))
       await page.route('**/cloud/api/workspaces/invitations', () => new Promise(() => {}))
       await page.goto('/#/')
       await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
+      await expect(page.getByText('Loading shared workspaces…')).toHaveCount(0)
       await expect(page.getByRole('heading', { name: 'Invitations' })).toHaveCount(0)
       await expect(page.getByRole('button', { name: 'Import other workspaces' })).toHaveCount(0)
     },
@@ -83,6 +97,7 @@ describe('Workspace', () => {
       const trigger = page.getByRole('button', { name: WORKSPACE + ' menu', exact: true })
       await trigger.hover()
       await expect(trigger.locator('svg.tabler-icon-dots')).toBeVisible()
+      await takeSnapshot('workspace menu hovered')
       await trigger.click()
       const theme = page.getByRole('menuitem', { name: 'Theme' })
       await theme.hover()
@@ -510,30 +525,18 @@ for (const failure of [
   )
 }
 
-for (const state of ['loading', 'error'] as const) {
-  test(
-    `shared workspace list ${state}`,
-    async page => {
-      if (state === 'loading')
-        await page.route('**/cloud/api/workspaces/shared', () => new Promise(() => {}))
-      else
-        await page.route('**/cloud/api/workspaces/shared', route =>
-          route.fulfill({ status: 503, json: { error: 'Cloud unavailable' } })
-        )
-      await page.goto('/#/')
-      if (state === 'loading') {
-        await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
-        await expect(page.getByText('Loading shared workspaces…')).toHaveCount(0)
-      } else await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
-    },
-    {
-      api: {
-        '/api/config': { environment: 'cloud', demo: false },
-        '/cloud/api/workspaces/shared': { workspaces: [] }
-      }
-    }
-  )
-}
+test(
+  'shared workspace list error',
+  async page => {
+    await page.route('**/cloud/api/workspaces/shared', route =>
+      route.fulfill({ status: 503, json: { error: 'Cloud unavailable' } })
+    )
+    await page.goto('/#/')
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+  },
+  { api: { '/api/config': { environment: 'cloud', demo: false } } }
+)
+
 test(
   'shared workspace opening',
   async page => {
