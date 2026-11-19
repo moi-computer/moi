@@ -3,11 +3,7 @@ import { jsonRequest, requestJson } from '@/client/api/http'
 import { useClientEvent } from '@/client/runtime/use-client-events'
 import type { AppSettings } from '@/lib/types'
 
-export const appSettingsQuery = {
-  queryKey: ['app-settings'] as const,
-  queryFn: () => requestJson<AppSettings>('/api/settings'),
-  staleTime: 30_000
-}
+import { appSettingsQuery } from './query'
 
 export function useAppSettings() {
   const queryClient = useQueryClient()

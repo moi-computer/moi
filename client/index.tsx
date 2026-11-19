@@ -5,7 +5,7 @@ import 'blobatar/motion.css'
 import './index.css'
 
 import { queryClient } from './api/query-client'
-import { appSettingsQuery } from './features/app-settings/api'
+import { appSettingsQuery } from './features/app-settings/query'
 import { initializeLocalUser, subscribeLocalProfileStorage } from './features/collab/host-state'
 
 import { installIdentityHostApi } from './features/identity/host-api'
