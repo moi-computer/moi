@@ -378,9 +378,7 @@ test(
   async page => {
     await page.goto(remotePage)
     await expect(page.getByRole('button', { name: 'Customize', exact: true })).toBeVisible()
-    await expect(
-      page.getByText('Widgets can surface information, read data, and perform actions')
-    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'New widget', exact: true })).toBeVisible()
     await expect(page.getByPlaceholder('Do anything')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Create tab', exact: true })).toBeVisible()
     await expect(

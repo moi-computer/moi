@@ -9,7 +9,6 @@ import { DrawingLayer } from '@/client/features/drawings/drawing-layer'
 import { DrawingToolbar } from '@/client/features/drawings/drawing-toolbar'
 import { useChatAnnotation } from '@/client/features/drawings/use-chat-annotation'
 import { ChatPanel } from '@/client/features/chat/chat-panel'
-import type { WelcomeDestination } from '@/client/features/chat/messages/chat-empty-state'
 import { ChatPopup } from '@/client/features/chat/chat-popup'
 import { ThemePanel } from '@/client/features/workspace/theme-panel'
 import { Overview } from '@/client/features/overview/overview'
@@ -134,7 +133,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   })
 
   const hasAppletWidgets = widgets.some(widget => !isDefaultWidget(widget.id))
-  const hasWorkspaceApplets = hasAppletWidgets || views.length > 0
 
   const revealChat = useCallback(() => {
     setFloatingChatOpen(true)
@@ -243,17 +241,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   const createView = () => {
     // A pending view has no chat until its first submission.
     void viewActions.create().then(pendingView => openTab(viewTabId(pendingView.id)))
-  }
-
-  const navigateFromWelcome = (destination: WelcomeDestination) => {
-    if (destination === 'views') {
-      const firstView = views[0]
-      if (firstView) openTab(viewTabId(firstView.id))
-      else createView()
-    } else {
-      openTab(destination)
-    }
-    setFloatingChatOpen(false)
   }
 
   useWorkspaceEvent(workspaceId, event => {
@@ -405,7 +392,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     agent: theme.agent,
     focusRequest: chatFocusRequest,
     chatLoaded: visibleChatLoaded,
-    hasWorkspaceApplets,
     view,
     forkedFromSessionId,
     previewTurn,
@@ -415,7 +401,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     agentAvailability,
     send: sendChat,
     stop,
-    onNavigateFromWelcome: navigateFromWelcome,
     viewDraft: viewChatDraft
   }
 

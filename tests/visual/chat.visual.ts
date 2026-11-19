@@ -22,6 +22,9 @@ describe('Chat', () => {
     'new chat',
     async page => {
       await page.goto(WORKSPACE_PAGE)
+      await expect(
+        page.getByText('Chat with your agent, create widgets and views', { exact: false })
+      ).toBeVisible()
       await expect(page.getByPlaceholder('Do anything')).toBeVisible()
     },
     {

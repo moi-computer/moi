@@ -29,11 +29,7 @@ import type { AgentTheme, SystemNotice, Turn, ViewState } from '@/lib/types'
 
 import type { ComposerBanner } from './composer/banners/composer-banner'
 import { ChatComposer, type ComposerAnnotationControls } from './composer/chat-composer'
-import {
-  ChatEmptyState,
-  type WelcomeDestination,
-  resolveChatEmptyState
-} from './messages/chat-empty-state'
+import { ChatEmptyState, resolveChatEmptyState } from './messages/chat-empty-state'
 import { ChatSelector } from './sessions/chat-selector'
 import { useWorkspaceSessions } from './sessions/api'
 import { TurnView } from './messages/turn-view'
@@ -55,7 +51,6 @@ type ChatPanelProps = {
   focusRequest?: number
   docked?: boolean
   chatLoaded: boolean
-  hasWorkspaceApplets: boolean
   view: ViewState
   // The live streaming preview as a synthetic assistant turn (or null). Merged
   // into the trailing assistant run so a thinking-only
@@ -68,7 +63,6 @@ type ChatPanelProps = {
   annotation?: ComposerAnnotationControls
   send: (text: string, options?: ChatSendOptions) => Promise<void>
   stop: () => void
-  onNavigateFromWelcome: (destination: WelcomeDestination) => void
   onToggleDock?: () => void
   onClose: () => void
   viewDraft?: ViewChatDraft
@@ -84,7 +78,6 @@ export function ChatPanel({
   focusRequest = 0,
   docked = false,
   chatLoaded,
-  hasWorkspaceApplets,
   view,
   previewTurn,
   sessionId,
@@ -94,7 +87,6 @@ export function ChatPanel({
   annotation,
   send,
   stop,
-  onNavigateFromWelcome,
   onToggleDock,
   onClose,
   viewDraft
@@ -109,7 +101,6 @@ export function ChatPanel({
   const effectiveSessionId = viewDraft?.sessionId ?? sessionId ?? draftSessionId(tabId)
   const modelSessionId = viewDraft ? null : (sessionId ?? null)
   const turns = viewDraft ? EMPTY_TURNS : view.turns
-  const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
   const isWorkspacePendingAnalysis = useUiStore(state =>
     (state.workspaceIdsPendingAnalysis ?? []).includes(workspaceId)
   )
@@ -146,7 +137,6 @@ export function ChatPanel({
   const emptyStateKind = resolveChatEmptyState({
     tabId,
     isViewDraft: !!viewDraft,
-    hasSentMessageFromMoi,
     isWorkspacePendingAnalysis
   })
 
@@ -263,10 +253,8 @@ export function ChatPanel({
               <ChatEmptyState
                 agent={agent}
                 kind={emptyStateKind}
-                hasWorkspaceApplets={hasWorkspaceApplets}
                 disabled={promptDisabled}
                 onSelectPrompt={handlePromptSelect}
-                onNavigate={onNavigateFromWelcome}
               />
             )}
             {showTranscript &&
