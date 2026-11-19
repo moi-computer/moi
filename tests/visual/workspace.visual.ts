@@ -1,4 +1,4 @@
-import { expect, takeSnapshot } from '@uiverify/bun'
+import { DEFAULT_VIEWPORT, expect, takeSnapshot } from '@uiverify/bun'
 
 import type { Identity } from '@/client/features/identity/types'
 import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
@@ -66,11 +66,15 @@ describe('Workspace', () => {
     { api: { '/api/settings': { showOnboarding: true, autoUpdateSkills: false } } }
   )
 
-  test('theme', async page => {
-    await page.goto(WORKSPACE_PAGE)
-    await page.getByRole('button', { name: 'Theme' }).click()
-    await expect(page.getByRole('button', { name: 'Close panel' })).toBeVisible()
-  })
+  test(
+    'theme',
+    async page => {
+      await page.goto(WORKSPACE_PAGE)
+      await page.getByRole('button', { name: 'Theme' }).click()
+      await expect(page.getByRole('button', { name: 'Close panel' })).toBeVisible()
+    },
+    { viewports: { '': DEFAULT_VIEWPORT, short: { width: 920, height: 420 } } }
+  )
 
   test(
     'workspace menu keeps the themed icon tile on hover',

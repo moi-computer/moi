@@ -516,11 +516,11 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
             onComplete={() => void annotationControls.finish()}
           />
         </DrawingLayer>
-      </div>
 
-      <AnimatePresence>
-        {widgetMode === 'theming' && <ThemePanel onClose={() => setWidgetMode('idle')} />}
-      </AnimatePresence>
+        <AnimatePresence>
+          {widgetMode === 'theming' && <ThemePanel onClose={() => setWidgetMode('idle')} />}
+        </AnimatePresence>
+      </div>
 
       <PanelHeader>
         <div className="flex min-w-0 flex-1 items-center gap-4">
