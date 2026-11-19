@@ -79,6 +79,13 @@ describe('Workspace', () => {
       const trigger = page.getByRole('button', { name: WORKSPACE + ' menu', exact: true })
       await trigger.hover()
       await expect(trigger.locator('svg.tabler-icon-dots')).toBeVisible()
+      await trigger.click()
+      const theme = page.getByRole('menuitem', { name: 'Theme' })
+      await theme.hover()
+      await expect(trigger.locator('svg.tabler-icon-dots')).toBeVisible()
+      await takeSnapshot('workspace menu open')
+      await theme.click()
+      await expect(trigger.locator('svg.tabler-icon-book')).toBeVisible()
     },
     {
       api: {
