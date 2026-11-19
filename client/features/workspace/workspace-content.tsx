@@ -3,12 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { AnimatePresence } from 'motion/react'
 
-import {
-  IconBrowserPlus,
-  IconLayout2,
-  IconLayoutSidebarRight,
-  IconSketching
-} from '@tabler/icons-react'
+import { IconBrowserPlus, IconLayout2, IconSketching } from '@tabler/icons-react'
 
 import { DrawingLayer } from '@/client/features/drawings/drawing-layer'
 import { DrawingToolbar } from '@/client/features/drawings/drawing-toolbar'
@@ -21,8 +16,6 @@ import { Overview } from '@/client/features/overview/overview'
 import { useAppConfig } from '@/client/api/app-config'
 import { WorkspaceSharingMenu } from '@/client/features/collab'
 import { PanelHeader } from '@/client/components/shared/panel-header'
-import { Button } from '@/client/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { toast } from '@/client/components/ui/toast'
 import {
   useAppletChatMessage,
@@ -426,11 +419,17 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     viewDraft: viewChatDraft
   }
 
+  function showPopup(open: boolean) {
+    setFloatingChatOpen(open)
+    setMode('fullscreen')
+  }
+
   const dockedChat = (
     <ChatPanel
       {...chatPanelProps}
       active={mode === 'split'}
-      onClose={() => setMode('fullscreen')}
+      onToggleDock={() => showPopup(true)}
+      onClose={() => showPopup(false)}
       annotation={dockedAnnotation}
       docked
     />
@@ -542,24 +541,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
             onOpenTab={openTab}
           />
         )}
-        {canUseSplit && mode === 'fullscreen' && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setMode('split')}
-                  aria-label="Dock chat"
-                  className="text-muted-foreground"
-                >
-                  <IconLayoutSidebarRight stroke={1.75} />
-                </Button>
-              }
-            />
-            <TooltipContent>Dock chat</TooltipContent>
-          </Tooltip>
-        )}
       </PanelHeader>
     </WorkspacePane>
   )
@@ -587,6 +568,14 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
             <ChatPanel
               {...chatPanelProps}
               active={floatingChatOpen}
+              onToggleDock={
+                canUseSplit
+                  ? () => {
+                      setFloatingChatOpen(false)
+                      setMode('split')
+                    }
+                  : undefined
+              }
               onClose={onClose}
               annotation={popupAnnotation}
             />
