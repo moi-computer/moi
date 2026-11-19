@@ -412,6 +412,7 @@ test(
     await expect(people.getByText('Trip bot')).toHaveCount(0)
     await sharing.click()
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Environment', exact: true })).toHaveCount(0)
     await page.getByRole('button', { name: 'Agents', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible()
     const menu = page.getByRole('dialog').getByRole('button', { name: 'More options', exact: true })
