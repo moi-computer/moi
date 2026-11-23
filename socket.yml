@@ -3,4 +3,5 @@ triggerPaths:
   - /package.json
   - /bun.lock
 githubApp:
-  disableCommentsAndCheckRuns: true
+  dependencyOverviewEnabled: false
+  disableCommentsAndCheckRuns: false
