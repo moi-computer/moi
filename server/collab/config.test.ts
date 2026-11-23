@@ -27,7 +27,7 @@ afterEach(async () => {
 })
 
 describe('collab startup configuration', () => {
-  test('dev mode, old environment settings and legacy workspace flags do not enable runtime', async () => {
+  test('dev mode and legacy workspace flags do not expose the cloud collaboration guide', async () => {
     process.env.MOI_DEV = '1'
 
     await Bun.write(

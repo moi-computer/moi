@@ -5,6 +5,7 @@ import { isAbsolute, join } from 'path'
 import type { AppEnvironment, ClientAppConfig } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
+import { isBundled } from './package-paths'
 
 // Startup (deployment) config, read once per process from `config.json` in
 // moi's data dir and overridable by `MOI_*` env vars (env wins). Distinct from
@@ -256,9 +257,26 @@ export function resetAppConfig(): void {
   _config = null
 }
 
+export function localCollabTestingEnabled(): boolean {
+  if (isBundled || process.env.MOI_DEV !== '1') return false
+  const { environment, cloudflareAccess, demo, unixSocket } = getAppConfig()
+  return (
+    environment === 'local' &&
+    !cloudflareAccess &&
+    !demo &&
+    !unixSocket &&
+    ['127.0.0.1', 'localhost', '::1'].includes(process.env.HOST ?? '127.0.0.1')
+  )
+}
+
 // The only shape that reaches the browser (GET /api/config). Server-only keys
 // added to AppConfig later stay out unless explicitly forwarded here.
 export function clientAppConfig(): ClientAppConfig {
   const { environment, demo, demoInstallUrl } = getAppConfig()
-  return { environment, demo, demoInstallUrl }
+  return {
+    environment,
+    demo,
+    demoInstallUrl,
+    ...(localCollabTestingEnabled() && { localCollabTesting: true })
+  }
 }

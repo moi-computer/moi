@@ -353,6 +353,7 @@ export type ClientAppConfig = {
   demo: boolean
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
+  localCollabTesting?: true
 }
 
 export type UpdateStatus = {
