@@ -51,7 +51,7 @@ jobs:
         # Avoid loading Linux keychain libraries into the Sharp test process.
         env:
           MOI_SECRET_BACKEND: file
-        run: bun test
+        run: bun test --parallel=2
 
       - name: Pack and inspect package
         run: |
@@ -76,17 +76,8 @@ jobs:
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
-        id: bun
         with:
           bun-version-file: package.json
-
-      - name: Cache Bun packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ steps.bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-${{ steps.bun.outputs.bun-version }}-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
