@@ -1,0 +1,7 @@
+version: 2
+triggerPaths:
+  - /package.json
+  - /bun.lock
+githubApp:
+  dependencyOverviewEnabled: false
+  disableCommentsAndCheckRuns: false
