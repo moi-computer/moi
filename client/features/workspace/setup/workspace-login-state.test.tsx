@@ -107,6 +107,7 @@ test('cloud Claude asks for the full code from the sign-in page', () => {
     }
   })
   expect(html).toContain('Paste the code here:')
+  expect((html.match(/<li /g) ?? []).length).toBe(2)
   expect(html).toContain('Authorization code')
   expect(html).toContain('Continue')
   expect(html).not.toContain('Having trouble logging in?')

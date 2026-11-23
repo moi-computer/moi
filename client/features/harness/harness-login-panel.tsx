@@ -6,6 +6,7 @@ import { Button, buttonVariants } from '@/client/components/ui/button'
 import { Textarea } from '@/client/components/ui/textarea'
 import { Spinner } from '@/client/components/ui/spinner'
 import { harnessLabel, harnessIcon } from './harness-presentation'
+import { LoginSteps, LoginStep } from './login-steps'
 import { DeviceLoginSteps } from './device-login-steps'
 import { useHarnessLogin } from './use-harness-login'
 import { useRetryHarnessStatus, type LoginHarness } from './api'
@@ -157,16 +158,40 @@ function PendingLoginState({
   }
 
   const showCodeForm = Boolean(pending.codeUrl && !waitingForBrowser)
-  let message = 'Log in in your browser, then come back to Moi'
-  if (showCodeForm) message = `Log in to ${name} to get your authorization code.`
 
   let url = pending.url
   if (manualLogin) url = pending.codeUrl ?? pending.url
 
+  if (showCodeForm) {
+    return (
+      <LoginSteps count={2} className="mt-6">
+        <LoginStep number={1}>
+          <p>Log in to {name} to get your authorization code</p>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonVariants({ variant: 'secondary' })}
+          >
+            Open {name}
+          </a>
+        </LoginStep>
+        <LoginStep number={2}>
+          <LoginCodeForm
+            code={code}
+            onCodeChange={onCodeChange}
+            submitting={submitting}
+            onSubmit={onSubmit}
+          />
+        </LoginStep>
+      </LoginSteps>
+    )
+  }
+
   return (
     <>
       <p role="status" className="mt-6 text-sm text-muted-foreground">
-        {message}
+        Log in in your browser, then come back to Moi
       </p>
       <a
         className={cn(buttonVariants({ variant: 'secondary' }), 'mt-4')}
@@ -180,14 +205,6 @@ function PendingLoginState({
         <Button variant="ghost" onClick={onManualLogin} className="mt-4">
           Having trouble logging in?
         </Button>
-      )}
-      {showCodeForm && (
-        <LoginCodeForm
-          code={code}
-          onCodeChange={onCodeChange}
-          submitting={submitting}
-          onSubmit={onSubmit}
-        />
       )}
     </>
   )
@@ -205,13 +222,13 @@ function LoginCodeForm({ code, onCodeChange, submitting, onSubmit }: LoginCodeFo
 
   return (
     <form
-      className="mt-6 flex w-full flex-col gap-3"
+      className="flex w-full flex-col gap-3"
       onSubmit={event => {
         event.preventDefault()
         onSubmit()
       }}
     >
-      <label htmlFor={inputId} className="text-sm text-muted-foreground">
+      <label htmlFor={inputId} className="text-sm">
         Paste the code here:
       </label>
       <Textarea
@@ -224,7 +241,7 @@ function LoginCodeForm({ code, onCodeChange, submitting, onSubmit }: LoginCodeFo
         autoComplete="off"
         spellCheck={false}
       />
-      <Button type="submit" className="mt-3" disabled={!code.trim() || submitting}>
+      <Button type="submit" disabled={!code.trim() || submitting}>
         {submitting ? 'Connecting…' : 'Continue'}
       </Button>
     </form>
