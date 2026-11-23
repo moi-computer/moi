@@ -51,6 +51,17 @@ jobs:
           esac
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      - name: Audit dependencies with Socket
+        env:
+          SOCKET_CLI_API_TOKEN: ${{ secrets.SOCKET_CLI_API_TOKEN }}
+          SOCKET_CLI_ORG_SLUG: moi-computer
+        run: |
+          if [ -z "$SOCKET_CLI_API_TOKEN" ]; then
+            echo "::error::Set the SOCKET_CLI_API_TOKEN Actions secret to run the release audit"
+            exit 1
+          fi
+          bunx --package socket@1.16.0 socket ci
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
