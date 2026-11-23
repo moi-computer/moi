@@ -1,21 +1,24 @@
 import { HarnessSelector } from '@/client/features/harness/harness-selector'
-import { type ReactNode, useEffect } from 'react'
+import type { ReactNode } from 'react'
 
 import { Button } from '@/client/components/ui/button'
 import { DialogDescription, DialogTitle } from '@/client/components/ui/dialog'
 import { Skeleton } from '@/client/components/ui/skeleton'
-import type { HarnessType } from '@/lib/types'
+import type { HarnessStatuses, HarnessType } from '@/lib/types'
 
 import {
-  resolveWorkspaceAgentSelection,
+  resolveWorkspaceHarnessSelection,
   type WorkspaceAgentOption
 } from './workspace-agent-options'
 
 const WORKSPACE_AGENT_DESCRIPTION = 'Choose the agent to build the workspace'
 type WorkspaceAgentSelectorProps = {
   title: string
-  selectedHarness: HarnessType
+  description?: string
+  selectedHarness?: HarnessType
   options: WorkspaceAgentOption[]
+  statuses?: HarnessStatuses
+  detectedHarnesses?: HarnessType[]
   isLoading?: boolean
   isPending: boolean
   errorMessage?: string
@@ -24,13 +27,16 @@ type WorkspaceAgentSelectorProps = {
   primaryLabel: string
   pendingLabel?: string
   onHarnessChange: (harness: HarnessType) => void
-  onSubmit: () => void
+  onSubmit: (harness: HarnessType) => void
 }
 
 export function WorkspaceAgentSelector({
   title,
+  description = WORKSPACE_AGENT_DESCRIPTION,
   selectedHarness,
   options,
+  statuses,
+  detectedHarnesses,
   isLoading = false,
   isPending,
   errorMessage,
@@ -41,18 +47,18 @@ export function WorkspaceAgentSelector({
   onHarnessChange,
   onSubmit
 }: WorkspaceAgentSelectorProps) {
-  const selectableType = resolveWorkspaceAgentSelection(options, selectedHarness)
-  const selectedUnavailable = selectableType !== selectedHarness
-
-  useEffect(() => {
-    if (!isPending && selectableType && selectedUnavailable) onHarnessChange(selectableType)
-  }, [isPending, onHarnessChange, selectableType, selectedUnavailable])
+  const harness = resolveWorkspaceHarnessSelection(
+    options,
+    selectedHarness,
+    statuses,
+    detectedHarnesses
+  )
 
   return (
     <div className="flex min-w-[min(22rem,calc(100vw-5rem))] flex-col gap-5">
       <div className="flex w-0 min-w-full flex-col gap-0.5 pr-8">
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{WORKSPACE_AGENT_DESCRIPTION}</DialogDescription>
+        <DialogDescription>{description}</DialogDescription>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -69,7 +75,7 @@ export function WorkspaceAgentSelector({
           <HarnessSelector
             disabled={isPending}
             options={options}
-            selectedHarness={selectedUnavailable ? undefined : selectedHarness}
+            selectedHarness={harness}
             onHarnessChange={onHarnessChange}
           />
         )}
@@ -81,13 +87,13 @@ export function WorkspaceAgentSelector({
         </p>
       )}
 
-      {emptyMessage && !selectableType && !isPending && !errorMessage && (
+      {emptyMessage && !harness && !isPending && !errorMessage && (
         <p className="w-0 min-w-full text-sm text-muted-foreground">{emptyMessage}</p>
       )}
 
       <div className="flex items-center justify-end gap-2">
         {secondaryAction}
-        <Button onClick={onSubmit} disabled={isPending || selectedUnavailable}>
+        <Button onClick={() => harness && onSubmit(harness)} disabled={isPending || !harness}>
           {isPending && pendingLabel ? pendingLabel : primaryLabel}
         </Button>
       </div>

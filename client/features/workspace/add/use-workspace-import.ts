@@ -1,60 +1,42 @@
 import { useState } from 'react'
 
 import { useImportWorkspace } from '@/client/features/workspace/add/api'
-import { HARNESS_ORDER } from '@/lib/harness-types'
 import type { DiscoveredWorkspace, WorkspaceEntry, HarnessType } from '@/lib/types'
-
-export function workspaceImportDefaultType(workspace: DiscoveredWorkspace): HarnessType {
-  return workspace.harnesses[0] ?? HARNESS_ORDER[0]
-}
 
 type UseWorkspaceImportProps = {
   onSuccess: (entry: WorkspaceEntry) => void
 }
 
-export type WorkspaceImportChoice = {
-  workspace: DiscoveredWorkspace
-  selectedHarness: HarnessType
-}
-
 export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
   const mutation = useImportWorkspace()
-  const [choice, setChoice] = useState<WorkspaceImportChoice | null>(null)
+  const [workspace, setWorkspace] = useState<DiscoveredWorkspace>()
 
   function startImport(workspace: DiscoveredWorkspace) {
     mutation.reset()
-    setChoice({
-      workspace,
-      selectedHarness: workspaceImportDefaultType(workspace)
-    })
+    setWorkspace(workspace)
   }
 
-  function selectHarness(harness: HarnessType) {
-    setChoice(current => (current ? { ...current, selectedHarness: harness } : current))
-  }
-
-  function submit() {
-    if (!choice || mutation.isPending) return
+  function submit(harness: HarnessType) {
+    if (!workspace || mutation.isPending) return
     mutation.mutate(
       {
-        path: choice.workspace.path,
-        harness: choice.selectedHarness
+        path: workspace.path,
+        harness
       },
       { onSuccess }
     )
   }
 
   function reset() {
-    setChoice(null)
+    setWorkspace(undefined)
     mutation.reset()
   }
 
   return {
-    choice,
+    workspace,
     isPending: mutation.isPending,
     error: mutation.error,
     startImport,
-    selectHarness,
     submit,
     reset
   }

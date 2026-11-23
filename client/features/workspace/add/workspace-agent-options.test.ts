@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   getWorkspaceAgentOptions as optionsFromStatuses,
-  resolveWorkspaceAgentSelection
+  resolveWorkspaceHarnessSelection
 } from './workspace-agent-options'
 import type { HarnessInstallations } from '@/lib/types'
 
@@ -34,7 +34,7 @@ describe('create workspace agent options', () => {
             disabledCommand: `moi ${harness} init`
           })
       }
-      expect(resolveWorkspaceAgentSelection(options, 'claude-code')).toBe(
+      expect(resolveWorkspaceHarnessSelection(options, 'claude-code')).toBe(
         installed['claude-code'] ? 'claude-code' : installed.codex ? 'codex' : undefined
       )
     })
@@ -126,7 +126,7 @@ describe('import workspace agent options', () => {
       disabledReason: undefined,
       disabledCommand: undefined
     })
-    expect(resolveWorkspaceAgentSelection(options, harness)).toBe(harness)
+    expect(resolveWorkspaceHarnessSelection(options, harness)).toBe(harness)
   })
 
   test('waits for installation data even when a folder has a detected agent', () => {
@@ -141,14 +141,58 @@ describe('import workspace agent options', () => {
       hermes: false
     }
     expect(
-      resolveWorkspaceAgentSelection(getWorkspaceAgentOptions(installed, ['codex']), 'codex')
+      resolveWorkspaceHarnessSelection(
+        getWorkspaceAgentOptions(installed, ['codex']),
+        undefined,
+        undefined,
+        ['codex']
+      )
     ).toBe('codex')
     expect(
-      resolveWorkspaceAgentSelection(
+      resolveWorkspaceHarnessSelection(
         getWorkspaceAgentOptions({ ...installed, codex: false }, ['codex']),
-        'codex'
+        undefined,
+        undefined,
+        ['codex']
       )
     ).toBe('claude-code')
+  })
+})
+
+describe('workspace agent preselection', () => {
+  const statuses: HarnessStatuses = {
+    'claude-code': { availability: { status: 'available' } },
+    codex: { availability: { status: 'available' } },
+    openclaw: { availability: { status: 'available' } },
+    hermes: { availability: { status: 'available' } }
+  }
+  const options = optionsFromStatuses(statuses, ['openclaw', 'hermes'])
+
+  test('defaults to Claude when both primary agents are connected', () => {
+    expect(resolveWorkspaceHarnessSelection(options, undefined, statuses)).toBe('claude-code')
+  })
+
+  test('prefers the only connected primary agent even if the folder was used with the other', () => {
+    const onlyCodex: HarnessStatuses = {
+      ...statuses,
+      'claude-code': { availability: { status: 'login-required', reason: 'Sign in' } }
+    }
+    const primaryOptions = optionsFromStatuses(onlyCodex, ['claude-code'])
+    expect(
+      resolveWorkspaceHarnessSelection(primaryOptions, undefined, onlyCodex, ['claude-code'])
+    ).toBe('codex')
+    expect(resolveWorkspaceHarnessSelection(primaryOptions, 'claude-code', onlyCodex)).toBe(
+      'claude-code'
+    )
+  })
+
+  test('prefers the first selectable detected agent among connected agents', () => {
+    expect(
+      resolveWorkspaceHarnessSelection(options, undefined, statuses, ['codex', 'openclaw'])
+    ).toBe('codex')
+    expect(resolveWorkspaceHarnessSelection(options, undefined, statuses, ['hermes'])).toBe(
+      'hermes'
+    )
   })
 })
 

@@ -43,11 +43,21 @@ export function getWorkspaceAgentOptions(
   })
 }
 
-export function resolveWorkspaceAgentSelection(
+export function resolveWorkspaceHarnessSelection(
   options: WorkspaceAgentOption[],
-  selectedHarness: HarnessType
+  selectedHarness?: HarnessType,
+  statuses?: HarnessStatuses,
+  detectedHarnesses: readonly HarnessType[] = []
 ): HarnessType | undefined {
-  const selected = options.find(option => option.harness === selectedHarness)
-  if (selected && !selected.disabled) return selected.harness
-  return options.find(option => !option.disabled)?.harness
+  const selectable = options.filter(option => !option.disabled).map(option => option.harness)
+  if (selectedHarness && selectable.includes(selectedHarness)) return selectedHarness
+
+  const connected = selectable.filter(
+    harness => statuses?.[harness].availability.status === 'available'
+  )
+  const candidates = connected.length ? connected : selectable
+  return (
+    detectedHarnesses.find(harness => candidates.includes(harness)) ??
+    HARNESS_ORDER.find(harness => candidates.includes(harness))
+  )
 }

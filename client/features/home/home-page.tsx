@@ -13,7 +13,7 @@ import {
   useWorkspaceMetadata
 } from './api'
 import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
-import { ImportWorkspaceDialog } from '@/client/features/workspace/add/import-workspace-dialog'
+import { AddWorkspaceDialog } from '@/client/features/workspace/add/add-workspace-dialog'
 import { DemoDialog } from '@/client/features/demo/demo-dialog'
 import { useWorkspaceImport } from '@/client/features/workspace/add/use-workspace-import'
 import { HomeLogo } from './home-logo'
@@ -177,14 +177,14 @@ export function HomePage() {
         </section>
       )}
 
-      {importFlow.choice && (
-        <ImportWorkspaceDialog
-          choice={importFlow.choice}
+      {importFlow.workspace && (
+        <AddWorkspaceDialog
+          key={importFlow.workspace.path}
+          workspace={importFlow.workspace}
           isPending={importFlow.isPending}
           errorMessage={importFlow.error?.message}
-          onHarnessChange={importFlow.selectHarness}
           onSubmit={importFlow.submit}
-          onReset={importFlow.reset}
+          onClose={importFlow.reset}
         />
       )}
 

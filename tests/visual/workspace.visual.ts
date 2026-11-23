@@ -4,7 +4,7 @@ import type { Identity } from '@/client/features/identity/types'
 import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
 import type { ClientAppConfig, WorkspaceLayoutResponse } from '@/lib/types'
 
-import { API, suite, WORKSPACE } from './fixtures'
+import { API, HARNESSES, suite, WORKSPACE } from './fixtures'
 
 const { describe, test } = suite(import.meta.path)
 const WORKSPACE_PAGE = `/#/workspace/${WORKSPACE}`
@@ -139,7 +139,30 @@ describe('Workspace', () => {
     await page.goto('/#/')
     await page.getByRole('button', { name: 'New', exact: true }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
+    await takeSnapshot()
+    await page.getByRole('textbox', { name: 'Workspace name' }).fill('Project notes')
+    await page.getByRole('button', { name: 'Continue', exact: true }).click()
+    await expect(page.getByRole('button', { name: /Claude/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    await takeSnapshot('workspace agent')
   })
+
+  test(
+    'import preselects a detected connected agent',
+    async page => {
+      await page.goto('/#/')
+      await page.getByRole('button', { name: 'Add', exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: 'Import notes' })
+      await expect(dialog.getByRole('button', { name: /ChatGPT/ })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+      await takeSnapshot('import agent')
+    },
+    { api: { '/api/workspaces/discover': [{ path: '/projects/notes', harnesses: ['codex'] }] } }
+  )
 })
 
 const sharingUser: Identity = {
@@ -540,13 +563,11 @@ test(
 test(
   'shared workspace opening',
   async page => {
-    await page.route('**/api/workspaces', route =>
-      route.request().method() === 'POST' ? new Promise(() => {}) : route.fallback()
-    )
-    await page.goto('/#/workspace/alice:board')
+    await page.route(`**${ownerBase}`, () => new Promise(() => {}))
+    await page.goto('/#/workspace/alice:owner-board')
     await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
   },
-  { api: { ...remoteAnswers, '/api/workspaces/alice:board': remoteAnswers[ownerBase] } }
+  remoteOptions
 )
 test(
   'shared workspace setup failure can be retried after access succeeds',
@@ -562,9 +583,12 @@ test(
       )
     })
     await page.goto('/#/workspace/alice:owner-board')
+    await page.getByRole('button', { name: /Claude/ }).click()
+    const add = page.getByRole('button', { name: 'Add workspace', exact: true })
+    await add.click()
     await expect(page.getByText('Could not initialize workspace', { exact: false })).toBeVisible()
     await takeSnapshot('workspace registration failed')
-    await page.getByRole('button', { name: 'Try again', exact: true }).click()
+    await add.click()
     await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
     expect(attempts).toBe(2)
   },
@@ -613,14 +637,98 @@ test(
       if (route.request().method() !== 'POST') return route.fallback()
       expect(checkedAccess).toBe(true)
       registrations++
-      expect(route.request().method()).toBe('POST')
+      return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
+    })
+    await page.goto('/#/workspace/alice:owner-board')
+    const dialog = page.getByRole('dialog', { name: 'Add shared workspace' })
+    await expect(dialog.getByText('Choose an agent for Shared board')).toBeVisible()
+    const add = dialog.getByRole('button', { name: 'Add workspace', exact: true })
+    await expect(dialog.getByRole('button', { name: /Claude/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    await expect(add).not.toBeDisabled()
+    expect(registrations).toBe(0)
+    await dialog.getByRole('button', { name: /ChatGPT/ }).click()
+    await takeSnapshot('choose an agent for a shared workspace')
+    await add.click()
+    await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
+    expect(registrations).toBe(1)
+  },
+  { ...remoteOptions, viewports: { '': DEFAULT_VIEWPORT, narrow: { width: 390, height: 844 } } }
+)
+
+test(
+  'an already-added shared workspace opens without asking for an agent',
+  async page => {
+    let registrations = 0
+    await page.route('**/api/workspaces', route => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      registrations++
       return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
     })
     await page.goto('/#/workspace/alice:owner-board')
     await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
-    expect(registrations).toBe(1)
+    await expect(page.getByRole('dialog', { name: 'Add shared workspace' })).toHaveCount(0)
+    expect(registrations).toBe(0)
   },
-  remoteOptions
+  {
+    ...remoteOptions,
+    api: {
+      ...remoteAnswers,
+      '/api/workspaces': [
+        {
+          id: REMOTE,
+          path: '/visitor',
+          addedAt: '',
+          harness: 'claude-code',
+          remote: { user_id: 'alice', workspace_id: 'owner-board' }
+        }
+      ]
+    }
+  }
+)
+
+test(
+  'shared workspace opens before asking for the chosen agent login',
+  async page => {
+    let registrations = 0
+    await page.route('**/api/workspaces', route => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      registrations++
+      return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
+    })
+    await page.goto('/#/workspace/alice:owner-board')
+    const picker = page.getByRole('dialog', { name: 'Add shared workspace' })
+    await expect(picker.getByRole('button', { name: /Claude/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    await picker.getByRole('button', { name: /ChatGPT/ }).click()
+    expect(registrations).toBe(0)
+    await picker.getByRole('button', { name: 'Add workspace', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Set up ChatGPT' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible()
+    await expect(picker).toHaveCount(0)
+    expect(registrations).toBe(1)
+    await takeSnapshot('sign in after opening a shared workspace')
+  },
+  {
+    ...remoteOptions,
+    api: {
+      ...remoteAnswers,
+      [remoteBase]: { ...remoteAnswers[remoteBase], harness: 'codex' },
+      [`${remoteBase}/harness`]: {
+        harness: 'codex',
+        availability: { status: 'available' },
+        models: []
+      },
+      '/api/harnesses/status': {
+        ...HARNESSES,
+        codex: { availability: { status: 'login-required', reason: 'Log in to ChatGPT' } }
+      }
+    }
+  }
 )
 
 test(
@@ -654,9 +762,6 @@ test(
 test(
   'home mixes unopened shares with registered workspaces',
   async page => {
-    await page.route('**/api/workspaces', route =>
-      route.request().method() === 'POST' ? new Promise(() => {}) : route.fallback()
-    )
     await page.goto('/#/')
     const cards = page.getByRole('link', { name: /^Open / })
     await expect(cards).toHaveCount(3)
@@ -665,7 +770,16 @@ test(
     await expect(page.getByRole('link', { name: 'Open Zebra', exact: true })).toBeVisible()
     await takeSnapshot('mixed workspace grid')
     await page.getByRole('link', { name: 'Open Alpha', exact: true }).click()
-    await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
+    const dialog = page.getByRole('dialog', { name: 'Add shared workspace' })
+    await expect(dialog.getByRole('button', { name: /ChatGPT/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    await expect(
+      dialog.getByRole('button', { name: 'Add workspace', exact: true })
+    ).not.toBeDisabled()
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.getByRole('link', { name: 'Open Alpha', exact: true })).toBeVisible()
   },
   {
     api: {
@@ -682,6 +796,10 @@ test(
       ],
       '/api/workspaces/alice:board': { name: 'Bravo' },
       '/api/workspaces/bob:board': { name: 'Alpha' },
+      '/api/harnesses/status': {
+        ...HARNESSES,
+        'claude-code': { availability: { status: 'login-required', reason: 'Log in to Claude' } }
+      },
       '/cloud/api/workspaces/shared': {
         workspaces: [
           { id: 'board', owner: { id: 'alice', name: 'Alice' } },
@@ -734,15 +852,19 @@ test(
       if (route.request().method() !== 'POST') return route.fallback()
       expect(accepted && checkedAccess).toBe(true)
       registrations++
-      expect(route.request().method()).toBe('POST')
       return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
     })
     await page.goto('/#/')
-    await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Invitations', exact: true })).toBeVisible()
     await expect(page.getByText('Import other workspaces', { exact: true })).toBeVisible()
     await takeSnapshot('invitation below workspaces and above imports')
-    await page.getByRole('button', { name: 'Accept', exact: true }).click()
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Add shared workspace' })
+    await expect(dialog.getByText('Choose an agent for Team notes')).toBeVisible()
+    expect(accepted).toBe(false)
+    await dialog.getByRole('button', { name: /Claude/ }).click()
+    await dialog.getByRole('button', { name: 'Add workspace', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
     expect(registrations).toBe(1)
   },
@@ -765,9 +887,13 @@ test(
       })
     )
     await page.goto('/#/')
-    await page.getByRole('button', { name: 'Accept', exact: true }).click()
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Add shared workspace' })
+    await dialog.getByRole('button', { name: /Claude/ }).click()
+    const add = dialog.getByRole('button', { name: 'Add workspace', exact: true })
+    await add.click()
     await expect(page.getByText('Could not accept invitation', { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
+    await expect(add).not.toBeDisabled()
   },
   {
     api: {

@@ -36,6 +36,7 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   if (separator !== -1)
     return (
       <WorkspaceRegistration
+        key={id}
         userId={id.slice(0, separator)}
         workspaceId={id.slice(separator + 1)}
       />
