@@ -257,13 +257,15 @@ test('human credentials cannot be overwritten by an agent invitation', async () 
       refreshToken: 'human-refresh'
     }
     await Bun.write(file, JSON.stringify(credentials))
-    await expect(
-      createRemoteClient(dir).accept(
-        url + '/agent-invite/a?token=' + 'A'.repeat(43),
-        'Lawyer',
-        'muse'
-      )
-    ).rejects.toThrow('Already signed in as a human')
+    for (const origin of [url, 'https://run.moi.computer/cloud']) {
+      await expect(
+        createRemoteClient(dir).accept(
+          origin + '/agent-invite/a?token=' + 'A'.repeat(43),
+          'Lawyer',
+          'muse'
+        )
+      ).rejects.toThrow('Already signed in as a human')
+    }
     expect(await Bun.file(file).json()).toEqual(credentials)
   } finally {
     await rm(dir, { recursive: true, force: true })

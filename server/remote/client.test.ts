@@ -268,6 +268,22 @@ test('validates and normalizes the configured Cloud URL', () => {
   }
 })
 
+test('uses a saved legacy login on the canonical Cloud only', async () => {
+  const legacy = 'https://run.moi.computer/cloud'
+  const canonical = 'https://moi.computer/cloud'
+  await credentials()
+  await Bun.write(
+    join(directory, 'remote-auth.json'),
+    JSON.stringify({ ...(await stored()), url: legacy })
+  )
+  for (const url of [legacy + '/', canonical]) {
+    await config({ url })
+    expect(await client.loginInfo()).toEqual({ url: canonical, login: 'human' })
+  }
+  await config()
+  await expect(client.loginInfo()).rejects.toThrow('Your saved login is not valid')
+})
+
 test('source runs require an explicit Cloud URL', async () => {
   await rm(join(directory, 'config.json'))
   await expect(client.loginInfo()).rejects.toThrow(
