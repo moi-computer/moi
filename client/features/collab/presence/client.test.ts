@@ -280,7 +280,7 @@ test('errors after joining keep the connection available for further presence', 
 })
 
 test('profile edits publish immediately without changing the user id or reconnecting', () => {
-  const alice = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(alice)
   const engine = new CollabClient('workspace')
   stop = engine.start()
@@ -294,7 +294,7 @@ test('profile edits publish immediately without changing the user id or reconnec
 })
 
 test('a directory change that leaves the viewer alone sends nothing to the room', () => {
-  const alice = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice, [bob])
   const engine = new CollabClient('workspace')
@@ -324,7 +324,7 @@ test('changing user reconnects and never sends workspace membership over the soc
 })
 
 test('disabled engine exposes host profiles without starting a transport', () => {
-  const alice = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice)
   const engine = new CollabClient('workspace', false)
@@ -354,7 +354,7 @@ test('disabled engine exposes host profiles without starting a transport', () =>
 })
 
 test('engine cleanup survives remounting and does not leave user listeners or retry sockets', async () => {
-  const alice = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(alice)
   const engine = new CollabClient('workspace')
   stop = engine.start()
@@ -373,7 +373,7 @@ test('engine cleanup survives remounting and does not leave user listeners or re
 })
 
 test('the default engine exposes identity but no workspace directory or transport', () => {
-  const alice = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice, [bob])
   expect(NO_ENGINE.getCurrentUser()).toEqual(alice)
