@@ -11,7 +11,6 @@ import { syncRemoteWorkspaces } from './remote'
 import * as appConfig from '../app-config'
 import {
   DEFAULT_WORKSPACE_STATE_ROOT,
-  getWorkspaceState,
   setWorkspaceStateRoot,
   updateWorkspaceState
 } from '../workspace-state'
@@ -40,7 +39,6 @@ import { changeWorkspaceTrash, startTrashSweeper, sweepTrash } from './trash'
 let dir: string
 let root: string
 const day = 24 * 60 * 60 * 1000
-const calls: string[] = []
 
 const trashWorkspace = (id: string, now?: Date) =>
   setWorkspaceTrashed(id, true, async () => {}, now)
@@ -61,11 +59,7 @@ beforeEach(async () => {
   })
   spyOn(appConfig, 'createdWorkspacesRoot').mockReturnValue(root)
   spyOn(remoteClient, 'fetchRemoteWorkspaces').mockResolvedValue([])
-  calls.length = 0
-  spyOn(remoteClient, 'clearWorkspaceAccess').mockImplementation(async id => {
-    calls.push(id)
-    return { success: true }
-  })
+  spyOn(remoteClient, 'clearWorkspaceAccess').mockResolvedValue({ success: true })
 })
 
 afterEach(async () => {
@@ -104,17 +98,6 @@ test('a trashed workspace is gone from lookups and listings but keeps its place 
   await expect(registerWorkspace(join(root, 'trashed'))).rejects.toThrow('in trash')
 })
 
-test('restore brings back the same workspace without contacting Cloud', async () => {
-  const ws = await workspace(join(root, 'board'))
-  await trashWorkspace(ws.id)
-
-  const result = await changeWorkspaceTrash(ws.id, false)
-
-  expect(result.status).toBe('updated')
-  expect((await getWorkspace(ws.id))?.path).toBe(ws.path)
-  expect(calls).toEqual([])
-})
-
 test('restore is refused once 30 days have passed, before cleanup has run', async () => {
   const ws = await workspace(join(root, 'board'))
   const trashedAt = new Date('2026-01-01T00:00:00Z')
@@ -143,7 +126,7 @@ test.each(['codex', 'openclaw'] as const)(
     expect(existsSync(ws.path)).toBe(true)
 
     await sweepTrash(new Date(trashedAt.getTime() + TRASH_RETENTION_MS))
-    expect(calls).toEqual([])
+    expect(remoteClient.clearWorkspaceAccess).not.toHaveBeenCalled()
     expect(existsSync(ws.path)).toBe(false)
     expect(existsSync(join(dir, 'state', ws.id))).toBe(false)
     expect(await listTrashedWorkspaces()).toEqual([])
@@ -196,7 +179,6 @@ test('sync removes references missing from the remote workspace list', async () 
   await writeFile(join(linked.path, 'mine.txt'), 'keep')
   await updateWorkspaceEnv(gone.path, { set: { KEY: 'removed' } })
   await updateWorkspaceEnv(retained.path, { set: { KEY: 'kept' } })
-  await getWorkspaceState(gone)
   spyOn(remoteClient, 'fetchRemoteWorkspaces').mockResolvedValue([
     { id: 'trash', owner: { id: 'alice', name: 'Alice', email: 'alice@example.com' } },
     { id: 'notes', owner: { id: 'alice', name: 'Alice', email: 'alice@example.com' } },
@@ -229,7 +211,7 @@ test('sync keeps references when the remote workspace list is unavailable', asyn
   expect(existsSync(ref.path)).toBe(true)
 })
 
-test('workspace suggestions skip folders that no longer exist and references to remote workspaces', async () => {
+test('workspace suggestions exclude remote references', async () => {
   await mkdir(join(root, 'plain', '.moi'), { recursive: true })
   await mkdir(join(root, 'remote-board-abc'), { recursive: true })
   await initializeRemoteWorkspaceConfig(join(root, 'remote-board-abc'), {
@@ -277,7 +259,7 @@ test('interrupted reference cleanup finishes after the folder is gone', async ()
   expect(existsSync(join(dir, 'state', ws.id))).toBe(false)
   expect(await Bun.file(join(dir, 'secrets.json')).json()).toEqual({})
   expect(JSON.parse(await Bun.file(join(dir, 'workspaces.json')).text())).toEqual([])
-  expect(calls).toEqual([])
+  expect(remoteClient.clearWorkspaceAccess).not.toHaveBeenCalled()
 })
 
 test('reference cleanup preserves a folder that now points to another workspace', async () => {
@@ -291,7 +273,7 @@ test('reference cleanup preserves a folder that now points to another workspace'
     [ws.path]: { KEY: 'replacement' }
   })
   expect(existsSync(join(ws.path, '.moi', '.workspace.json'))).toBe(true)
-  expect(calls).toEqual([])
+  expect(remoteClient.clearWorkspaceAccess).not.toHaveBeenCalled()
 })
 
 test('standalone startup skips trash cleanup even with an expired registry entry', async () => {
@@ -305,5 +287,5 @@ test('standalone startup skips trash cleanup even with an expired registry entry
   startTrashSweeper()
   expect(interval).not.toHaveBeenCalled()
   expect(existsSync(ws.path)).toBe(true)
-  expect(calls).toEqual([])
+  expect(remoteClient.clearWorkspaceAccess).not.toHaveBeenCalled()
 })

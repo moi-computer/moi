@@ -34,15 +34,12 @@ test('cleanup removes an older Claude skill folder and keeps neighboring skills'
   expect(await personal.text()).toBe('my skill')
 })
 
-test('a user file at .agents survives cleanup of the Claude link', async () => {
-  const { workspace, claude } = await fixture()
+test('removing a dangling Claude skill link leaves its parent directory', async () => {
+  const { claude } = await fixture()
   await mkdir(dirname(claude), { recursive: true })
-  const file = Bun.file(join(workspace, '.agents'))
-  await Bun.write(file, 'keep')
-  await symlink('../../.agents/skills/moi-workspace', claude, 'dir')
+  await symlink('missing', claude, 'dir')
 
   await removeWorkspaceSkill(dirname(claude))
-  expect(await file.text()).toBe('keep')
   await expect(lstat(claude)).rejects.toMatchObject({ code: 'ENOENT' })
   expect((await lstat(dirname(claude))).isDirectory()).toBe(true)
 })

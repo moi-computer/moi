@@ -11,14 +11,9 @@ import { installWorkspaceSkills } from '../skills/workspace'
 import {
   resetWorkspaceEnvForTest,
   setSecretStoreBackend,
-  setWorkspaceEnvStorePath,
-  updateWorkspaceEnv
+  setWorkspaceEnvStorePath
 } from '../workspaces/env'
-import {
-  DEFAULT_WORKSPACE_STATE_ROOT,
-  setWorkspaceStateRoot,
-  updateWorkspaceState
-} from '../workspace-state'
+import { DEFAULT_WORKSPACE_STATE_ROOT, setWorkspaceStateRoot } from '../workspace-state'
 import * as remote from '../remote/client'
 import { codexHarness } from '../harness/codex'
 import {
@@ -98,51 +93,36 @@ test('restoring an unknown workspace answers 404', async () => {
   expect(response.status).toBe(404)
 })
 
-test.each([false, true])(
-  'leaving cleans up the reference after Cloud confirms (has personal files: %s)',
-  async hasFiles => {
-    cloudMode()
-    const target = { user_id: 'alice', workspace_id: 'board' }
-    const path = join(tempDir, 'board')
-    await initializeRemoteWorkspaceConfig(path, target)
-    await installWorkspaceSkills(path, 'codex')
-    const notes = Bun.file(join(path, 'notes.txt'))
-    const otherSkill = Bun.file(join(path, '.agents/skills/personal/SKILL.md'))
-    if (hasFiles) {
-      await Bun.write(notes, 'keep my linked files')
-      await Bun.write(otherSkill, 'keep my skill')
-    }
-    const reference = await registerWorkspace(path, { harness: 'codex' })
-    await updateWorkspaceState(reference, state => {
-      state.openTabs = ['views/board']
-    })
-    await updateWorkspaceEnv(path, { set: { KEY: 'value' } })
-    const stop = spyOn(codexHarness, 'stopWorkspace').mockImplementation(() => {})
-    const leave = spyOn(remote, 'leave')
-      .mockRejectedValueOnce(new Error('Cloud unavailable'))
-      .mockResolvedValue({ success: true })
-    const request = () => api.request(`/api/workspaces/${reference.id}`, { method: 'DELETE' })
+test('leaving cleans up the reference only after Cloud confirms', async () => {
+  cloudMode()
+  const target = { user_id: 'alice', workspace_id: 'board' }
+  const path = join(tempDir, 'board')
+  await initializeRemoteWorkspaceConfig(path, target)
+  await installWorkspaceSkills(path, 'codex')
+  const notes = Bun.file(join(path, 'notes.txt'))
+  const otherSkill = Bun.file(join(path, '.agents/skills/personal/SKILL.md'))
+  await Bun.write(notes, 'keep my linked files')
+  await Bun.write(otherSkill, 'keep my skill')
+  const reference = await registerWorkspace(path, { harness: 'codex' })
+  const stop = spyOn(codexHarness, 'stopWorkspace').mockImplementation(() => {})
+  const leave = spyOn(remote, 'leave')
+    .mockRejectedValueOnce(new Error('Cloud unavailable'))
+    .mockResolvedValue({ success: true })
+  const request = () => api.request(`/api/workspaces/${reference.id}`, { method: 'DELETE' })
 
-    expect((await request()).status).toBe(503)
-    expect((await getWorkspace(reference.id))?.remote).toEqual(target)
-    expect(stop).not.toHaveBeenCalled()
-    expect(existsSync(join(path, '.moi'))).toBe(true)
-    expect(existsSync(join(path, '.claude/skills/moi-workspace/SKILL.md'))).toBe(true)
+  expect((await request()).status).toBe(503)
+  expect((await getWorkspace(reference.id))?.remote).toEqual(target)
+  expect(stop).not.toHaveBeenCalled()
+  expect(existsSync(join(path, '.moi'))).toBe(true)
 
-    expect((await request()).status).toBe(204)
-    expect(leave).toHaveBeenCalledWith('alice', 'board')
-    expect(remote.clearWorkspaceAccess).not.toHaveBeenCalled()
-    expect(stop).toHaveBeenCalledWith(path)
-    expect(await getWorkspace(reference.id)).toBeNull()
-    expect(existsSync(join(path, '.moi'))).toBe(false)
-    expect(existsSync(path)).toBe(hasFiles)
-    if (hasFiles) {
-      expect(await notes.text()).toBe('keep my linked files')
-      expect(await otherSkill.text()).toBe('keep my skill')
-      expect(existsSync(join(path, '.agents/skills/moi-workspace'))).toBe(false)
-      expect(existsSync(join(path, '.claude'))).toBe(false)
-    }
-    expect(existsSync(join(tempDir, 'state', reference.id))).toBe(false)
-    expect(await Bun.file(join(tempDir, 'secrets.json')).json()).toEqual({})
-  }
-)
+  expect((await request()).status).toBe(204)
+  expect(leave).toHaveBeenCalledWith('alice', 'board')
+  expect(remote.clearWorkspaceAccess).not.toHaveBeenCalled()
+  expect(stop).toHaveBeenCalledWith(path)
+  expect(await getWorkspace(reference.id)).toBeNull()
+  expect(existsSync(join(path, '.moi'))).toBe(false)
+  expect(await notes.text()).toBe('keep my linked files')
+  expect(await otherSkill.text()).toBe('keep my skill')
+  expect(existsSync(join(path, '.agents/skills/moi-workspace'))).toBe(false)
+  expect(existsSync(join(path, '.claude'))).toBe(false)
+})

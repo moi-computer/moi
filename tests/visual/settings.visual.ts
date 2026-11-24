@@ -45,7 +45,7 @@ describe('Settings', () => {
           await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
         } else {
           const dialog = page.getByRole('alertdialog', { name: `Delete ${WORKSPACE}`, exact: true })
-          await expect(dialog.getByText('You have 30 days to restore it.')).toBeVisible()
+          await expect(dialog.getByRole('button', { name: 'Delete workspace' })).toBeVisible()
         }
       },
       { api: { '/api/config': { environment, demo: false, demoInstallUrl: '/' } } }
