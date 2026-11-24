@@ -53,7 +53,7 @@ test('cursors render supplied positions and profiles without a collaboration pro
       cursors={[
         {
           connectionId: 'peer-tab',
-          profile: { id: 'ada', name: 'Ada', color: 'cyan' },
+          profile: { type: 'human', id: 'ada', name: 'Ada', color: 'cyan' },
           point: { x: 10, y: 20 }
         }
       ]}

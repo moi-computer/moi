@@ -26,7 +26,12 @@ test('you label is opt-in and identifies the current user by id', () => {
 })
 
 test('you label follows display-name fallbacks and stays hidden without a current user', () => {
-  const profile = { id: 'nameless', email: 'user@example.test', color: 'cyan' } as const
+  const profile = {
+    type: 'human',
+    id: 'nameless',
+    email: 'user@example.test',
+    color: 'cyan'
+  } as const
   const room = createFakeEngine({ self: profile, users: [profile] })
   const rendered = renderCollab(room, <UserContainer id={profile.id} showYouLabel />)
   expect(rendered).toContain('user@example.test')

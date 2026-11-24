@@ -37,7 +37,7 @@ export function randomLocalUser(current?: LocalUserDraft): LocalUserDraft {
 
 export function localUserProfile(id: string, draft: LocalUserDraft): UserProfile {
   const name = draft.name.trim()
-  return { id, ...(name ? { name } : {}), color: draft.color }
+  return { id, type: 'human', ...(name ? { name } : {}), color: draft.color }
 }
 
 // The id stays with the browser through renames, so peers keep seeing one user.

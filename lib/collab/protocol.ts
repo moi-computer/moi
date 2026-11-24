@@ -38,7 +38,7 @@ export function isUserProfile(value: unknown): value is UserProfile {
     isCollabString(value.id, 240) &&
     value.id.trim().length > 0 &&
     (value.name === undefined || (isCollabString(value.name) && value.name.trim().length > 0)) &&
-    (value.type === undefined || value.type === 'human' || value.type === 'agent') &&
+    (value.type === 'human' || value.type === 'agent') &&
     (value.ownerId === undefined ||
       (value.type === 'agent' && isCollabString(value.ownerId, 240))) &&
     isUserColor(value.color) &&

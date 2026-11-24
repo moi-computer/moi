@@ -31,7 +31,7 @@ export function normalizeUserProfile(value: UserProfileInput): UserProfile {
   const name = value.name?.trim()
   const normalized: UserProfile = {
     id,
-    type: value.type ?? 'human',
+    type: value.type,
     ...(value.ownerId !== undefined && { ownerId: value.ownerId }),
     ...(name ? { name } : {}),
     color: value.color ?? colorForId(id),

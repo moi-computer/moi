@@ -4,8 +4,8 @@ import { connectPlaygroundParticipants } from './playground-room'
 
 test('participants exchange real publications, clear them, and stop relaying on cleanup', () => {
   const users = [
-    { id: 'you', name: 'You', color: 'violet' as const },
-    { id: 'fig', name: 'Fig', color: 'amber' as const }
+    { type: 'human' as const, id: 'you', name: 'You', color: 'violet' as const },
+    { type: 'human' as const, id: 'fig', name: 'Fig', color: 'amber' as const }
   ]
   const rooms = users.map(self => createFakeEngine({ self, users, page: 'playground' }))
   const [you, fig] = rooms

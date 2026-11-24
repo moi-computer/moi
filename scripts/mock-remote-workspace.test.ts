@@ -127,7 +127,7 @@ describe('owner startup', () => {
         JSON.stringify({
           type: 'join',
           version: 1,
-          profile: { id: 'visitor', name: 'Visitor', color: 'blue' }
+          profile: { type: 'human', id: 'visitor', name: 'Visitor', color: 'blue' }
         })
       )
       await peersActive.promise

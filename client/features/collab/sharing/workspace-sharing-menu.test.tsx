@@ -22,13 +22,18 @@ import { createFakeEngine } from '../testing/fake-engine'
 import type { FakeEngineOptions } from '../testing/fake-engine'
 import { CollabContext, CollabProvider } from '../presence/provider'
 
-const self = { id: 'self', name: 'Self', color: 'emerald' } as const
-const active = { id: 'active', name: 'Active colleague', color: 'blue' } as const
-const away = { id: 'away', name: 'Away colleague', color: 'blue' } as const
+const self = { type: 'human', id: 'self', name: 'Self', color: 'emerald' } as const
+const active = { type: 'human', id: 'active', name: 'Active colleague', color: 'blue' } as const
+const away = { type: 'human', id: 'away', name: 'Away colleague', color: 'blue' } as const
 const offline = Array.from(
   { length: 3 },
   (_, index) =>
-    ({ id: `offline-${index}`, name: `Offline colleague ${index}`, color: 'blue' }) as const
+    ({
+      type: 'human',
+      id: `offline-${index}`,
+      name: `Offline colleague ${index}`,
+      color: 'blue'
+    }) as const
 )
 
 function connection(user: UserProfile, page: string | null): Connection {
@@ -115,7 +120,7 @@ test('header shows only active users, reversed from the popup order', () => {
 test('header limits active avatars to four and puts the overflow on the left', () => {
   const peers = Array.from(
     { length: 5 },
-    (_, i) => ({ id: `p${i}`, name: `Peer ${i}`, color: 'blue' }) as const
+    (_, i) => ({ type: 'human', id: `p${i}`, name: `Peer ${i}`, color: 'blue' }) as const
   )
   const html = renderSharingMenu({
     self,

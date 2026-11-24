@@ -82,7 +82,7 @@ async function connect(url: string, id: string) {
   socket.onmessage = event => messages.push(JSON.parse(String(event.data)) as CollabServerMessage)
   const send = (message: CollabClientMessage) => socket.send(JSON.stringify(message))
   await until(() => socket.readyState === WebSocket.OPEN)
-  send({ type: 'join', version: 1, profile: { id, name: id, color: 'blue' } })
+  send({ type: 'join', version: 1, profile: { type: 'human', id, name: id, color: 'blue' } })
   await until(() => messages.some(message => message.type === 'welcome'))
   return { socket, messages, send }
 }
@@ -126,7 +126,7 @@ function joinLocal(runtime: CollabManager, socket: ClientSocket, id = 'anna') {
     JSON.stringify({
       type: 'join',
       version: 1,
-      profile: { id, name: id, color: 'blue' }
+      profile: { type: 'human', id, name: id, color: 'blue' }
     })
   )
 }
@@ -233,7 +233,7 @@ describe('collab process and socket integration', () => {
       JSON.stringify({
         type: 'join',
         version: 0,
-        profile: { id: 'invalid', name: 'Invalid', color: 'blue' }
+        profile: { type: 'human', id: 'invalid', name: 'Invalid', color: 'blue' }
       }),
       JSON.stringify({
         type: 'mutate',
@@ -301,7 +301,12 @@ describe('collab process and socket integration', () => {
   test('a proxy-verified socket joins only with its verified id and keeps its verified profile', async () => {
     const runtime = manager()
     const workspace = directory()
-    const verified = { id: 'cf-user-1', color: 'blue', email: 'alex@example.com' } as const
+    const verified = {
+      type: 'human',
+      id: 'cf-user-1',
+      color: 'blue',
+      email: 'alex@example.com'
+    } as const
     const [client, peer, other] = [localSocket(), localSocket(), localSocket()]
     runtime.open(other.socket, workspace, { verifiedProfile: verified })
     joinLocal(runtime, other.socket, 'host-user')
@@ -406,7 +411,7 @@ describe('collab process and socket integration', () => {
         return message.length;
       }, close() {} };
       runtime.open(socket, ${JSON.stringify(root)});
-      runtime.message(socket, JSON.stringify({ type: 'join', version: 1, profile: { id: 'test', name: 'Test', color: 'blue' } }));
+      runtime.message(socket, JSON.stringify({ type: 'join', version: 1, profile: { type: 'human', id: 'test', name: 'Test', color: 'blue' } }));
     `
     )
     const parent = Bun.spawn([process.execPath, parentPath], { stdout: 'pipe', stderr: 'inherit' })

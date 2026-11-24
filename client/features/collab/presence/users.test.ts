@@ -26,6 +26,7 @@ const source = { connections, users: [alice, bob, eve] }
 
 test('display names fall back to email or stable id without changing profile fields', () => {
   const nameless = {
+    type: 'human',
     id: 'user-id',
     color: 'emerald',
     name: '  ',
@@ -34,7 +35,7 @@ test('display names fall back to email or stable id without changing profile fie
   expect(userDisplayName({ ...nameless, name: '  Named user  ' })).toBe('Named user')
   expect(userDisplayName(nameless)).toBe('user@example.test')
   expect(userDisplayName({ ...nameless, email: '  ' })).toBe('user-id')
-  expect(userDisplayName({ id: 'only-id', color: 'emerald' })).toBe('only-id')
+  expect(userDisplayName({ type: 'human', id: 'only-id', color: 'emerald' })).toBe('only-id')
   expect(nameless.name).toBe('  ')
   expect(nameless.email).toBe('  user@example.test  ')
 })
@@ -128,11 +129,4 @@ test('summary prefers an active page, keeps the first active connection, and use
   expect(result[0]).toMatchObject({ self: true, page: 'current-page' })
   expect(result[1]).toMatchObject({ page: 'board', status: 'active' })
   expect(result[2]).toMatchObject({ page: undefined, status: 'away' })
-})
-
-test('stored agent references resolve to the current identity and its live status', () => {
-  const bot = { ...bob, type: 'agent' as const, ownerId: alice.id }
-  const members = { connections, users: [alice, bot] }
-  expect(resolveUser(members, 'agent:bob')).toEqual({ ...bot, status: 'active' })
-  expect(resolveUser(members, 'agent:alice')).toBeUndefined()
 })

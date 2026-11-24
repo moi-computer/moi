@@ -21,7 +21,7 @@ describe('collab service', () => {
     service.receive(connectionId, {
       type: 'join',
       version: 1,
-      profile: { id, name: id, color: 'blue' },
+      profile: { type: 'human', id, name: id, color: 'blue' },
       location: { page: 'views/board', status: 'active' }
     })
   }
@@ -57,8 +57,8 @@ describe('collab service', () => {
         }
       ],
       users: [
-        { id: 'anna', name: 'anna', color: 'blue' },
-        { id: 'boris', name: 'boris', color: 'blue' }
+        { type: 'human', id: 'anna', name: 'anna', color: 'blue' },
+        { type: 'human', id: 'boris', name: 'boris', color: 'blue' }
       ]
     })
   })
@@ -111,6 +111,7 @@ describe('collab service', () => {
     join('one', 'anna')
     join('two', 'anna')
     const profile = {
+      type: 'human',
       id: 'anna',
       name: 'Anna updated',
       color: 'blue',
@@ -123,7 +124,7 @@ describe('collab service', () => {
     expect(() =>
       service.receive('two', {
         type: 'profile',
-        profile: { id: 'boris', name: 'Boris', color: 'pink' }
+        profile: { type: 'human', id: 'boris', name: 'Boris', color: 'pink' }
       })
     ).toThrow('Reconnect')
     expect(() => service.receive('missing', { type: 'ping' })).toThrow('Join')
@@ -132,6 +133,7 @@ describe('collab service', () => {
 
   test('nameless profiles and clearing a name preserve supplied optional data across tabs', () => {
     const nameless = {
+      type: 'human',
       id: 'anna',
       color: 'blue',
       email: 'anna@example.com',
@@ -148,7 +150,7 @@ describe('collab service', () => {
     expect(latest().users).toEqual([nameless])
     service.leave('one')
     expect(latest().users).toEqual([nameless])
-    const minimal = { id: 'anna', color: 'blue' } as const
+    const minimal = { type: 'human', id: 'anna', color: 'blue' } as const
     service.receive('two', { type: 'profile', profile: minimal })
     expect(latest().users).toEqual([minimal])
     expect(Object.hasOwn(latest().users[0]!, 'name')).toBe(false)

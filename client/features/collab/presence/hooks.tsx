@@ -68,7 +68,6 @@ export function useMe(): WorkspaceUser | undefined {
         : undefined
     return {
       ...self,
-      type: self.type ?? 'human',
       ...(ownerId && { ownerId }),
       status: userStatus(state.connections, self.id)
     }

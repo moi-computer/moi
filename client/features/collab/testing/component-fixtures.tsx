@@ -9,11 +9,14 @@ import { presenceTarget } from '../presence/presence-target'
 import { createFakeEngine } from './fake-engine'
 import type { FakeEngine } from './fake-engine'
 
-export const me: UserProfile = { id: 'me', name: 'Me', color: 'blue' }
-export const peer: UserProfile = { id: 'peer', name: 'Ada', color: 'cyan' }
+export const me: UserProfile = { type: 'human', id: 'me', name: 'Me', color: 'blue' }
+export const peer: UserProfile = { type: 'human', id: 'peer', name: 'Ada', color: 'cyan' }
 export const namelessUsers = [
-  [{ id: 'user-id', color: 'cyan' }, 'user-id'],
-  [{ id: 'user-id', name: '   ', email: 'user@example.test', color: 'cyan' }, 'user@example.test']
+  [{ type: 'human', id: 'user-id', color: 'cyan' }, 'user-id'],
+  [
+    { type: 'human', id: 'user-id', name: '   ', email: 'user@example.test', color: 'cyan' },
+    'user@example.test'
+  ]
 ] satisfies Array<[UserProfile, string]>
 
 export function createRoom(profile: UserProfile = peer, presence: PresenceRegistration[] = []) {

@@ -239,7 +239,13 @@ test(
                     connectionId: 'self',
                     users: [
                       message.profile,
-                      { id: 'tony', name: 'Tony', email: 'tony@example.com', color: 'blue' }
+                      {
+                        type: 'human',
+                        id: 'tony',
+                        name: 'Tony',
+                        email: 'tony@example.com',
+                        color: 'blue'
+                      }
                     ],
                     connections: [
                       ...['lee', 'sam', 'pat', 'cleo'].map(id => ({

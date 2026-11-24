@@ -209,6 +209,7 @@ function InvitationRow({ workspaceId, invitation }: InvitationRowProps) {
         className="flex-1 text-muted-foreground **:data-[slot=avatar]:opacity-30"
         size="sm"
         profile={{
+          type: 'human',
           id: invitation.id,
           email: invitation.email,
           color: colorForId(invitation.email)

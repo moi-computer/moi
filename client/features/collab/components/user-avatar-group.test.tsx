@@ -16,7 +16,10 @@ test('avatar groups deduplicate user IDs and count the remaining users in overfl
 
 test('avatar groups render supplied profiles and overflow without a collaboration provider', () => {
   const html = renderToStaticMarkup(
-    <UserAvatarGroup users={[{ id: 'ada', name: 'Ada', color: 'cyan' }, undefined]} max={1} />
+    <UserAvatarGroup
+      users={[{ type: 'human', id: 'ada', name: 'Ada', color: 'cyan' }, undefined]}
+      max={1}
+    />
   )
   expect(html).toContain('aria-label="Ada"')
   expect(html).toContain('aria-label="2 users"')

@@ -23,19 +23,8 @@ export function userStatus(connections: readonly Connection[], id: string): User
 }
 
 export function resolveUser(source: UsersSource, id: string): WorkspaceUser | undefined {
-  const profile =
-    source.users.find(user => user.id === id) ??
-    // Applets may still have assignee IDs saved by an older version of Moi.
-    (id.startsWith('agent:')
-      ? source.users.find(user => user.type === 'agent' && user.id === id.slice(6))
-      : undefined)
-  return profile
-    ? {
-        ...profile,
-        type: profile.type ?? 'human',
-        status: userStatus(source.connections, profile.id)
-      }
-    : undefined
+  const profile = source.users.find(user => user.id === id)
+  return profile ? { ...profile, status: userStatus(source.connections, id) } : undefined
 }
 
 export function resolvePeers(

@@ -8,7 +8,7 @@ import {
   isUserProfile
 } from './protocol'
 
-const profile = { id: 'anna', name: 'Anna', color: 'violet' } as const
+const profile = { type: 'human', id: 'anna', name: 'Anna', color: 'violet' } as const
 const presence = {
   type: 'presence:set',
   registrationId: 'field',
@@ -65,7 +65,7 @@ test('only protocol v1 clients with a user profile can join', () => {
 })
 
 test('join and profile updates accept missing names and reject blank names', () => {
-  const unnamed = { id: 'anna', color: 'violet' } as const
+  const unnamed = { type: 'human', id: 'anna', color: 'violet' } as const
   for (const profile of [
     unnamed,
     { ...unnamed, email: 'anna@example.com', avatar: 'https://example.com/avatar' }

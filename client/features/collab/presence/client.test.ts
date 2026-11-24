@@ -131,7 +131,7 @@ test('runtime without a current user stays idle and never joins anonymously', ()
 test('an explicit user enables workspace presence without an applet and clearing it disconnects', () => {
   const engine = new CollabClient('workspace')
   stop = engine.start()
-  const profile = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const profile = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(profile)
   expect(sockets).toHaveLength(1)
   const socket = sockets[0]!
@@ -148,7 +148,7 @@ test('an explicit user enables workspace presence without an applet and clearing
 })
 
 test('two tabs send the same resolved color for a host user without one', () => {
-  signIn({ id: 'alice' })
+  signIn({ type: 'human', id: 'alice' })
   const first = new CollabClient('workspace')
   const second = new CollabClient('workspace')
   stop = first.start()
@@ -159,7 +159,7 @@ test('two tabs send the same resolved color for a host user without one', () => 
     for (const socket of sockets) {
       expect(socket.sent[0]).toMatchObject({
         type: 'join',
-        profile: { id: 'alice', color: colorForId('alice') }
+        profile: { type: 'human', id: 'alice', color: colorForId('alice') }
       })
     }
   } finally {
@@ -168,7 +168,7 @@ test('two tabs send the same resolved color for a host user without one', () => 
 })
 
 test('reconnecting restores current presence and removed registrations stay gone', async () => {
-  signIn({ id: 'alice', name: 'Alice', color: colorForId('alice') })
+  signIn({ type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') })
   const engine = new CollabClient('workspace')
   stop = engine.start()
   sockets[0]!.open()
@@ -206,10 +206,10 @@ test('a rejected join retries after capacity frees and cleanup cancels pending w
     service.receive(`occupied-${index}`, {
       type: 'join',
       version: 1,
-      profile: { id: `occupied-${index}`, color: 'blue' }
+      profile: { type: 'human', id: `occupied-${index}`, color: 'blue' }
     })
   }
-  signIn({ id: 'alice', color: 'emerald' })
+  signIn({ type: 'human', id: 'alice', color: 'emerald' })
   const heartbeat = spyOn(globalThis, 'setInterval')
   const clearHeartbeat = spyOn(globalThis, 'clearInterval')
   const timer = spyOn(globalThis, 'setTimeout')
@@ -262,7 +262,7 @@ test('a rejected join retries after capacity frees and cleanup cancels pending w
 })
 
 test('errors after joining keep the connection available for further presence', () => {
-  signIn({ id: 'alice', color: 'emerald' })
+  signIn({ type: 'human', id: 'alice', color: 'emerald' })
   const client = new CollabClient('workspace')
   stop = client.start()
   const socket = sockets[0]!
@@ -295,7 +295,7 @@ test('profile edits publish immediately without changing the user id or reconnec
 
 test('a directory change that leaves the viewer alone sends nothing to the room', () => {
   const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
-  const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
+  const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice, [bob])
   const engine = new CollabClient('workspace')
   stop = engine.start()
@@ -311,11 +311,11 @@ test('a directory change that leaves the viewer alone sends nothing to the room'
 })
 
 test('changing user reconnects and never sends workspace membership over the socket', async () => {
-  signIn({ id: 'alice', name: 'Alice', color: colorForId('alice') })
+  signIn({ type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') })
   const engine = new CollabClient('workspace')
   stop = engine.start()
   sockets[0]!.open()
-  signIn({ id: 'bob', name: 'Bob', color: 'blue' })
+  signIn({ type: 'human', id: 'bob', name: 'Bob', color: 'blue' })
   expect(sockets[0]!.readyState).toBe(3)
   await Bun.sleep(550)
   sockets[1]!.open()
@@ -325,7 +325,7 @@ test('changing user reconnects and never sends workspace membership over the soc
 
 test('disabled engine exposes host profiles without starting a transport', () => {
   const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
-  const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
+  const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice)
   const engine = new CollabClient('workspace', false)
   stop = engine.start()
@@ -374,7 +374,7 @@ test('engine cleanup survives remounting and does not leave user listeners or re
 
 test('the default engine exposes identity but no workspace directory or transport', () => {
   const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
-  const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
+  const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice, [bob])
   expect(NO_ENGINE.getCurrentUser()).toEqual(alice)
   // No workspace means no member directory.
@@ -393,7 +393,7 @@ test('the default engine exposes identity but no workspace directory or transpor
 })
 
 test('cloud presence waits for this workspace membership and closes when access is removed', () => {
-  const viewer = { id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const viewer = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(viewer)
   const engine = new CollabClient('other-workspace')
   stop = engine.start()
@@ -417,7 +417,7 @@ test('cloud presence waits for this workspace membership and closes when access 
 })
 
 test('remote presence connects to the owner with the same membership rules', () => {
-  signIn({ id: 'visitor', name: 'Visitor' })
+  signIn({ type: 'human', id: 'visitor', name: 'Visitor' })
   clearWorkspaceMembers()
   const id = 'visitor-board'
   seedWorkspaceInfo(id, { user_id: 'alice', workspace_id: 'board' })
@@ -446,7 +446,7 @@ test('presence joins a shared workspace socket and leaving keeps it for shared u
   sockets[0]!.open()
   expect(sockets[0]!.sent).toEqual([])
 
-  signIn({ id: 'alice', name: 'Alice' })
+  signIn({ type: 'human', id: 'alice', name: 'Alice' })
   const engine = new CollabClient('workspace', true, socket)
   stop = engine.start()
   expect(sockets).toHaveLength(1)

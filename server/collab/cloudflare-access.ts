@@ -55,7 +55,7 @@ export function accessVerifier(
 // Access tokens carry an id and an email but no display name, so the profile
 // has none and labels fall back to the email. The color is a stable pick from the id.
 export function accessProfile({ id, email }: AccessUser): UserProfile | null {
-  const profile: UserProfile = { id, color: colorForId(id), email }
+  const profile: UserProfile = { id, type: 'human', color: colorForId(id), email }
   return isUserProfile(profile) ? profile : null
 }
 

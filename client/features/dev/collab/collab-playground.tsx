@@ -49,6 +49,7 @@ import { AppletPresenceProvider, CollabContext } from '@/client/features/collab/
 import { connectPlaygroundParticipants } from './playground-room'
 
 const YOU: UserProfile = {
+  type: 'human',
   id: 'you',
   name: 'You',
   email: 'you@example.com',
@@ -56,11 +57,17 @@ const YOU: UserProfile = {
 }
 const USERS: UserProfile[] = [
   YOU,
-  { id: 'fig', name: 'Fig', email: 'fig@example.com', color: 'amber' },
-  { id: 'alex', name: 'Alex Hao', email: 'alex@example.com', color: 'blue' },
-  { id: 'andrea', name: 'Andrea Lim', email: 'andrea@example.com', color: 'pink' },
-  { id: 'pierre', name: 'Pierre', email: 'pierre@example.com', color: 'orange' },
-  { id: 'david', name: 'David Tibbitts', email: 'david@example.com', color: 'emerald' }
+  { type: 'human', id: 'fig', name: 'Fig', email: 'fig@example.com', color: 'amber' },
+  { type: 'human', id: 'alex', name: 'Alex Hao', email: 'alex@example.com', color: 'blue' },
+  { type: 'human', id: 'andrea', name: 'Andrea Lim', email: 'andrea@example.com', color: 'pink' },
+  { type: 'human', id: 'pierre', name: 'Pierre', email: 'pierre@example.com', color: 'orange' },
+  {
+    type: 'human',
+    id: 'david',
+    name: 'David Tibbitts',
+    email: 'david@example.com',
+    color: 'emerald'
+  }
 ]
 const PAGE = 'kit'
 const APPLET_ID = 'views/kit'
