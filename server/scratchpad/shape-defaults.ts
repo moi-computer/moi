@@ -13,6 +13,8 @@ export const SHAPE_DEFAULTS: Record<string, Record<string, unknown>> = {
     w: 100,
     h: 100,
     geo: 'rectangle',
+    flipX: false,
+    flipY: false,
     dash: 'draw',
     growY: 0,
     url: '',
