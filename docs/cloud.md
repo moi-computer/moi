@@ -147,3 +147,9 @@ Cloud collaboration waits until the current identity appears in the workspace's 
 Cloud deployments enable presence and sharing automatically. Cloud workspace setup and skill updates install the collaboration guide and applet types. Local deployments keep a local profile and leave presence disconnected.
 
 The code lives in [identity](../client/features/identity/store.ts), [the frontend API](../client/features/identity/host-api.ts), and [workspace member hooks](../client/features/collab/members/hooks.ts). The [workspace sharing menu](../client/features/collab/sharing/workspace-sharing-menu.tsx) manages invitations and members. [Profile settings](../client/features/app-settings/profile-settings.tsx) manages the user's name and avatar.
+
+## Test collaboration locally
+
+Run `bun run dev:collab` from the Moi checkout. Open the **Anna** and **Boris** URLs printed in the terminal in two tabs or browsers. Both open the same temporary workspace. Each URL keeps its identity on reload. Close one tab to test how its user appears offline.
+
+The command runs a separate Moi server on ports 13338 and 13060 and prints the workspace folder for applet development. It uses the normal workspace APIs and presence WebSocket. The two profiles and their membership are fixtures. Sign-in, invitations, and membership changes require Moi Cloud. Restarting the command creates a fresh workspace.

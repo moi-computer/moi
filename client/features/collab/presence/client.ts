@@ -72,13 +72,12 @@ export class CollabClient implements CollabEngineApi {
   private stopped = true
   private attempts = 0
   private localDirectory: readonly UserProfile[] | undefined
-  private userId: string | undefined
+  private userId = getCurrentUser()?.id
 
   constructor(
     readonly workspaceId: string,
     readonly enabled = true,
-    private readonly socket = createWorkspaceSocket(workspaceId),
-    private readonly localTestProfile?: UserProfile
+    private readonly socket = createWorkspaceSocket(workspaceId)
   ) {
     this.store.setSender(message => this.send(message))
   }
@@ -90,30 +89,20 @@ export class CollabClient implements CollabEngineApi {
     this.enabled ? this.store.getPresenceSnapshot(appletId, channel) : EMPTY_PRESENCE
   subscribe = (listener: () => void): Unsubscribe =>
     this.enabled ? this.store.subscribe(listener) : noop
-  getCurrentUser = () => this.localTestProfile ?? getCurrentUser()
-  subscribeCurrentUser = (listener: () => void) =>
-    this.localTestProfile ? noop : subscribeCurrentUserStore(listener)
+  getCurrentUser = getCurrentUser
+  subscribeCurrentUser = subscribeCurrentUserStore
   getDirectory = () => {
-    if (this.localTestProfile) {
-      const { users } = this.store.getUsersSnapshot()
-      if (users.length) return users
-    } else {
-      const members = getWorkspaceDirectory(this.workspaceId)
-      if (members !== undefined) return members
-    }
+    const members = getWorkspaceDirectory(this.workspaceId)
+    if (members !== undefined) return members
     // Standalone Moi has one local viewer. Cloud membership never falls back.
-    const local =
-      this.localTestProfile ??
-      (getCurrentUserSource() !== 'external' ? getCurrentUser() : undefined)
+    const local = getCurrentUserSource() !== 'external' ? getCurrentUser() : undefined
     if (!local) return undefined
     if (this.localDirectory?.[0] !== local) this.localDirectory = [local]
     return this.localDirectory
   }
   subscribeDirectory = (listener: () => void) => {
-    const members = this.localTestProfile
-      ? this.subscribe(listener)
-      : subscribeWorkspaceDirectory(listener)
-    const identity = this.subscribeCurrentUser(listener)
+    const members = subscribeWorkspaceDirectory(listener)
+    const identity = subscribeCurrentUserStore(listener)
     return () => {
       members()
       identity()
@@ -134,21 +123,19 @@ export class CollabClient implements CollabEngineApi {
     if (!this.enabled) return noop
     if (!this.stopped) return () => {}
     this.stopped = false
-    this.userId = this.getCurrentUser()?.id
-    this.unsubscribeCurrentUser = this.subscribeCurrentUser(() => {
-      const profile = this.getCurrentUser()
+    this.userId = getCurrentUser()?.id
+    this.unsubscribeCurrentUser = subscribeCurrentUserStore(() => {
+      const profile = getCurrentUser()
       if (profile?.id !== this.userId) {
         this.userId = profile?.id
         this.leave()
         this.connect()
       } else if (profile) this.send({ type: 'profile', profile })
     })
-    if (!this.localTestProfile) {
-      this.unsubscribeMembers = subscribeWorkspaceDirectory(() => {
-        if (this.wantsConnection()) this.connect()
-        else this.leave()
-      })
-    }
+    this.unsubscribeMembers = subscribeWorkspaceDirectory(() => {
+      if (this.wantsConnection()) this.connect()
+      else this.leave()
+    })
     this.unsubscribeSocket = this.socket.subscribe({
       open: () => this.join(),
       message: message => this.receive(message),
@@ -159,7 +146,7 @@ export class CollabClient implements CollabEngineApi {
   }
 
   private wantsConnection(): boolean {
-    const viewer = this.getCurrentUser()
+    const viewer = getCurrentUser()
     return (
       !this.stopped &&
       viewer !== undefined &&
@@ -179,7 +166,7 @@ export class CollabClient implements CollabEngineApi {
   }
 
   private join(): void {
-    const profile = this.getCurrentUser()
+    const profile = getCurrentUser()
     if (!this.release || !profile || !this.socket.isOpen) return
     this.socket.send({
       type: 'join',
@@ -220,7 +207,7 @@ export class CollabClient implements CollabEngineApi {
 
   private send(message: CollabClientMessage): void {
     if (
-      !this.getCurrentUser() &&
+      !getCurrentUser() &&
       (message.type === 'location' ||
         message.type === 'presence:set' ||
         message.type === 'presence:delete')

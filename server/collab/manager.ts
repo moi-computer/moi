@@ -7,7 +7,7 @@ import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/pr
 import type { CollabClientMessage, CollabServerMessage, UserProfile } from '@/lib/collab/types'
 
 import { agentActivitySnapshot } from './agent-activity'
-import { getAppConfig, localCollabTestingEnabled } from '../app-config'
+import { getAppConfig } from '../app-config'
 import type { ParentMessage, WorkerMessage } from './worker-messages'
 
 export type ClientSocket = {
@@ -112,7 +112,7 @@ export class CollabManager {
     if (binding.closed) throw new CollabRuntimeError('unavailable', 'Collab connection closed')
     const enabled = this.options.enabled
       ? await this.options.enabled(canonicalPath)
-      : getAppConfig().environment === 'cloud' || localCollabTestingEnabled()
+      : getAppConfig().environment === 'cloud'
     if (!enabled) {
       throw new CollabRuntimeError(
         'unavailable',

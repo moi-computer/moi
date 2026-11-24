@@ -11,7 +11,7 @@ import { startOperations, stopOperations } from './operations/server'
 import index from '../client/index.html'
 import devSandbox from '../client/dev/index.html'
 import { api } from './api'
-import { getAppConfig, localCollabTestingEnabled } from './app-config'
+import { getAppConfig } from './app-config'
 import { harnessStore } from './harness/auth'
 import { PORT } from './constants'
 import { control } from './control'
@@ -179,12 +179,7 @@ export const app = Bun.serve<WsData>({
       upgrade(server, req, { channel: 'events', workspaceId: '' }),
 
     '/api/workspaces/:id/events': async (req: Request, server: Bun.Server<WsData>) => {
-      const url = new URL(req.url)
-      const origin = req.headers.get('Origin')
-      if (localCollabTestingEnabled() && origin && origin !== url.origin) {
-        return new Response('Invalid origin', { status: 403 })
-      }
-      const workspaceId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
+      const workspaceId = decodeURIComponent(new URL(req.url).pathname.split('/')[3] ?? '')
       const workspace = await getWorkspace(workspaceId)
       if (!workspace) return new Response('Workspace not found', { status: 404 })
       if (workspace.remote) return new Response('Use the owner workspace address', { status: 404 })
@@ -233,10 +228,7 @@ export const app = Bun.serve<WsData>({
         // Presence starts with the first presence message; until then the socket only pings.
         if (!ws.data.presence && String(message) === '{"type":"ping"}') {
           ws.send('{"type":"pong"}')
-        } else if (
-          ws.data.workspacePath &&
-          (getAppConfig().environment === 'cloud' || localCollabTestingEnabled())
-        ) {
+        } else if (getAppConfig().environment === 'cloud' && ws.data.workspacePath) {
           if (!ws.data.presence) {
             collabManager.open(ws, ws.data.workspacePath, {
               workspaceId: ws.data.workspaceId,

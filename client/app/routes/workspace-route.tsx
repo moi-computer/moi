@@ -24,7 +24,6 @@ import { useViews } from '@/client/features/views/api'
 import { useWidgets } from '@/client/features/overview/api'
 import { useWorkspaceEvent } from '@/client/runtime/use-client-events'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
-import { useLocalCollabProfile } from '@/client/features/collab/local-test-profile'
 
 type WorkspaceRouteProps = {
   id: string
@@ -60,20 +59,12 @@ type WorkspaceLiveProps = {
   children: ReactNode
 }
 
-// The same owner connection carries shared updates and presence.
+// One owner connection carries shared updates always and presence on Cloud.
 function WorkspaceLive({ id, children }: WorkspaceLiveProps) {
   const { environment } = useAppConfig()
-  const { isRemote } = useWorkspaceLayoutCtx()
   const socket = useWorkspaceSocket(id)
-  const localProfile = useLocalCollabProfile()
-  const localTestProfile = isRemote ? undefined : localProfile
   return (
-    <CollabProvider
-      workspaceId={id}
-      enabled={environment === 'cloud' || localTestProfile !== undefined}
-      socket={socket}
-      localTestProfile={localTestProfile}
-    >
+    <CollabProvider workspaceId={id} enabled={environment === 'cloud'} socket={socket}>
       {children}
     </CollabProvider>
   )

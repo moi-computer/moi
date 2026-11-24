@@ -128,26 +128,6 @@ test('runtime without a current user stays idle and never joins anonymously', ()
   expect(engine.getSnapshot().status).toBe('disconnected')
 })
 
-test('local testing sees both the default profile and a tab profile as peers', () => {
-  const standard = { id: 'local-mole', name: 'Mole', color: 'blue' } as const
-  const custom = { id: 'dev-boris', name: 'Boris', color: 'emerald' } as const
-  const first = new CollabClient('workspace', true, undefined, standard)
-  const second = new CollabClient('workspace', true, undefined, custom)
-  const stopFirst = first.start()
-  const stopSecond = second.start()
-  try {
-    expect(getCurrentUser()).toBeUndefined()
-    expect(sockets).toHaveLength(2)
-    sockets.forEach(socket => socket.open())
-    expect(first.getDirectory()).toEqual([standard, custom])
-    expect(second.getDirectory()).toEqual([standard, custom])
-    expect(second.getCurrentUser()).toEqual(custom)
-  } finally {
-    stopFirst()
-    stopSecond()
-  }
-})
-
 test('an explicit user enables workspace presence without an applet and clearing it disconnects', () => {
   const engine = new CollabClient('workspace')
   stop = engine.start()
