@@ -546,12 +546,6 @@ export type WorkspaceEntry = {
   trashedAt?: string
 }
 
-// A workspace in trash, as the owner's Home lists it.
-export type TrashedWorkspace = Pick<WorkspaceEntry, 'id' | 'icon' | 'theme' | 'harness'> & {
-  name: string
-  trashedAt: string
-}
-
 export type WorkspaceSuggestion = {
   path: string
   displayPath?: string

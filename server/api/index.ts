@@ -1196,17 +1196,7 @@ workspaces.get('/suggestions', async c => c.json(await listWorkspaceSuggestions(
 // Standalone Moi unregisters the workspace and keeps its folder. Only cloud owners have trash.
 workspaces.get('/trash', async c => {
   if (getAppConfig().environment !== 'cloud') return c.json([])
-  const trashed = await mergeWorkspaceList(await listTrashedWorkspaces())
-  return c.json(
-    trashed.map(({ id, name, path, icon, theme, harness, trashedAt }) => ({
-      id,
-      name: name || basename(path),
-      icon,
-      theme,
-      harness,
-      trashedAt
-    }))
-  )
+  return c.json(await mergeWorkspaceList(await listTrashedWorkspaces()))
 })
 
 workspaces.post('/trash/:id/restore', async c => {

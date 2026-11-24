@@ -2,7 +2,7 @@ import { DEFAULT_VIEWPORT, expect, takeSnapshot } from '@uiverify/bun'
 
 import type { Identity } from '@/client/features/identity/types'
 import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
-import type { ClientAppConfig, TrashedWorkspace, WorkspaceLayoutResponse } from '@/lib/types'
+import type { ClientAppConfig, WorkspaceEntry, WorkspaceLayoutResponse } from '@/lib/types'
 
 import { API, HARNESSES, suite, WORKSPACE } from './fixtures'
 
@@ -609,9 +609,20 @@ test(
     api: {
       '/api/config': { environment: 'cloud', demo: false },
       '/api/workspaces/trash': [
-        { id: 'old-store', name: 'Old storefront', trashedAt: '2026-05-01T10:00:00Z' },
-        { id: 'notes', name: 'Launch notes', trashedAt: '2026-05-10T10:00:00Z' }
-      ] satisfies TrashedWorkspace[]
+        {
+          id: 'old-store',
+          path: '/projects/Old storefront',
+          addedAt: '',
+          trashedAt: '2026-05-01T10:00:00Z'
+        },
+        {
+          id: 'notes',
+          path: '/projects/notes',
+          addedAt: '',
+          name: 'Launch notes',
+          trashedAt: '2026-05-10T10:00:00Z'
+        }
+      ] satisfies WorkspaceEntry[]
     }
   }
 )

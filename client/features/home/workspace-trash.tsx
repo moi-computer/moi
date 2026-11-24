@@ -5,7 +5,8 @@ import { WorkspaceIcon } from '@/client/components/shared/workspace-icon'
 import { Button } from '@/client/components/ui/button'
 import { WorkspaceListRow, WorkspaceListSection } from './workspace-list-section'
 import { toast } from '@/client/components/ui/toast'
-import type { TrashedWorkspace } from '@/lib/types'
+import { workspaceDisplayName } from '@/client/features/workspace/workspace-presentation'
+import type { WorkspaceEntry } from '@/lib/types'
 
 import { useRestoreWorkspace, useTrashedWorkspaces } from './api'
 
@@ -27,7 +28,7 @@ export function WorkspaceTrash() {
   )
 }
 
-type TrashRowProps = { workspace: TrashedWorkspace }
+type TrashRowProps = { workspace: WorkspaceEntry }
 
 function TrashRow({ workspace }: TrashRowProps) {
   const restore = useRestoreWorkspace()
@@ -40,7 +41,7 @@ function TrashRow({ workspace }: TrashRowProps) {
         className="size-4 shrink-0 rounded-xs"
       />
       <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-        {workspace.name}
+        {workspaceDisplayName(workspace)}
       </span>
       <Button
         variant="outline"

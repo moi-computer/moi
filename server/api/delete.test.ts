@@ -74,8 +74,10 @@ test('in Cloud, deleting moves the workspace to trash and restore brings it back
   expect((await api.request(`/api/workspaces/${workspace.id}`)).status).toBe(404)
   expect((await api.request(`/api/workspaces/${workspace.id}/views`)).status).toBe(404)
   expect(await (await api.request('/api/workspaces')).json()).toEqual([])
-  const trash = (await (await api.request('/api/workspaces/trash')).json()) as { id: string }[]
-  expect(trash).toMatchObject([{ id: workspace.id, name: 'Board' }])
+  const trash = await (await api.request('/api/workspaces/trash')).json()
+  expect(trash).toMatchObject([
+    { id: workspace.id, name: 'Board', path: workspacePath, addedAt: workspace.addedAt }
+  ])
 
   const restored = await api.request(`/api/workspaces/trash/${workspace.id}/restore`, {
     method: 'POST'

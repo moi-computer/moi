@@ -19,12 +19,7 @@ import {
   workspaceKeys
 } from '@/client/api/workspace-keys'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
-import type {
-  WorkspaceSuggestion,
-  TrashedWorkspace,
-  WorkspaceEntry,
-  WorkspacePreview
-} from '@/lib/types'
+import type { WorkspaceSuggestion, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
 
 const registeredWorkspacesOptions = queryOptions({
   queryKey: workspaceKeys.all,
@@ -169,7 +164,7 @@ export function useDeleteWorkspace(action: 'delete' | 'leave' = 'delete') {
 }
 
 export function useTrashedWorkspaces(enabled: boolean) {
-  return useQuery<TrashedWorkspace[]>({
+  return useQuery<WorkspaceEntry[]>({
     queryKey: trashedWorkspacesKey,
     enabled,
     queryFn: () => requestJson('/api/workspaces/trash'),
@@ -187,7 +182,7 @@ export function useRestoreWorkspace() {
         'Failed to restore workspace'
       ),
     onSuccess: (_entry, workspaceId) => {
-      queryClient.setQueryData<TrashedWorkspace[]>(trashedWorkspacesKey, previous =>
+      queryClient.setQueryData<WorkspaceEntry[]>(trashedWorkspacesKey, previous =>
         (previous ?? []).filter(workspace => workspace.id !== workspaceId)
       )
       queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
