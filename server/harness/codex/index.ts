@@ -19,7 +19,7 @@ import {
   killAllCodexClients,
   killCodexWorkspace
 } from './client'
-import { discoverCodexWorkspaces } from './discovery'
+import { listCodexWorkspaceSuggestions } from './workspace-suggestions'
 import {
   ensureCodexSessionLive,
   getCodexActiveSessions,
@@ -83,7 +83,7 @@ export const codexHarness: Harness = {
   listModels: ws => getCodexModels(ws.path),
   mcpStatus: (ws, onProgress) =>
     getCodexMcpStatus(ws.path, getLatestCodexSessionId(ws.id), onProgress),
-  discoverWorkspaces: registeredPaths => discoverCodexWorkspaces(registeredPaths),
+  listWorkspaceSuggestions: listCodexWorkspaceSuggestions,
   availability: async ws => {
     const runtime = await pathHarnessAvailability('codex')
     return runtime.status === 'available' && ws ? getCodexAuthReadiness(ws.path) : runtime

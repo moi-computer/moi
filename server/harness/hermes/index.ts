@@ -4,7 +4,7 @@
 //
 // See ./NOTES.md for the protocol research and the two backend quirks the ACP
 // layer works around.
-import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
+import type { HarnessWorkspaceSuggestion, Harness } from '../types'
 import { join } from 'node:path'
 
 import type { HarnessAvailability } from '@/lib/types'
@@ -116,11 +116,11 @@ export const hermesHarness: Harness = {
   // Profiles moi has not imported yet. Like OpenClaw, agents are only ever
   // imported — `moi hermes init <profile>` is the install path, and there is
   // no create-from-UI flow.
-  discoverWorkspaces: async registeredPaths => {
+  listWorkspaceSuggestions: async registeredPaths => {
     const profiles = await discoverHermesProfiles()
     return profiles
       .filter(p => !registeredPaths.has(p.path))
-      .map((p): DiscoveredWorkspaceCandidate => ({ path: p.path, harness: 'hermes' }))
+      .map((p): HarnessWorkspaceSuggestion => ({ path: p.path, harness: 'hermes' }))
   },
 
   availability: async (ws): Promise<HarnessAvailability> => {

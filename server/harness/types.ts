@@ -76,7 +76,7 @@ export type WorkspaceActivityPreview = {
   updatedAt?: number
 }
 
-export type DiscoveredWorkspaceCandidate = {
+export type HarnessWorkspaceSuggestion = {
   path: string
   harness: HarnessType
 }
@@ -141,7 +141,7 @@ export type Harness = {
     onProgress?: (connectors: McpServer[]) => void
   ): Promise<McpServer[]>
   // Workspaces this backend knows about that aren't registered yet.
-  discoverWorkspaces?(registeredPaths: Set<string>): Promise<DiscoveredWorkspaceCandidate[]>
+  listWorkspaceSuggestions?(registeredPaths: Set<string>): Promise<HarnessWorkspaceSuggestion[]>
   // Without a workspace, only check whether the runtime is installed. With a
   // workspace, also check provider state such as authentication.
   availability?(ws?: HarnessWorkspace): Promise<HarnessAvailability>

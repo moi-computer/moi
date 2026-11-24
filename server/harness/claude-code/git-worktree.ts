@@ -1,9 +1,9 @@
-// Detecting linked git worktrees so workspace discovery can skip them.
+// Detecting linked git worktrees so workspace suggestions can skip them.
 //
 // Claude Code accumulates session history in every directory an agent ever ran
 // in, including the throwaway checkouts created for worktree-isolated runs.
 // Those derived directories shouldn't surface as importable workspaces in the
-// discovery list, so we filter them out. This is a filter on discovery only:
+// suggestions list, so we filter them out. This only filters suggestions:
 // moi doesn't support running inside a linked worktree as a workspace, and a
 // worktree that was already imported stays registered until removed by hand.
 // Detection fails open — a read error means "not a worktree" — so a transient
@@ -25,7 +25,7 @@ export function pointsIntoWorktrees(gitFileContents: string): boolean {
 // Whether `dir` is a linked git worktree checkout. A normal repo keeps `.git`
 // as a directory (so `readFile` fails with EISDIR → false); a non-repo has no
 // `.git` at all (ENOENT → false). Any read error is treated as "not a
-// worktree" so discovery fails open rather than hiding real workspaces.
+// worktree" so the filter fails open rather than hiding real workspaces.
 export async function isLinkedGitWorktree(dir: string): Promise<boolean> {
   try {
     return pointsIntoWorktrees(await readFile(join(dir, '.git'), 'utf8'))

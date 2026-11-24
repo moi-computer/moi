@@ -4,7 +4,7 @@ import { runClaudeAction } from './run-action'
 import { join } from 'node:path'
 import { forkSession } from '@anthropic-ai/claude-agent-sdk'
 
-import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
+import type { HarnessWorkspaceSuggestion, Harness } from '../types'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import { getClaudeAuthReadiness, startClaudeLogin } from './auth'
 import { isLinkedGitWorktree } from './git-worktree'
@@ -47,10 +47,10 @@ function fmtAgo(ts: number, now: number): string {
   return `${Math.floor(m / 60)}h ${m % 60}m ago`
 }
 
-// Discover directories with CC session history that aren't registered yet.
-async function discoverWorkspaces(
+// Suggest directories with CC session history that aren't registered yet.
+async function listWorkspaceSuggestions(
   registeredPaths: Set<string>
-): Promise<DiscoveredWorkspaceCandidate[]> {
+): Promise<HarnessWorkspaceSuggestion[]> {
   try {
     const { listSessions } = await import('@anthropic-ai/claude-agent-sdk')
     const sessions = await listSessions({})
@@ -106,7 +106,7 @@ export const claudeCodeHarness: Harness = {
   listModels: ws => getClaudeModels(ws.path),
   // Expose only provider apps and explicitly configured MCP servers.
   mcpStatus: async ws => claudeConnectors(await getMcpStatus(ws.path)),
-  discoverWorkspaces,
+  listWorkspaceSuggestions,
   availability: async ws => {
     const runtime = await pathHarnessAvailability('claude-code')
     return runtime.status === 'available' && ws ? getClaudeAuthReadiness(ws.path) : runtime

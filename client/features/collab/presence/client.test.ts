@@ -436,7 +436,7 @@ test('remote presence connects to the owner with the same membership rules', () 
   expect(engine.getSnapshot().status).toBe('disconnected')
 })
 
-test('presence joins a shared workspace socket and leaving keeps it for shared updates', async () => {
+test('presence joins a remote workspace socket and leaving keeps it for shared updates', async () => {
   const socket = new ReconnectingSocket(() => 'ws://localhost/api/workspaces/workspace/events', {
     ping: true
   })

@@ -3,7 +3,7 @@ import type { ViewInfo, WidgetInfo } from '@/lib/types'
 import { useWorkspaceLayoutCtx } from './workspace-layout-context'
 import { WorkspaceContent } from './workspace-content'
 import { useWorkspaceSetup } from './setup/workspace-setup'
-import { WorkspacePendingScreen } from './workspace-pending-screen'
+import { WorkspaceFallbackScreen } from './workspace-fallback-screen'
 
 type WorkspaceScreenProps = {
   contentPending: boolean
@@ -13,7 +13,7 @@ type WorkspaceScreenProps = {
 
 export function WorkspaceScreen({ contentPending, widgets, views }: WorkspaceScreenProps) {
   const { layout, workspaceId, name, harness } = useWorkspaceLayoutCtx()
-  const { content, ready, setupRequired } = useWorkspaceSetup(workspaceId, contentPending, {
+  const { content, ready, showPanel } = useWorkspaceSetup(workspaceId, contentPending, {
     name: name ?? 'Workspace',
     icon: layout.icon,
     harness: harness,
@@ -23,6 +23,6 @@ export function WorkspaceScreen({ contentPending, widgets, views }: WorkspaceScr
   return ready ? (
     <WorkspaceContent widgets={widgets} views={views} />
   ) : (
-    <WorkspacePendingScreen setupRequired={setupRequired}>{content}</WorkspacePendingScreen>
+    <WorkspaceFallbackScreen showPanel={showPanel}>{content}</WorkspaceFallbackScreen>
   )
 }

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { discoverCodexWorkspaces } from './discovery'
+import { listCodexWorkspaceSuggestions } from './workspace-suggestions'
 
 let root: string // fake ~/.codex/sessions
 let workDirs: string // real directories the fake sessions point at
@@ -32,7 +32,7 @@ function sessionMeta(cwd: string, timestamp?: string): string {
   })
 }
 
-describe('discoverCodexWorkspaces', () => {
+describe('listCodexWorkspaceSuggestions', () => {
   test('finds and deduplicates cwds from rollout session_meta lines', async () => {
     const projectA = join(workDirs, 'a')
     await mkdir(projectA)
@@ -46,7 +46,7 @@ describe('discoverCodexWorkspaces', () => {
       sessionMeta(projectA, '2026-07-15T09:30:00Z')
     )
 
-    const found = await discoverCodexWorkspaces(new Set(), root)
+    const found = await listCodexWorkspaceSuggestions(new Set(), root)
     expect(found).toEqual([{ path: projectA, harness: 'codex' }])
   })
 
@@ -59,7 +59,7 @@ describe('discoverCodexWorkspaces', () => {
     await writeRollout('2026/07/10/rollout-2.jsonl', sessionMeta(fresh))
     await writeRollout('2026/07/10/rollout-3.jsonl', sessionMeta(join(workDirs, 'deleted')))
 
-    const found = await discoverCodexWorkspaces(new Set([registered]), root)
+    const found = await listCodexWorkspaceSuggestions(new Set([registered]), root)
     expect(found.map(w => w.path)).toEqual([fresh])
   })
 
@@ -70,7 +70,7 @@ describe('discoverCodexWorkspaces', () => {
     await writeRollout('2026/06/01/rollout-junk.jsonl', 'not json at all')
     await writeRollout('2026/06/01/rollout-nocwd.jsonl', JSON.stringify({ type: 'session_meta' }))
 
-    const found = await discoverCodexWorkspaces(new Set(), root)
+    const found = await listCodexWorkspaceSuggestions(new Set(), root)
     expect(found).toEqual([{ path: flat, harness: 'codex' }])
   })
 
@@ -82,11 +82,11 @@ describe('discoverCodexWorkspaces', () => {
     const truncated = `{"type":"session_meta","payload":{"id":"x","cwd":${JSON.stringify(dir)},"instructions":"${'x'.repeat(64)}`
     await writeRollout('2026/05/01/rollout-truncated.jsonl', truncated)
 
-    const found = await discoverCodexWorkspaces(new Set(), root)
+    const found = await listCodexWorkspaceSuggestions(new Set(), root)
     expect(found).toEqual([{ path: dir, harness: 'codex' }])
   })
 
   test('returns nothing when the sessions dir does not exist', async () => {
-    expect(await discoverCodexWorkspaces(new Set(), join(root, 'missing'))).toEqual([])
+    expect(await listCodexWorkspaceSuggestions(new Set(), join(root, 'missing'))).toEqual([])
   })
 })

@@ -1,7 +1,7 @@
 # Moi Cloud CLI
 
 `moi remote login` opens the browser for human sign-in; `--no-browser` prints the link.
-`moi remote [--json]` shows your account, accepted workspaces, and this folder's remote target.
+`moi remote [--json]` shows your account, workspaces shared with you, and this folder's remote target.
 Use `moi status` for local workspaces.
 
 Human credentials live in `remote-auth.json` in Moi's data directory, with owner-only permissions
@@ -43,7 +43,7 @@ matching the config, plus `success` and `membershipId`. First agent acceptance a
 `agentId` and `hostId`.
 
 ```sh
-moi remote workspaces                  # Shared workspaces, invitations, and acceptance help
+moi remote workspaces                  # Remote workspaces, invitations, and acceptance help
 moi remote invitations --json
 moi remote accept "<invitation-id-or-url>"
 moi remote leave                        # Current folder's remote workspace
@@ -53,9 +53,9 @@ moi remote leave <ownerId>:<workspaceId> # Explicit workspace
 
 `moi remote workspaces --json` returns `workspaces` and `invitations` arrays without formatted help.
 
-`moi remote` shows your signed-in identity. Inside a linked remote workspace it also shows the
-remote ID and a command cheatsheet; local workspaces and unlinked folders show your identity and a help hint.
-Use `moi remote workspaces` to list shared workspaces and pending invitations.
+`moi remote` shows your signed-in identity. From a linked local folder it also shows the remote
+workspace address and a command cheatsheet; local workspaces and unlinked folders show your identity and a help hint.
+Use `moi remote workspaces` to list remote workspaces and pending invitations.
 
 `moi init [directory]` creates a local workspace at version 2. With `--remote`, it writes the
 version 2 remote reference, installs the skill, and registers the folder without downloading
@@ -65,8 +65,7 @@ target; conflicting configs and duplicate registrations at other paths are rejec
 Remote initialization supports `--json` or `--web` separately. `--web` starts the local UI;
 otherwise no local server is needed. `--harness` and `--id` are local-only.
 
-`leave` removes cloud membership and keeps local files and registration. To remove only the
-registration, use Moi's workspace UI. Removing a registration or folder keeps cloud access.
+`moi remote leave` ends your membership. The next successful Cloud sync cleans up the local reference. See [Leaving and deleting](remote-workspaces.md#leaving-and-deleting) for which files Moi keeps.
 
 ## Agent credentials
 
@@ -79,7 +78,7 @@ workspaces keeps the identity available for future invitations.
 
 ## Remote operations
 
-Run these from the linked remote workspace folder. To target another workspace, change into its folder first.
+Run these from the member’s linked local folder. Paths in the remote workspace resolve on the owner’s machine.
 
 ```sh
 moi remote read notes.txt
@@ -127,12 +126,12 @@ Installed packages default to `https://moi.computer/cloud`. Source checkouts req
 ## Use from server code
 
 ```ts
-import { fetchSharedWorkspaces } from './remote/client'
+import { fetchRemoteWorkspaces } from './remote/client'
 
-const workspaces = await fetchSharedWorkspaces()
+const workspaces = await fetchRemoteWorkspaces()
 // [{ id, owner: { id, name, email, ... } }]
 ```
 
-Returns accepted workspaces using the configured Cloud URL and saved credentials. Authentication and network failures throw. No CLI or browser is required.
+Returns remote workspaces the signed-in account can access. Authentication and network failures throw. No CLI or browser is required.
 
 Credentials use the same data-directory layout in every environment. Set `MOI_DATA_DIR` to a different directory to keep local testing and production logins separate. Saved credentials are bound to their Cloud URL (including its mount path) and client ID: changing either requires a new login, and never sends the previous login's tokens to the new target.

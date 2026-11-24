@@ -1,17 +1,17 @@
-// Discover workspace paths from rollout metadata under $CODEX_HOME/sessions
+// Find workspace suggestions in rollout metadata under $CODEX_HOME/sessions
 // (default ~/.codex/sessions), even when the CLI is no longer installed.
 import { readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 
-import type { DiscoveredWorkspaceCandidate } from '../types'
+import type { HarnessWorkspaceSuggestion } from '../types'
 
 export const CODEX_SESSIONS_ROOT = join(
   process.env.CODEX_HOME || join(homedir(), '.codex'),
   'sessions'
 )
 
-// Bound discovery cost; workspaces present only in older rollouts may be missed.
+// Bound the scan; workspaces present only in older rollouts may be missed.
 const SCAN_LIMIT = 400
 // The session_meta line is small (id/cwd/timestamps), but read a generous head
 // in case a Codex version inlines instructions into it.
@@ -80,10 +80,10 @@ async function listRolloutFiles(root: string, limit: number): Promise<string[]> 
   return out
 }
 
-export async function discoverCodexWorkspaces(
+export async function listCodexWorkspaceSuggestions(
   registeredPaths: Set<string>,
   sessionsRoot: string = CODEX_SESSIONS_ROOT
-): Promise<DiscoveredWorkspaceCandidate[]> {
+): Promise<HarnessWorkspaceSuggestion[]> {
   const files = await listRolloutFiles(sessionsRoot, SCAN_LIMIT)
   // Newest-first scan: only the first rollout seen per cwd is needed.
   const byCwd = new Map<string, string | undefined>()
@@ -92,7 +92,7 @@ export async function discoverCodexWorkspaces(
     if (!meta || byCwd.has(meta.cwd)) continue
     byCwd.set(meta.cwd, meta.timestamp)
   }
-  const out: DiscoveredWorkspaceCandidate[] = []
+  const out: HarnessWorkspaceSuggestion[] = []
   for (const cwd of byCwd.keys()) {
     if (registeredPaths.has(cwd)) continue
     try {

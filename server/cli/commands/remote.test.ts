@@ -103,7 +103,7 @@ test('human CLI login, status, workspaces, invitations, acceptance and logout', 
   const directory = await mkdtemp(join(tmpdir(), 'moi-human-commands-'))
   let accepted = false,
     revoked = false,
-    sharedReads = 0
+    remoteWorkspaceReads = 0
   const server = Bun.serve({
     port: 0,
     async fetch(request): Promise<Response> {
@@ -131,8 +131,8 @@ test('human CLI login, status, workspaces, invitations, acceptance and logout', 
       expect(request.headers.get('authorization')).toStartWith('Bearer ')
       if (path.endsWith('/me'))
         return Response.json({ id: 'human', name: 'Alex', email: 'alex@example.com' })
-      if (path.endsWith('/workspaces/shared')) {
-        sharedReads++
+      if (path.endsWith('/workspaces/remote')) {
+        remoteWorkspaceReads++
         return Response.json({
           workspaces: accepted
             ? [{ id: 'board', owner: { id: 'owner', name: 'Owner', email: 'owner@example.com' } }]
@@ -198,7 +198,7 @@ test('human CLI login, status, workspaces, invitations, acceptance and logout', 
     const pendingJson = JSON.parse(await cli(['workspaces', '--json']))
     expect(pendingJson.workspaces).toEqual([])
     expect(pendingJson.invitations[0].id).toBe('invite')
-    const beforeAcceptance = sharedReads
+    const beforeAcceptance = remoteWorkspaceReads
     expect(JSON.parse(await cli(['accept', 'invite', '--json'])).remote).toEqual({
       user_id: 'owner',
       workspace_id: 'board'
@@ -207,7 +207,7 @@ test('human CLI login, status, workspaces, invitations, acceptance and logout', 
       'moi init ./workspace-folder --remote owner:board'
     )
     expect(accepted).toBe(true)
-    expect(sharedReads).toBe(beforeAcceptance)
+    expect(remoteWorkspaceReads).toBe(beforeAcceptance)
     expect(await cli(['workspaces'])).toContain('owner:board')
     await Bun.write(
       join(directory, '.moi/.workspace.json'),
@@ -216,7 +216,7 @@ test('human CLI login, status, workspaces, invitations, acceptance and logout', 
         remote: { user_id: 'owner', workspace_id: 'board' }
       })
     )
-    expect(await cli([])).toContain('Remote ID: owner:board')
+    expect(await cli([])).toContain('Workspace address: owner:board')
     await Bun.write(
       join(directory, '.agents/skills/moi-workspace/SKILL.md'),
       '<moi-skill version="0.1.0" />'

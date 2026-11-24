@@ -148,7 +148,7 @@ test('recovers an abandoned lock before refreshing', async () => {
 test('fresh tokens use no mutation lock and the server helper makes one request', async () => {
   await credentials(Date.now() / 1000 + 3600)
   await mkdir(join(directory, 'remote-auth.json.lock'))
-  expect((await client.fetchSharedWorkspaces())[0]?.id).toBe('w1')
+  expect((await client.fetchRemoteWorkspaces())[0]?.id).toBe('w1')
   expect(requests).toBe(1)
   expect(refreshes).toBe(0)
 })
@@ -243,7 +243,7 @@ test('invalid token responses do not expose secrets or replace saved credentials
 test('redirects are not followed with credentials', async () => {
   await credentials(Date.now() / 1000 + 3600)
   responseMode = 'redirect'
-  await expect(client.fetchSharedWorkspaces()).rejects.toThrow()
+  await expect(client.fetchRemoteWorkspaces()).rejects.toThrow()
   expect(requests).toBe(1)
 })
 

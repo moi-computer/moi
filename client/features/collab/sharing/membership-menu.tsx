@@ -8,24 +8,31 @@ import {
 } from '@/client/components/ui/dropdown-menu'
 import { toast } from '@/client/components/ui/toast'
 import { getAccountGeneration } from '../../identity/store'
+import { useDeleteWorkspace } from '@/client/features/home/api'
 import { useMembershipAction, type MembershipAction } from '../members/hooks'
 
 type MembershipMenuProps = {
   workspaceId: string
-  action: Exclude<MembershipAction, { type: 'invite' }>
-  removeLabel?: string
+  action: Exclude<MembershipAction, { type: 'invite' }> | { type: 'leave' }
   disabled?: boolean
 }
 
-export function MembershipMenu({
-  workspaceId,
-  action,
-  disabled,
-  removeLabel = 'Remove'
-}: MembershipMenuProps) {
+const labels = {
+  leave: 'Leave',
+  remove: 'Remove',
+  revoke: 'Revoke invitation'
+}
+
+export function MembershipMenu({ workspaceId, action, disabled }: MembershipMenuProps) {
+  const leave = useDeleteWorkspace('leave')
   const mutation = useMembershipAction(workspaceId)
+  const pending = mutation.isPending || leave.isPending
   async function submit() {
-    if (mutation.isPending || disabled) return
+    if (pending || disabled) return
+    if (action.type === 'leave') {
+      leave.mutate(workspaceId)
+      return
+    }
     const generation = getAccountGeneration()
     try {
       await mutation.mutateAsync(action)
@@ -41,7 +48,7 @@ export function MembershipMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        disabled={disabled || mutation.isPending}
+        disabled={disabled || pending}
         render={
           <Button
             variant="ghost"
@@ -54,9 +61,7 @@ export function MembershipMenu({
         <IconDots stroke={1.75} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-max">
-        <DropdownMenuItem onClick={() => void submit()}>
-          {action.type === 'remove' ? removeLabel : 'Revoke invitation'}
-        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void submit()}>{labels[action.type]}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

@@ -98,6 +98,8 @@ window.moi.workspaceMembers.setAll([{ id: address, members, invitations }])
 window.moi.workspaceMembers.set(address, { members, invitations })
 window.moi.workspaceMembers.remove(address)
 window.moi.workspaceMembers.clear()
+
+window.moi.remoteWorkspaces.sync() // Relay a remote workspace membership change to this machine
 ```
 
 A workspace is named by its address: `workspaceId` on the account's own machine, and `ownerId:workspaceId` for a workspace someone shared with the account.
@@ -110,7 +112,7 @@ The page starts in this order:
 
 The cloud inserts its module just before `#moi-start`. It also loads `/cloud/bridge.js` for later updates; that download does not hold up rendering. There is no temporary global payload or readiness polling. If either setter is unavailable, initialization does nothing.
 
-`setAll()` replaces the full sharing collection, which is the only source of member lists: the account's own workspaces and every workspace shared with it. An own workspace omitted from it has no invited members; the machine owner still has access. A shared workspace omitted from it is no longer accessible, and its list becomes empty. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
+`setAll()` replaces the full sharing collection, which is the only source of member lists: the account's own workspaces and every workspace shared with it. An own workspace omitted from it has no invited members; the machine owner still has access. A remote workspace omitted from it is no longer accessible, and its list becomes empty. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
 
 When sharing records are removed, existing member lists receive the owner-only replacement immediately. If ownership has not been established, the replacement is empty. This keeps mounted views and live presence in sync.
 

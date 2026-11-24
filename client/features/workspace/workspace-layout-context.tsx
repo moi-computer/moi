@@ -1,8 +1,10 @@
-import { WorkspacePendingScreen } from './workspace-pending-screen'
-import { WorkspaceOpenError, WorkspaceLoadingState } from './setup/workspace-recovery-states'
+import { WorkspaceLoadingState, WorkspaceFallbackScreen } from './workspace-fallback-screen'
+import { WorkspaceOpenError, WorkspaceUnavailableState } from './workspace-error-states'
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
+
+import { useWorkspaces } from '@/client/features/home/api'
 
 import {
   type WorkspaceLayoutResponse,
@@ -122,7 +124,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       setLayout,
       name: query.data?.name ?? null,
       cwd: query.data?.cwd ?? null,
-      harness: query.data ? (query.data.harness ?? 'claude-code') : null,
+      harness: query.data?.harness ?? (query.data && !query.data.isRemote ? 'claude-code' : null),
       workspaceId: id,
       apiBase: query.data?.apiBase ?? '',
       isRemote: query.data?.isRemote ?? false,
@@ -131,14 +133,21 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
     [query.data, query.isLoading, setLayout, id]
   )
 
+  const { data: workspaces } = useWorkspaces()
+  const missing = workspaces && !workspaces.some(workspace => workspace.id === id)
+
   return (
     <WorkspaceLayoutContext value={value}>
-      {query.isPending || personal.isPending ? (
-        <WorkspacePendingScreen>
+      {missing ? (
+        <WorkspaceFallbackScreen showPanel>
+          <WorkspaceUnavailableState />
+        </WorkspaceFallbackScreen>
+      ) : query.isPending || personal.isPending ? (
+        <WorkspaceFallbackScreen>
           <WorkspaceLoadingState />
-        </WorkspacePendingScreen>
+        </WorkspaceFallbackScreen>
       ) : (query.isError && !query.data) || (personal.isError && !personal.data) ? (
-        <WorkspacePendingScreen setupRequired>
+        <WorkspaceFallbackScreen showPanel>
           <WorkspaceOpenError
             error={query.error ?? personal.error!}
             retrying={query.isFetching || personal.isFetching}
@@ -147,7 +156,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
               void personal.refetch()
             }}
           />
-        </WorkspacePendingScreen>
+        </WorkspaceFallbackScreen>
       ) : (
         children
       )}

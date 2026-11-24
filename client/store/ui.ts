@@ -20,10 +20,8 @@ export const defaultWorkspaceUi: WorkspaceUi = {
 type UiStore = {
   workspaces: Record<string, WorkspaceUi>
   setWorkspaceUi: (workspaceId: string, patch: Partial<WorkspaceUi>) => void
-  discoveredWorkspacesOpen: boolean
   workspaceIdsPendingAnalysis: string[]
   composerDrafts: Record<string, string>
-  setDiscoveredWorkspacesOpen: (open: boolean) => void
   markWorkspacePendingAnalysis: (workspaceId: string) => void
   clearWorkspacePendingAnalysis: (workspaceId: string) => void
   setComposerDraft: (key: string, value: string | null) => void
@@ -42,10 +40,8 @@ export const createUiStore = (storage?: StateStorage) =>
               [workspaceId]: { ...defaultWorkspaceUi, ...state.workspaces[workspaceId], ...patch }
             }
           })),
-        discoveredWorkspacesOpen: true,
         workspaceIdsPendingAnalysis: [],
         composerDrafts: {},
-        setDiscoveredWorkspacesOpen: open => set({ discoveredWorkspacesOpen: open }),
         markWorkspacePendingAnalysis: workspaceId =>
           set(state => {
             const workspaceIds = state.workspaceIdsPendingAnalysis ?? []

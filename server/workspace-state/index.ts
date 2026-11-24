@@ -137,8 +137,7 @@ async function peekWorkspacePath(workspaceId: string): Promise<string | undefine
   }
 }
 
-// The id a removed workspace had, so re-adding the same folder brings back its
-// chats, pin and settings.
+// Reuse the previous ID when re-registering a folder so its chats, pin and settings return.
 export async function findStateIdForPath(workspacePath: string): Promise<string | undefined> {
   for (const id of await listStateIds()) {
     if ((await peekWorkspacePath(id)) === workspacePath) return id
@@ -146,9 +145,15 @@ export async function findStateIdForPath(workspacePath: string): Promise<string 
   return undefined
 }
 
-// Startup housekeeping: drop temp files a killed process left behind, and the
-// state of removed workspaces whose folders no longer exist. A removed
-// workspace whose folder still exists keeps its state for re-adding.
+// Permanent deletion of a workspace: its chats' metadata, tabs and pin go with it.
+export async function deleteWorkspaceState(workspaceId: string): Promise<void> {
+  await withLock(workspaceId, async () => {
+    cache.delete(workspaceId)
+    await rm(join(root, workspaceId), { recursive: true, force: true })
+  })
+}
+
+// At startup, clear leftover temp files and discard state for unregistered folders that no longer exist.
 export async function prepareWorkspaceStates(registered: readonly WorkspaceRef[]): Promise<void> {
   const registeredIds = new Set(registered.map(ws => ws.id))
   for (const id of await listStateIds()) {

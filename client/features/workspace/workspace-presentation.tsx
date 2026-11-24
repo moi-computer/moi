@@ -1,5 +1,5 @@
 import { harnessIcon } from '@/client/components/shared/workspace-icon'
-import type { DiscoveredWorkspace, WorkspaceEntry, HarnessType } from '@/lib/types'
+import type { WorkspaceSuggestion, WorkspaceEntry, HarnessType } from '@/lib/types'
 
 import { harnessLabel } from '@/client/features/harness/harness-presentation'
 
@@ -24,7 +24,7 @@ export function WorkspaceAgentIcons({ harnesses }: WorkspaceAgentIconsProps) {
   )
 }
 
-type WorkspaceDisplaySource = WorkspaceEntry | DiscoveredWorkspace
+type WorkspaceDisplaySource = WorkspaceEntry | WorkspaceSuggestion
 
 export function workspaceDisplayName(workspace: WorkspaceDisplaySource): string {
   if ('harnesses' in workspace) return workspace.path.split('/').pop() || workspace.path

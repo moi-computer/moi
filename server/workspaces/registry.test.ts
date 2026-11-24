@@ -6,14 +6,14 @@ import { join } from 'path'
 
 import {
   assertWorkspaceIdAvailable,
-  discoverWorkspaceFolders,
+  listWorkspaceFolders,
   findWorkspaceForPath,
   getWorkspace,
-  mergeWorkspaceCandidates,
+  mergeWorkspaceSuggestions,
   liftToWorkspaceRoot,
   listWorkspaces,
   registerWorkspace,
-  removeWorkspace,
+  unregisterWorkspace,
   reorderWorkspaces,
   setRegistryPath
 } from './registry'
@@ -65,12 +65,12 @@ describe('registerWorkspace', () => {
     expect((await listWorkspaces()).map(entry => entry.id)).toEqual(['other', 'chosen'])
   })
 
-  test('serializes removal and reordering with registration', async () => {
+  test('serializes unregistration and reordering with registration', async () => {
     const a = await registerWorkspace(join(tmpDir, 'a'))
     const b = await registerWorkspace(join(tmpDir, 'b'))
     const [, , c] = await Promise.all([
       reorderWorkspaces([a.id, b.id]),
-      removeWorkspace(a.id),
+      unregisterWorkspace(a.id),
       registerWorkspace(join(tmpDir, 'c'))
     ])
     expect((await listWorkspaces()).map(entry => entry.id)).toEqual([c.id, b.id])
@@ -179,14 +179,14 @@ describe('registerWorkspace with a chosen id', () => {
   })
 })
 
-describe('re-adding a removed workspace', () => {
+describe('re-registering a workspace', () => {
   test('takes back its old id when it left state behind', async () => {
     const path = join(tmpDir, 'project')
     const first = await registerWorkspace(path)
     await updateWorkspaceState(first, state => {
       state.pinnedSessionId = 'chat-1'
     })
-    await removeWorkspace(first.id)
+    await unregisterWorkspace(first.id)
 
     expect((await registerWorkspace(path)).id).toBe(first.id)
   })
@@ -194,7 +194,7 @@ describe('re-adding a removed workspace', () => {
   test('gets a new id when it left no state, or when its old id is taken', async () => {
     const path = join(tmpDir, 'project')
     const first = await registerWorkspace(path)
-    await removeWorkspace(first.id)
+    await unregisterWorkspace(first.id)
     expect((await registerWorkspace(path)).id).not.toBe(first.id)
 
     const other = join(tmpDir, 'other')
@@ -202,7 +202,7 @@ describe('re-adding a removed workspace', () => {
     await updateWorkspaceState(second, state => {
       state.pinnedSessionId = 'chat-1'
     })
-    await removeWorkspace(second.id)
+    await unregisterWorkspace(second.id)
     await registerWorkspace(join(tmpDir, 'third'), { id: second.id })
     expect((await registerWorkspace(other)).id).not.toBe(second.id)
   })
@@ -213,15 +213,15 @@ describe('re-adding a removed workspace', () => {
     await updateWorkspaceState(first, state => {
       state.pinnedSessionId = 'chat-1'
     })
-    await removeWorkspace(first.id)
+    await unregisterWorkspace(first.id)
     expect((await registerWorkspace(path, { id: 'chosen' })).id).toBe('chosen')
   })
 })
 
-describe('workspace discovery grouping', () => {
+describe('workspace suggestion grouping', () => {
   test('groups providers by normalized path in display order', () => {
     const path = '/Users/foo/project'
-    const grouped = mergeWorkspaceCandidates([
+    const grouped = mergeWorkspaceSuggestions([
       { path, harness: 'openclaw' },
       { path: '/Users/foo/project/../project', harness: 'codex' },
       { path, harness: 'claude-code' },
@@ -237,7 +237,7 @@ describe('workspace discovery grouping', () => {
   })
 
   test('filters registered paths after normalization', () => {
-    const grouped = mergeWorkspaceCandidates(
+    const grouped = mergeWorkspaceSuggestions(
       [{ path: '/Users/foo/project/../project', harness: 'codex' }],
       new Set(['/Users/foo/project'])
     )
@@ -246,7 +246,7 @@ describe('workspace discovery grouping', () => {
   })
 })
 
-describe('discoverWorkspaceFolders', () => {
+describe('listWorkspaceFolders', () => {
   test('finds immediate workspace folders without requiring chat history', async () => {
     const workspace = join(tmpDir, 'firma')
     await mkdir(join(workspace, '.moi'), { recursive: true })
@@ -256,22 +256,22 @@ describe('discoverWorkspaceFolders', () => {
     await Bun.write(join(tmpDir, 'invalid', '.moi'), 'not a directory')
     await Bun.write(join(tmpDir, 'file'), 'not a workspace')
 
-    expect(await discoverWorkspaceFolders(tmpDir)).toEqual([{ path: workspace }])
+    expect(await listWorkspaceFolders(tmpDir)).toEqual([{ path: workspace }])
   })
 
-  test('merges folder and history discoveries and excludes registered workspaces', async () => {
+  test('merges folder and history suggestions and excludes registered workspaces', async () => {
     const workspace = join(tmpDir, 'firma')
     const withoutHistory = join(tmpDir, 'fresh')
     await mkdir(join(workspace, '.moi'), { recursive: true })
     await mkdir(join(withoutHistory, '.moi'), { recursive: true })
-    const folders = await discoverWorkspaceFolders(tmpDir)
+    const folders = await listWorkspaceFolders(tmpDir)
     const history = [{ path: workspace, harness: 'codex' as const }]
 
-    expect(mergeWorkspaceCandidates([...history, ...folders])).toEqual([
+    expect(mergeWorkspaceSuggestions([...history, ...folders])).toEqual([
       { path: workspace, harnesses: ['codex'] },
       { path: withoutHistory, harnesses: [] }
     ])
-    expect(mergeWorkspaceCandidates([...history, ...folders], new Set([workspace]))).toEqual([
+    expect(mergeWorkspaceSuggestions([...history, ...folders], new Set([workspace]))).toEqual([
       { path: withoutHistory, harnesses: [] }
     ])
   })
@@ -284,14 +284,14 @@ describe('discoverWorkspaceFolders', () => {
     await symlink(target, join(root, 'linked'), 'dir')
     await symlink(join(tmpDir, 'missing'), join(root, 'broken'), 'dir')
 
-    expect(await discoverWorkspaceFolders(root)).toEqual([{ path: join(root, 'linked') }])
+    expect(await listWorkspaceFolders(root)).toEqual([{ path: join(root, 'linked') }])
   })
 
   test('returns no folders when the workspace root is missing or not a directory', async () => {
-    expect(await discoverWorkspaceFolders(join(tmpDir, 'missing'))).toEqual([])
+    expect(await listWorkspaceFolders(join(tmpDir, 'missing'))).toEqual([])
     const file = join(tmpDir, 'file')
     await Bun.write(file, '')
-    expect(await discoverWorkspaceFolders(file)).toEqual([])
+    expect(await listWorkspaceFolders(file)).toEqual([])
   })
 })
 
@@ -533,7 +533,7 @@ test('remote references get their own ids, one registration per owner workspace'
   // A second folder pointing at the same owner workspace reuses the registration.
   expect((await reference('alice-again', 'alice')).id).toBe(alice.id)
   expect(await listWorkspaces()).toHaveLength(3)
-  await removeWorkspace(alice.id)
+  await unregisterWorkspace(alice.id)
   expect(await getWorkspace(alice.id)).toBeNull()
   expect(await getWorkspace(bob.id)).not.toBeNull()
 })
