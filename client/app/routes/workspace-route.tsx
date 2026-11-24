@@ -1,6 +1,6 @@
 import { WorkspaceRegistration } from './workspace-registration'
 import { WorkspaceErrorMessage } from '@/client/features/workspace/workspace-error-states'
-import { WorkspacePendingScreen } from '@/client/features/workspace/workspace-pending-screen'
+import { WorkspaceFallbackScreen } from '@/client/features/workspace/workspace-fallback-screen'
 import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
 import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-transition'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
@@ -122,7 +122,7 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
 
   if ((!views.data && views.isError) || (widgets.isError && !widgets.hasData)) {
     return (
-      <WorkspacePendingScreen setupRequired>
+      <WorkspaceFallbackScreen showPanel>
         <WorkspaceErrorMessage
           title="Couldn’t load workspace content"
           retrying={views.isFetching || widgets.isFetching}
@@ -133,7 +133,7 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
         >
           Please try again.
         </WorkspaceErrorMessage>
-      </WorkspacePendingScreen>
+      </WorkspaceFallbackScreen>
     )
   }
 

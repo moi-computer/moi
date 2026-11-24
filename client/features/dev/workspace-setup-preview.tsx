@@ -17,8 +17,8 @@ import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { Toaster } from '@/client/components/ui/toast'
 import {
   WorkspaceLoadingState,
-  WorkspacePendingScreen
-} from '@/client/features/workspace/workspace-pending-screen'
+  WorkspaceFallbackScreen
+} from '@/client/features/workspace/workspace-fallback-screen'
 import { WorkspaceLayoutContext } from '@/client/features/workspace/workspace-layout-context'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { useWorkspaceSetup } from '@/client/features/workspace/setup/workspace-setup'
@@ -139,13 +139,13 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
       >
         <main className="flex min-h-0 flex-1 overflow-y-auto bg-muted">
           {scenario === 'welcome' ? (
-            <WorkspacePendingScreen setupRequired>
+            <WorkspaceFallbackScreen showPanel>
               <WorkspaceWelcomeState name="My workspace" harness={harness} />
-            </WorkspacePendingScreen>
+            </WorkspaceFallbackScreen>
           ) : scenario === 'loading' ? (
-            <WorkspacePendingScreen>
+            <WorkspaceFallbackScreen>
               <WorkspaceLoadingState />
-            </WorkspacePendingScreen>
+            </WorkspaceFallbackScreen>
           ) : (
             <SetupScreen />
           )}
@@ -197,7 +197,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
 
 function SetupScreen() {
   const [path] = useLocation()
-  const { content, ready, setupRequired } = useWorkspaceSetup(PREVIEW_WORKSPACE_ID)
+  const { content, ready, showPanel } = useWorkspaceSetup(PREVIEW_WORKSPACE_ID)
   if (ready) return null
   return path === '/' ? (
     <div
@@ -207,7 +207,7 @@ function SetupScreen() {
       Workspace removed
     </div>
   ) : (
-    <WorkspacePendingScreen setupRequired={setupRequired}>{content}</WorkspacePendingScreen>
+    <WorkspaceFallbackScreen showPanel={showPanel}>{content}</WorkspaceFallbackScreen>
   )
 }
 

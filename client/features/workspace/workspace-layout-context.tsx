@@ -1,4 +1,4 @@
-import { WorkspaceLoadingState, WorkspacePendingScreen } from './workspace-pending-screen'
+import { WorkspaceLoadingState, WorkspaceFallbackScreen } from './workspace-fallback-screen'
 import { WorkspaceOpenError, WorkspaceUnavailableState } from './workspace-error-states'
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef } from 'react'
 
@@ -142,15 +142,15 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
   return (
     <WorkspaceLayoutContext value={value}>
       {lostAccess ? (
-        <WorkspacePendingScreen setupRequired>
+        <WorkspaceFallbackScreen showPanel>
           <WorkspaceUnavailableState />
-        </WorkspacePendingScreen>
+        </WorkspaceFallbackScreen>
       ) : query.isPending || personal.isPending ? (
-        <WorkspacePendingScreen>
+        <WorkspaceFallbackScreen>
           <WorkspaceLoadingState />
-        </WorkspacePendingScreen>
+        </WorkspaceFallbackScreen>
       ) : (query.isError && !query.data) || (personal.isError && !personal.data) ? (
-        <WorkspacePendingScreen setupRequired>
+        <WorkspaceFallbackScreen showPanel>
           <WorkspaceOpenError
             error={query.error ?? personal.error!}
             retrying={query.isFetching || personal.isFetching}
@@ -159,7 +159,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
               void personal.refetch()
             }}
           />
-        </WorkspacePendingScreen>
+        </WorkspaceFallbackScreen>
       ) : (
         children
       )}

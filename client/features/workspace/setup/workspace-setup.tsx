@@ -2,7 +2,7 @@ import { useHarnessStatus, useRetryHarnessStatus } from '@/client/features/harne
 import { useCallback } from 'react'
 import { useAppConfig } from '@/client/api/app-config'
 
-import { WorkspaceLoadingState } from '../workspace-pending-screen'
+import { WorkspaceLoadingState } from '../workspace-fallback-screen'
 import { useWorkspaceHarness } from '../api'
 import {
   useWorkspaceWelcome,
@@ -93,6 +93,6 @@ export function useWorkspaceSetup(
       (recovery ?? <WorkspaceLoadingState />)
     ),
     ready: ready && !welcoming,
-    setupRequired: welcoming || !!recovery
+    showPanel: welcoming || !!recovery
   }
 }

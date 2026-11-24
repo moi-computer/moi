@@ -4,18 +4,18 @@ import { ScreenShell } from '@/client/components/shared/screen-shell'
 import { Spinner } from '@/client/components/ui/spinner'
 import { WorkspacePane } from './workspace-pane'
 
-type WorkspacePendingScreenProps = {
-  setupRequired?: boolean
+type WorkspaceFallbackScreenProps = {
+  showPanel?: boolean
   children: ReactNode
 }
 
-export function WorkspacePendingScreen({
-  setupRequired = false,
+export function WorkspaceFallbackScreen({
+  showPanel = false,
   children
-}: WorkspacePendingScreenProps) {
+}: WorkspaceFallbackScreenProps) {
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col font-sans text-foreground">
-      {setupRequired ? (
+      {showPanel ? (
         <WorkspacePane mode="fullscreen">
           <ScreenShell aria-label="Workspace setup">{children}</ScreenShell>
         </WorkspacePane>

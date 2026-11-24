@@ -7,8 +7,8 @@ import { openRemoteWorkspace } from '@/client/features/workspace/add/api'
 import { WorkspaceOpenError } from '@/client/features/workspace/workspace-error-states'
 import {
   WorkspaceLoadingState,
-  WorkspacePendingScreen
-} from '@/client/features/workspace/workspace-pending-screen'
+  WorkspaceFallbackScreen
+} from '@/client/features/workspace/workspace-fallback-screen'
 
 type WorkspaceRegistrationProps = { userId: string; workspaceId: string }
 export function WorkspaceRegistration({ userId, workspaceId }: WorkspaceRegistrationProps) {
@@ -38,7 +38,7 @@ export function WorkspaceRegistration({ userId, workspaceId }: WorkspaceRegistra
 
   return (
     <SidebarLayout>
-      <WorkspacePendingScreen setupRequired={opening.isError}>
+      <WorkspaceFallbackScreen showPanel={opening.isError}>
         {opening.isError ? (
           <WorkspaceOpenError
             error={opening.error}
@@ -50,7 +50,7 @@ export function WorkspaceRegistration({ userId, workspaceId }: WorkspaceRegistra
             <WorkspaceLoadingState />
           </div>
         )}
-      </WorkspacePendingScreen>
+      </WorkspaceFallbackScreen>
     </SidebarLayout>
   )
 }
