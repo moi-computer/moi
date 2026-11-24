@@ -685,7 +685,7 @@ test(
   async page => {
     await page.route(`**${ownerBase}`, () => new Promise(() => {}))
     await page.goto('/#/workspace/alice:owner-board')
-    await expect(page.getByRole('status', { name: 'Opening shared workspace' })).toBeVisible()
+    await expect(page.getByRole('status', { name: 'Loading', exact: true })).toBeVisible()
   },
   remoteOptions
 )

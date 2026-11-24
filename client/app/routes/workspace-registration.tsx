@@ -46,7 +46,7 @@ export function WorkspaceRegistration({ userId, workspaceId }: WorkspaceRegistra
             onRetry={() => void opening.refetch()}
           />
         ) : (
-          <WorkspaceLoadingState aria-label="Opening shared workspace" />
+          <WorkspaceLoadingState />
         )}
       </WorkspaceFallbackScreen>
     </SidebarLayout>
