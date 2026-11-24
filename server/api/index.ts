@@ -1191,6 +1191,8 @@ workspaces.post('/', async c => {
   return c.json((await mergeWorkspaceList([entry]))[0], 201)
 })
 
+workspaces.get('/suggestions', async c => c.json(await listWorkspaceSuggestions()))
+
 // Standalone Moi unregisters the workspace and keeps its folder. Only cloud owners have trash.
 workspaces.get('/trash', async c => {
   if (getAppConfig().environment !== 'cloud') return c.json([])
@@ -1291,7 +1293,6 @@ workspaces.route('/:id', one)
 // ---- top-level API ----------------------------------------------------------
 export const api = new Hono()
 
-api.get('/api/workspace-suggestions', async c => c.json(await listWorkspaceSuggestions()))
 api.route('/api/workspaces', workspaces)
 api.route('/api/harnesses', harnesses)
 api.route('/api/onboarding', onboarding)

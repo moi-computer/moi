@@ -96,7 +96,7 @@ export function useWorkspacePreview(workspaceId: string) {
 export function useWorkspaceSuggestions() {
   return useQuery<WorkspaceSuggestion[]>({
     queryKey: workspaceKeys.suggestions,
-    queryFn: () => requestJson('/api/workspace-suggestions')
+    queryFn: () => requestJson('/api/workspaces/suggestions')
   })
 }
 

@@ -174,7 +174,7 @@ export const API: Record<string, unknown> = {
   '/api/workspaces': workspaces,
   '/cloud/api/workspaces/invitations': { invitations: [] },
   '/cloud/api/workspaces/remote': { workspaces: [] },
-  '/api/workspace-suggestions': [],
+  '/api/workspaces/suggestions': [],
   '/api/workspaces/trash': [],
   '/api/workspaces/previews': {
     [WORKSPACE]: {

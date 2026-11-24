@@ -60,7 +60,7 @@ describe('Workspace', () => {
     'home shows workspace cards while optional lists load',
     async page => {
       await page.route('**/cloud/api/workspaces/remote', () => new Promise(() => {}))
-      await page.route('**/api/workspace-suggestions', () => new Promise(() => {}))
+      await page.route('**/api/workspaces/suggestions', () => new Promise(() => {}))
       await page.route('**/cloud/api/workspaces/invitations', () => new Promise(() => {}))
       await page.goto('/#/')
       await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
@@ -164,7 +164,7 @@ describe('Workspace', () => {
       )
       await takeSnapshot('import agent')
     },
-    { api: { '/api/workspace-suggestions': [{ path: '/projects/notes', harnesses: ['codex'] }] } }
+    { api: { '/api/workspaces/suggestions': [{ path: '/projects/notes', harnesses: ['codex'] }] } }
   )
 })
 
@@ -934,7 +934,7 @@ test(
   {
     api: {
       ...remoteAnswers,
-      '/api/workspace-suggestions': [{ path: '/projects/notes', harnesses: ['claude-code'] }]
+      '/api/workspaces/suggestions': [{ path: '/projects/notes', harnesses: ['claude-code'] }]
     }
   }
 )
