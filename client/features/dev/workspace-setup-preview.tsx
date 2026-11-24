@@ -15,12 +15,14 @@ import {
 } from '@/client/components/ui/dialog'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { Toaster } from '@/client/components/ui/toast'
-import { WorkspacePendingScreen } from '@/client/features/workspace/workspace-pending-screen'
+import {
+  WorkspaceLoadingState,
+  WorkspacePendingScreen
+} from '@/client/features/workspace/workspace-pending-screen'
 import { WorkspaceLayoutContext } from '@/client/features/workspace/workspace-layout-context'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { useWorkspaceSetup } from '@/client/features/workspace/setup/workspace-setup'
 import { WorkspaceWelcomeState } from '@/client/features/workspace/setup/workspace-welcome-state'
-import { WorkspaceLoadingState } from '@/client/features/workspace/setup/workspace-recovery-states'
 import type { AppEnvironment } from '@/lib/types'
 import { harnessLabel } from '@/client/features/harness/harness-presentation'
 import { useHarnessStatus, type LoginHarness } from '@/client/features/harness/api'

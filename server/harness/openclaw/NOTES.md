@@ -710,9 +710,9 @@ upgrade path.
   sending any new param to the gateway.
 - `thinking.ts` — per-model thinking menus learned from session rows, plus the
   relearn-from-rejection path. The effort picker reads it (§5).
-- `discovery.ts` — agents → workspace candidates, models catalog, transcript
-  seeds (2 round-trips: `agents.list` + `sessions.list`, then per-agent
-  `agents.files.get(IDENTITY.md)`).
+- `discovery.ts` reads agents, models, and session history from the gateway.
+  `listWorkspaceSuggestions` in `index.ts` uses the agents’ workspace paths
+  to suggest folders for import.
 - `session.ts` — live session records: `sessions.get` seed, `session.message`
   ingest, `chat` → StreamPreview, tool frames → tool cards, `sessions.patch`
   before sends, echo rendezvous, run-end reconcile, run-error reporting.

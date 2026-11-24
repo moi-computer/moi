@@ -130,7 +130,7 @@ afterEach(async () => {
 })
 
 describe('Claude session message queue', () => {
-  test('removing a workspace stops only its sessions and queued messages', async () => {
+  test('stopping a workspace stops only its sessions and queued messages', async () => {
     await send()
     await send({ workspaceId: 'other', workspacePath: '/fake/other', sessionId: 'other' })
     const queued = send({ content: 'second' })

@@ -51,7 +51,7 @@ const OWNER = '/api/workspaces/:workspace'
 export const cloudRoutes = {
   // Account
   me: route('GET', 'api/me', () => 'api/me'),
-  sharedWorkspaces: route('GET', 'api/workspaces/shared', () => 'api/workspaces/shared'),
+  remoteWorkspaces: route('GET', 'api/workspaces/remote', () => 'api/workspaces/remote'),
   invitations: route('GET', 'api/workspaces/invitations', () => 'api/workspaces/invitations'),
   // Changes to the account itself stay with whoever holds the login.
   renameAgent: route('PATCH', 'api/me', () => 'api/me', 'own login'),
@@ -62,6 +62,12 @@ export const cloudRoutes = {
     'own login'
   ),
   leave: route('POST', `${CLOUD}/leave`, (w: Workspace) => `${cloud(w)}/leave`, 'own login'),
+  workspace: route(
+    'DELETE',
+    'api/workspaces/:id',
+    (id: string) => `api/workspaces/${encodeURIComponent(id)}`,
+    'own login'
+  ),
   // Operations on the owner's machine
   exec: route('POST', `${CLOUD}/ops/exec`, (w: Workspace) => `${cloud(w)}/ops/exec`),
   commands: route('POST', `${CLOUD}/ops/commands`, (w: Workspace) => `${cloud(w)}/ops/commands`),

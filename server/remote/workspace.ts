@@ -1,8 +1,8 @@
 import { resolve } from 'node:path'
-import { fetchSharedWorkspaces } from './client'
+import { fetchRemoteWorkspaces } from './client'
 import { parseRemoteWorkspaceTarget, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { loadWorkspaceFileConfig } from '../workspaces/layout'
-import { registerRemoteWorkspaceReference } from '../workspaces/shared'
+import { registerRemoteWorkspaceReference } from '../workspaces/remote-workspace-reference'
 import { listWorkspaces } from '../workspaces/registry'
 import { resolveWorkspaceRoot } from '../skills/version'
 
@@ -13,11 +13,10 @@ export async function currentRemoteWorkspace(path = process.cwd()) {
 }
 export async function initializeRemoteWorkspace(path: string, target: RemoteWorkspaceTarget) {
   target = parseRemoteWorkspaceTarget(target)
-  const shares = await fetchSharedWorkspaces()
-  if (!shares.some(w => w.id === target.workspace_id && w.owner.id === target.user_id))
+  const remoteWorkspaces = await fetchRemoteWorkspaces()
+  if (!remoteWorkspaces.some(w => w.id === target.workspace_id && w.owner.id === target.user_id))
     throw new Error('This workspace is not shared with this account')
-  // Initialization creates a workspace at the requested folder. An ancestor's
-  // registration must not redirect this write into a different directory.
+  // Link the requested folder even if its parent is already registered.
   const root = resolve(path)
   const existing = (await listWorkspaces()).find(
     workspace =>

@@ -1,5 +1,5 @@
 import { WorkspaceRegistration } from './workspace-registration'
-import { RecoveryMessage } from '@/client/features/workspace/setup/workspace-recovery-states'
+import { WorkspaceErrorMessage } from '@/client/features/workspace/workspace-error-states'
 import { WorkspacePendingScreen } from '@/client/features/workspace/workspace-pending-screen'
 import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
 import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-transition'
@@ -104,7 +104,7 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
   if ((!views.data && views.isError) || (widgets.isError && !widgets.hasData)) {
     return (
       <WorkspacePendingScreen setupRequired>
-        <RecoveryMessage
+        <WorkspaceErrorMessage
           title="Couldn’t load workspace content"
           retrying={views.isFetching || widgets.isFetching}
           onRetry={() => {
@@ -113,7 +113,7 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
           }}
         >
           Please try again.
-        </RecoveryMessage>
+        </WorkspaceErrorMessage>
       </WorkspacePendingScreen>
     )
   }

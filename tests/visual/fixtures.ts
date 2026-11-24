@@ -173,8 +173,9 @@ export const API: Record<string, unknown> = {
   '/api/harnesses/status': HARNESSES,
   '/api/workspaces': workspaces,
   '/cloud/api/workspaces/invitations': { invitations: [] },
-  '/cloud/api/workspaces/shared': { workspaces: [] },
-  '/api/workspaces/discover': [],
+  '/cloud/api/workspaces/remote': { workspaces: [] },
+  '/api/workspace-suggestions': [],
+  '/api/workspaces/trash': [],
   '/api/workspaces/previews': {
     [WORKSPACE]: {
       thumbnails: [],

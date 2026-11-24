@@ -13,7 +13,7 @@ import { join, resolve } from 'node:path'
 
 import type { HarnessType } from '@/lib/types'
 
-import { discoverCodexWorkspaces } from './codex/discovery'
+import { listCodexWorkspaceSuggestions } from './codex/workspace-suggestions'
 import { type HermesProfile, discoverHermesProfiles } from './hermes/discovery'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw/discovery'
 
@@ -63,12 +63,12 @@ export type DetectionSources = {
 const defaultSources: DetectionSources = {
   hermesProfiles: discoverHermesProfiles,
   openclawAgents: discoverOpenClawAgents,
-  codexWorkspaces: async () => (await discoverCodexWorkspaces(new Set())).map(c => c.path),
+  codexWorkspaces: async () => (await listCodexWorkspaceSuggestions(new Set())).map(c => c.path),
   // Lazy: the Claude Code harness pulls in the agent SDK, and this module is
   // imported by the CLI, whose startup pays for every static import.
   claudeCodeWorkspaces: async () => {
     const { claudeCodeHarness } = await import('./claude-code')
-    const found = (await claudeCodeHarness.discoverWorkspaces?.(new Set())) ?? []
+    const found = (await claudeCodeHarness.listWorkspaceSuggestions?.(new Set())) ?? []
     return found.map(c => c.path)
   },
   hasClaudeConfigDir: path => existsSync(join(path, '.claude'))

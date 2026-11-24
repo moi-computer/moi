@@ -10,14 +10,17 @@ import {
 } from 'node:http'
 import { connect } from 'node:net'
 import { Readable } from 'node:stream'
+import { buffer } from 'node:stream/consumers'
 import envPaths from 'env-paths'
 
 import { colorForId } from '../lib/collab/colors'
+import { sameRemoteWorkspace } from '../lib/workspace-config'
 import { COLLAB_PROTOCOL_VERSION } from '../lib/collab/protocol'
 import type { WorkspaceMember } from '../client/features/collab/members/types'
 
 // Local-only Cloud fixture. State resets when the mock owner restarts.
 type MockUser = Extract<WorkspaceMember, { type: 'user' }>
+const mockTarget = { user_id: 'alice', workspace_id: 'owner-board' }
 const initialMembers: WorkspaceMember[] = [
   { id: 'alice', type: 'user', name: 'Alice', email: 'alice@example.com', isAnonymous: false },
   {
@@ -73,6 +76,7 @@ const initialMembers: WorkspaceMember[] = [
 ]
 export function createMockRemoteInvitations() {
   const members = [...initialMembers]
+  const acceptedInvites = new Set<string>()
   const invitations: { id: string; email: string; expiresAt: string }[] = []
   return async function (request: Request): Promise<Response> {
     const path = new URL(request.url).pathname
@@ -80,53 +84,67 @@ export function createMockRemoteInvitations() {
     const viewerHeader = request.headers.get('x-moi-mock-viewer')
     if (!viewerHeader) return Response.json({ error: 'Sign in required' }, { status: 401 })
     const viewer = JSON.parse(decodeURIComponent(viewerHeader)) as MockUser
+    const memberIndex = members.findIndex(
+      member => member.type === 'user' && member.id === viewer.id
+    )
     if (path === '/mock/cloud/api/workspaces/invitations' && request.method === 'GET')
       return Response.json({
-        invitations: members.some(member => member.type === 'user' && member.id === viewer.id)
-          ? []
-          : [
-              {
-                id: 'mock-owner-invite',
-                workspaceName: 'Product launch',
-                inviter: { name: 'Alice' }
-              }
-            ]
+        invitations:
+          memberIndex >= 0 || acceptedInvites.has(viewer.id)
+            ? []
+            : [
+                {
+                  id: 'mock-owner-invite',
+                  workspaceName: 'Product launch',
+                  inviter: { name: 'Alice' }
+                }
+              ]
       })
     if (
       path === '/mock/cloud/api/invitations/mock-owner-invite/accept' &&
       request.method === 'POST'
     ) {
-      if (!members.some(member => member.type === 'user' && member.id === viewer.id))
+      if (memberIndex < 0) {
+        if (acceptedInvites.has(viewer.id))
+          return new Response('Invitation expired', { status: 404 })
+        acceptedInvites.add(viewer.id)
         members.push({ ...viewer, membershipId: `member-${viewer.id}` })
+      }
       return Response.json({
         success: true,
-        remote: { user_id: 'alice', workspace_id: 'owner-board' },
+        remote: mockTarget,
         membershipId: `member-${viewer.id}`
       })
     }
     if (path === '/mock/snapshot' && request.method === 'GET')
       return Response.json({
-        workspaces: members.some(member => member.type === 'user' && member.id === viewer.id)
-          ? [{ id: 'alice:owner-board', members, invitations }]
-          : []
+        workspaces: memberIndex >= 0 ? [{ id: 'alice:owner-board', members, invitations }] : []
       })
-    if (path === '/mock/cloud/api/workspaces/shared' && request.method === 'GET')
+    if (path === '/mock/cloud/api/workspaces/remote' && request.method === 'GET')
       return Response.json({
-        workspaces: members.some(member => member.type === 'user' && member.id === viewer.id)
-          ? [
-              {
-                id: 'owner-board',
-                name: 'Product launch',
-                owner: { id: 'alice', name: 'Alice' }
-              }
-            ]
-          : []
+        workspaces:
+          memberIndex >= 0
+            ? [
+                {
+                  id: 'owner-board',
+                  name: 'Product launch',
+                  owner: { id: 'alice', name: 'Alice' }
+                }
+              ]
+            : []
       })
-    if (!members.some(member => member.type === 'user' && member.id === viewer.id))
+    if (memberIndex < 0)
       return Response.json(
         { error: 'Workspace not available', code: 'WORKSPACE_NOT_AVAILABLE' },
         { status: 404 }
       )
+    if (path === '/mock/leave' && request.method === 'DELETE') {
+      if (!members[memberIndex].membershipId)
+        return new Response('Owners cannot leave', { status: 403 })
+      members.splice(memberIndex, 1)
+      acceptedInvites.add(viewer.id)
+      return new Response(null, { status: 204 })
+    }
     if (path === '/mock/access') return new Response(null, { status: 204 })
     if (suffix === '/members' && request.method === 'GET')
       return Response.json({ members, invitations }, { headers: { 'cache-control': 'no-store' } })
@@ -166,22 +184,47 @@ export function createMockRemoteInvitations() {
   }
 }
 
+async function prepareMockReference(referencePath: string) {
+  const { initializeRemoteWorkspaceConfig, loadWorkspaceFileConfig } =
+    await import('../server/workspaces/layout')
+  try {
+    await initializeRemoteWorkspaceConfig(referencePath, mockTarget)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+    if (!sameRemoteWorkspace((await loadWorkspaceFileConfig(referencePath)).remote, mockTarget))
+      throw new Error('The mock visitor folder belongs to a different workspace')
+  }
+}
+
 // Development-only reverse proxy. Batiok owns sign-in and the visitor machine.
-export function createMockRemoteProxy(batiok: string, owner: string) {
+export function createMockRemoteProxy(
+  batiok: string,
+  owner: string,
+  referencePath: string,
+  testWorkspaceEntry?: (
+    id: string,
+    list?: 'active' | 'trash'
+  ) => Promise<{ id: string } | undefined>
+) {
   for (const origin of [batiok, owner]) {
     const url = new URL(origin)
     if (url.protocol !== 'http:' || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
       throw new Error('Mock upstreams must be local HTTP origins')
   }
   const cloud = createMockRemoteInvitations()
+  let mockWorkspaceId: string | undefined
   const agentInvitePaths = new Set<string>()
   const memberStreams = new Set<ServerResponse>()
   const remote = /^\/api\/workspaces\/alice:owner-board(?=\/|\?|$)/
+  const positions = new Map<string, number>()
+  const testWorkspace = /^\/api\/workspaces\/(?:trash\/)?(mock-owned-[a-f0-9]{24})(?=\/|\?|$)/
   const target = (path: string) => {
-    return new URL(
-      path.replace(remote, '/api/workspaces/owner-board'),
-      remote.test(path) ? owner : batiok
-    )
+    const { pathname, search } = new URL(path, 'http://localhost')
+    const fixture = remote.test(pathname) || (testWorkspaceEntry && testWorkspace.test(pathname))
+    const url = new URL(fixture ? owner : batiok)
+    url.pathname = pathname.replace(remote, '/api/workspaces/owner-board')
+    url.search = search
+    return url
   }
   const forwardHeaders = (req: IncomingMessage, url: URL) => {
     // HTML is rewritten below, so request an uncompressed upstream body.
@@ -211,7 +254,10 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
     const headers = new Headers({
       'x-moi-mock-viewer': encodeURIComponent(JSON.stringify({ ...identity.user, type: 'user' }))
     })
-    return { headers, session }
+    const testId =
+      'mock-owned-' +
+      new Bun.CryptoHasher('sha256').update(identity.user.id).digest('hex').slice(0, 24)
+    return { headers, session, testId }
   }
   const ownerAccess = async (req: IncomingMessage) => {
     const auth = await authorize(req)
@@ -219,18 +265,83 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
       auth.response ?? cloud(new Request('http://localhost/mock/access', { headers: auth.headers }))
     )
   }
+  const fixtureAccess = async (req: IncomingMessage) => {
+    const path = new URL(req.url!, 'http://localhost').pathname
+    const id = testWorkspaceEntry && testWorkspace.exec(path)?.[1]
+    if (!id) return remote.test(path) ? ownerAccess(req) : undefined
+    const auth = await authorize(req)
+    if (auth.response) return auth.response
+    if (id !== auth.testId) return new Response('Workspace not found', { status: 404 })
+    await testWorkspaceEntry(id)
+    return undefined
+  }
   const server = createServer(async (req, res) => {
     const path = new URL(req.url!, 'http://localhost').pathname
     const sharing =
       /^\/cloud\/api\/workspaces\/alice:owner-board(\/(?:members|invitations)(?:\/[^/]+)?)$/.exec(
         path
       )
-    const discovery = [
+    const remoteWorkspaceRequest = [
       '/cloud/api/workspaces/invitations',
-      '/cloud/api/workspaces/shared',
+      '/cloud/api/workspaces/remote',
       '/cloud/api/invitations/mock-owner-invite/accept'
     ].includes(path)
     try {
+      const reorder = req.method === 'PUT' && path === '/api/workspaces/order'
+      if (
+        testWorkspaceEntry &&
+        (reorder ||
+          (req.method === 'GET' &&
+            (path === '/api/workspaces' || path === '/api/workspaces/trash')))
+      ) {
+        const auth = await authorize(req)
+        if (auth.response) {
+          res.writeHead(auth.response.status).end(await auth.response.text())
+          return
+        }
+        // The visitor registry owns its order. Only add the fixture to the browser's list.
+        let order
+        let position = positions.get(auth.testId)
+        if (reorder) {
+          order = JSON.parse((await buffer(req)).toString())
+          if (!Array.isArray(order?.ids))
+            return void res.writeHead(400).end('Expected workspace ids')
+          position = order.ids.indexOf(auth.testId)
+          order.ids = order.ids.filter((id: string) => id !== auth.testId)
+        }
+        const visitor = await fetch(new URL(path, batiok), {
+          method: req.method,
+          headers: {
+            cookie: req.headers.cookie ?? '',
+            ...(reorder && { origin: new URL(batiok).origin, 'content-type': 'application/json' })
+          },
+          body: reorder ? JSON.stringify(order) : undefined,
+          redirect: 'manual'
+        })
+        if (!visitor.ok) {
+          res.writeHead(visitor.status).end(await visitor.text())
+          return
+        }
+        const entries = await visitor.json()
+        const owned = await testWorkspaceEntry(
+          auth.testId,
+          path === '/api/workspaces/trash' ? 'trash' : 'active'
+        )
+        if (owned)
+          entries.splice(
+            position === undefined || position < 0 ? entries.length : position,
+            0,
+            owned
+          )
+        if (reorder && position !== undefined) positions.set(auth.testId, position)
+        res.writeHead(200, {
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+          'set-cookie': [...visitor.headers.getSetCookie(), ...auth.session.headers.getSetCookie()]
+        })
+        res.end(JSON.stringify(entries))
+        return
+      }
       if (
         path === '/cloud/api/workspaces/alice:owner-board/agent-invitations' &&
         req.method === 'POST'
@@ -329,7 +440,9 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
         res.end(body)
         return
       }
-      if (discovery || sharing) {
+      const leave =
+        req.method === 'DELETE' && mockWorkspaceId && path === `/api/workspaces/${mockWorkspaceId}`
+      if (remoteWorkspaceRequest || sharing || leave) {
         const auth = await authorize(req)
         if (auth.response) {
           res.writeHead(auth.response.status, { 'content-type': 'application/json' })
@@ -337,17 +450,19 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
           return
         }
         const { headers, session } = auth
+        const mockPath = leave
+          ? '/mock/leave'
+          : sharing
+            ? `/mock/sharing${sharing[1]}`
+            : `/mock${path}`
         const response = await cloud(
-          new Request(
-            `http://localhost${sharing ? `/mock/sharing${sharing[1]}` : `/mock${path}`}`,
-            {
-              method: req.method,
-              headers,
-              body: ['GET', 'HEAD'].includes(req.method!)
-                ? undefined
-                : (Readable.toWeb(req) as unknown as ReadableStream<Uint8Array>)
-            }
-          )
+          new Request(`http://localhost${mockPath}`, {
+            method: req.method,
+            headers,
+            body: ['GET', 'HEAD'].includes(req.method!)
+              ? undefined
+              : (Readable.toWeb(req) as unknown as ReadableStream<Uint8Array>)
+          })
         )
         res.writeHead(response.status, {
           'content-type': 'application/json',
@@ -359,18 +474,56 @@ export function createMockRemoteProxy(batiok: string, owner: string) {
           for (const stream of memberStreams) stream.write('data: updated\n\n')
         return
       }
-      if (remote.test(req.url!)) {
-        const access = await ownerAccess(req)
-        if (!access.ok) {
-          res.writeHead(access.status, { 'content-type': 'application/json' })
-          res.end(await access.text())
+      const access = await fixtureAccess(req)
+      if (access && !access.ok) {
+        res.writeHead(access.status, { 'content-type': 'application/json' })
+        res.end(await access.text())
+        return
+      }
+      const url = target(req.url!)
+      const upstreamHeaders = forwardHeaders(req, url)
+      let body: Buffer | undefined
+      if (path === '/api/workspaces' && req.method === 'POST') {
+        body = await buffer(req)
+        const input = await new Response(body.toString()).json().catch(() => undefined)
+        if (sameRemoteWorkspace(input?.remote, mockTarget)) {
+          const access = await ownerAccess(req)
+          if (!access.ok) {
+            res.writeHead(access.status, { 'content-type': 'application/json' })
+            res.end(await access.text())
+            return
+          }
+          // Batiok has no record of this fixture. Import its local reference on the
+          // visitor after the mock confirms membership, keeping the chosen agent.
+          if (input.harness !== undefined && !['claude-code', 'codex'].includes(input.harness)) {
+            res.writeHead(400).end('Unknown workspace type')
+            return
+          }
+          await prepareMockReference(referencePath)
+          const registration = await fetch(url, {
+            method: 'POST',
+            headers: {
+              cookie: req.headers.cookie ?? '',
+              origin: url.origin,
+              'content-type': 'application/json'
+            },
+            body: JSON.stringify({ path: referencePath, harness: input.harness }),
+            redirect: 'manual'
+          })
+          const reply = await registration.text()
+          if (registration.ok) mockWorkspaceId = JSON.parse(reply).id
+          res
+            .writeHead(registration.status, {
+              'content-type': registration.headers.get('content-type') ?? 'text/plain',
+              'set-cookie': registration.headers.getSetCookie()
+            })
+            .end(reply)
           return
         }
       }
-      const url = target(req.url!)
       const upstream = httpRequest(
         url,
-        { method: req.method, headers: forwardHeaders(req, url) },
+        { method: req.method, headers: upstreamHeaders },
         async reply => {
           const headers = { ...reply.headers }
           if (headers.location) {
@@ -443,7 +596,8 @@ window.addEventListener('pagehide', () => events.close());</script>`,
         res.end('Local upstream unavailable')
       })
       res.on('close', () => upstream.destroy())
-      req.pipe(upstream)
+      if (body === undefined) req.pipe(upstream)
+      else upstream.end(body)
     } catch {
       res.writeHead(502)
       res.end('Local upstream unavailable. Check Batiok and the mock owner')
@@ -452,14 +606,12 @@ window.addEventListener('pagehide', () => events.close());</script>`,
   // Translate upgrade headers too, then tunnel bytes for collaboration and live updates.
   server.on('upgrade', async (req, socket, head) => {
     try {
-      if (remote.test(req.url!)) {
-        const access = await ownerAccess(req)
-        if (!access.ok) {
-          socket.end(
-            `HTTP/1.1 ${access.status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`
-          )
-          return
-        }
+      const access = await fixtureAccess(req)
+      if (access && !access.ok) {
+        socket.end(
+          `HTTP/1.1 ${access.status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`
+        )
+        return
       }
     } catch {
       socket.destroy()
@@ -490,7 +642,7 @@ window.addEventListener('pagehide', () => events.close());</script>`,
   return server
 }
 
-// The API deliberately blocks remote removal. Reset only this local fixture's registry entry.
+// Reset the mock registration locally. Its membership exists only in this fixture.
 export async function resetMockRegistration(
   visitorOrigin: string,
   registryPath = join(
@@ -512,7 +664,7 @@ export async function resetMockRegistration(
     .update(JSON.stringify(['alice', 'owner-board']))
     .digest('hex')
     .slice(0, 12)
-  const generatedName = `shared-owner-board-${hash}`
+  const generatedName = `remote-owner-board-${hash}`
   for (const entry of entries) {
     if (entry.remote?.user_id !== 'alice' || entry.remote.workspace_id !== 'owner-board') continue
     const registry = (await Bun.file(registryPath).json()) as { id: string; path: string }[]
@@ -599,8 +751,11 @@ if (import.meta.main) {
   const { collabManager } = await import('../server/collab/manager')
   const { setEventServer, workspaceEventsTopic } = await import('../server/events')
   const { api } = await import('../server/api')
-  const { registerWorkspace } = await import('../server/workspaces/registry')
+  const { registerWorkspace, getWorkspace, listTrashedWorkspaces } =
+    await import('../server/workspaces/registry')
   const { saveLayout, loadLayout } = await import('../server/workspaces/layout')
+  const { remoteReferenceFolderName } =
+    await import('../server/workspaces/remote-workspace-reference')
   const { buildAllViews } = await import('../server/applets/views')
   const { buildAllWidgets } = await import('../server/applets/widgets')
   const { createDefaultWorkspaceLayout } = await import('../lib/workspace-layout')
@@ -689,32 +844,74 @@ export default function LaunchPlan() {
   await buildAllViews(owner)
   await buildAllWidgets(owner)
 
+  const { spyOn } = await import('bun:test')
+  const remoteClient = await import('../server/remote/client')
+  const clearAccess = remoteClient.clearWorkspaceAccess
+  const { sweepTrash, startTrashSweeper } = await import('../server/workspaces/trash')
+  startTrashSweeper()
+  await sweepTrash()
+  const fixtures = new Map<string, Promise<void>>()
+  spyOn(remoteClient, 'clearWorkspaceAccess').mockImplementation(id =>
+    fixtures.has(id) ? Promise.resolve({ success: true }) : clearAccess(id)
+  )
+  const testWorkspaceEntry = async (id: string, list?: 'active' | 'trash') => {
+    let ready = fixtures.get(id)
+    if (!ready) {
+      ready = (async () => {
+        if ((await getWorkspace(id)) || (await listTrashedWorkspaces()).some(ws => ws.id === id))
+          return
+        const path = join(root, id)
+        await saveLayout({ ...createDefaultWorkspaceLayout(), name: 'Test workspace' }, path)
+        await registerWorkspace(path, { id, harness: 'claude-code' })
+      })().catch(error => {
+        fixtures.delete(id)
+        throw error
+      })
+      fixtures.set(id, ready)
+    }
+    await ready
+    if (!list) return
+    const response = await api.request(
+      list === 'trash' ? '/api/workspaces/trash' : '/api/workspaces'
+    )
+    if (!response.ok) throw new Error('Could not list fixture workspaces')
+    return ((await response.json()) as { id: string }[]).find(entry => entry.id === id)
+  }
   const present = new WeakSet<object>()
-  const ownerServer = Bun.serve({
+  const ownerServer = Bun.serve<{ workspaceId: string; path: string }>({
     hostname: '127.0.0.1',
     port: Number(process.env.MOCK_OWNER_PORT ?? 13340),
-    fetch: (request, server) => {
+    fetch: async (request, server) => {
       const { pathname } = new URL(request.url)
-      if (!/^\/api\/workspaces\/owner-board(?:\/|$)/.test(pathname)) {
+      const id = /^\/api\/workspaces\/(?:trash\/)?([^/]+)/.exec(pathname)?.[1]
+      if (!id || (id !== 'owner-board' && !fixtures.has(id))) {
         return new Response('Unknown mock owner or workspace', { status: 404 })
       }
       console.log(`OWNER ${request.method} ${pathname}`)
-      if (pathname === '/api/workspaces/owner-board/events') {
-        if (server.upgrade(request)) return
+      if (
+        id === 'owner-board' &&
+        pathname === '/api/workspaces/owner-board' &&
+        request.method === 'DELETE'
+      )
+        return new Response('Use Leave for a remote workspace', { status: 403 })
+      if (pathname === `/api/workspaces/${id}/events`) {
+        const ws = await getWorkspace(id)
+        if (!ws) return new Response('Workspace not found', { status: 404 })
+        if (server.upgrade(request, { data: { workspaceId: id, path: ws.path } })) return
         return new Response('WebSocket upgrade required', { status: 426 })
       }
       return api.fetch(request)
     },
     websocket: {
       open: socket => {
-        socket.subscribe(workspaceEventsTopic('owner-board'))
+        socket.subscribe(workspaceEventsTopic(socket.data.workspaceId))
       },
       // Same rule as server/web.ts: presence starts with the first presence message.
       message: (socket, message) => {
         if (!present.has(socket)) {
           if (String(message) === '{"type":"ping"}') return void socket.send('{"type":"pong"}')
           present.add(socket)
-          collabManager.open(socket, owner, { workspaceId: 'owner-board' })
+          collabManager.open(socket, socket.data.path, { workspaceId: socket.data.workspaceId })
         }
         collabManager.message(socket, message)
       },
@@ -747,9 +944,17 @@ export default function LaunchPlan() {
 
   const proxyPort = Number(process.env.MOCK_PROXY_PORT ?? 9898)
   const batiok = process.env.MOCK_BATIOK_ORIGIN ?? 'http://localhost:8787'
-  const proxy = createMockRemoteProxy(batiok, ownerServer.url.origin)
+  const referencePath = join(root, 'visitor-references', remoteReferenceFolderName(mockTarget))
+  const proxy = createMockRemoteProxy(
+    batiok,
+    ownerServer.url.origin,
+    referencePath,
+    testWorkspaceEntry
+  )
   proxy.listen(proxyPort, '127.0.0.1', () => {
-    console.log(`Open Moi at http://localhost:${proxyPort}`)
+    const address = proxy.address()
+    if (address && typeof address !== 'string')
+      console.log(`Open Moi at http://localhost:${address.port}`)
   })
   console.log(`Mock owner: ${ownerServer.url}; Batiok: ${batiok}`)
   const stop = async () => {

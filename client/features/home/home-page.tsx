@@ -1,65 +1,42 @@
+import { WorkspaceSuggestions } from './workspace-suggestions'
 import { WorkspaceInvitations } from './workspace-invitations'
-import { homeWorkspaces, useSharedWorkspaces, type HomeWorkspace } from './shared-workspaces'
-import { useState } from 'react'
+import { WorkspaceTrash } from './workspace-trash'
+import { homeWorkspaces, useRemoteWorkspaces, type HomeWorkspace } from './remote-workspaces'
 
-import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
-import { Link, useLocation } from 'wouter'
+import { IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
+import { Link } from 'wouter'
 
 import {
-  useDiscoveredWorkspaces,
   useWorkspacePreview,
   useWorkspacePreviews,
   useWorkspaces,
   useWorkspaceMetadata
 } from './api'
 import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
-import { AddWorkspaceDialog } from '@/client/features/workspace/add/add-workspace-dialog'
-import { DemoDialog } from '@/client/features/demo/demo-dialog'
-import { useWorkspaceImport } from '@/client/features/workspace/add/use-workspace-import'
 import { HomeLogo } from './home-logo'
 import { useAppConfig } from '@/client/api/app-config'
 import { AgentBlobatar } from '@/client/components/shared/agent-blobatar'
 import { WorkspaceIcon } from '@/client/components/shared/workspace-icon'
 import { Button } from '@/client/components/ui/button'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from '@/client/components/ui/collapsible'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { hasRunningWorkspaceActivity, useLive } from '@/client/features/chat/chat-store'
-import { cn } from '@/client/lib/cn'
 import { getWorkspaceThemeStyle, usePreloadWorkspaceFonts } from '@/client/runtime/workspace-theme'
-import { useUiStore } from '@/client/store/ui'
-import {
-  WorkspaceAgentIcons,
-  workspaceDisplayName
-} from '@/client/features/workspace/workspace-presentation'
 import { resolveWorkspaceTheme } from '@/lib/themes'
-import type { DiscoveredWorkspace } from '@/lib/types'
 import { resolveUrl } from '@/lib/navigation'
 
 import { WorkspacePreview } from './workspace-preview'
 
 export function HomePage() {
   usePreloadWorkspaceFonts()
-  const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
-  const sharedQuery = useSharedWorkspaces()
+  const remoteQuery = useRemoteWorkspaces()
   useWorkspacePreviews()
-  const discoveredQuery = useDiscoveredWorkspaces()
-  const importFlow = useWorkspaceImport({
-    onSuccess: entry => navigate(`/workspace/${entry.id}`)
-  })
   const appConfig = useAppConfig()
-  const [promoDialogOpen, setPromoDialogOpen] = useState(false)
-  const discoveredWorkspacesOpen = useUiStore(state => state.discoveredWorkspacesOpen)
-  const setDiscoveredWorkspacesOpen = useUiStore(state => state.setDiscoveredWorkspacesOpen)
 
   const workspaces = useWorkspaceMetadata(
     homeWorkspaces(
       workspacesQuery.data ?? [],
-      appConfig.environment === 'cloud' ? (sharedQuery.data ?? []) : []
+      appConfig.environment === 'cloud' && !remoteQuery.isError ? remoteQuery.data : undefined
     )
   )
 
@@ -79,17 +56,7 @@ export function HomePage() {
     )
   }
 
-  const discovered = discoveredQuery.data ?? []
   const count = workspaces.length
-
-  function handleAdd(suggestion: DiscoveredWorkspace) {
-    // Cloud demo: adding workspaces is off — offer the promo dialog instead.
-    if (appConfig.demo) {
-      setPromoDialogOpen(true)
-      return
-    }
-    importFlow.startImport(suggestion)
-  }
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
@@ -116,7 +83,7 @@ export function HomePage() {
           </div>
         </section>
       ) : (
-        (appConfig.environment !== 'cloud' || sharedQuery.isSuccess) && (
+        (appConfig.environment !== 'cloud' || remoteQuery.isSuccess) && (
           <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
             <IconEggCracked size={56} stroke={0.75} className="text-muted-foreground" />
             <div className="flex flex-col gap-1.5">
@@ -131,64 +98,20 @@ export function HomePage() {
         )
       )}
 
-      {appConfig.environment === 'cloud' && sharedQuery.isError && (
+      {appConfig.environment === 'cloud' && remoteQuery.isError && (
         <div className="mb-12" role="alert">
-          <p className="text-sm text-muted-foreground">{sharedQuery.error.message}</p>
-          <Button variant="ghost" onClick={() => void sharedQuery.refetch()}>
+          <p className="text-sm text-muted-foreground">{remoteQuery.error.message}</p>
+          <Button variant="ghost" onClick={() => void remoteQuery.refetch()}>
             Retry
           </Button>
         </div>
       )}
 
-      <WorkspaceInvitations />
-
-      {discovered.length > 0 && (
-        <section>
-          <Collapsible
-            open={discoveredWorkspacesOpen}
-            onOpenChange={setDiscoveredWorkspacesOpen}
-            className="group"
-          >
-            <CollapsibleTrigger
-              className={cn(
-                'group/trigger',
-                'flex w-full items-center gap-1 pb-4 text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                'text-muted-foreground group-data-open:text-foreground hover:text-foreground'
-              )}
-            >
-              <span className="text-sm font-medium">Import other workspaces</span>
-              <IconChevronRight
-                size={16}
-                stroke={2}
-                className={cn(
-                  'opacity-0 transition-[opacity,transform]',
-                  'group-hover/trigger:opacity-100 group-focus-visible/trigger:opacity-100 group-data-open:rotate-90'
-                )}
-              />
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <ul className="border-t border-border">
-                {discovered.map(item => (
-                  <SuggestedRow key={item.path} suggestion={item} onAdd={handleAdd} />
-                ))}
-              </ul>
-            </CollapsibleContent>
-          </Collapsible>
-        </section>
-      )}
-
-      {importFlow.workspace && (
-        <AddWorkspaceDialog
-          key={importFlow.workspace.path}
-          workspace={importFlow.workspace}
-          isPending={importFlow.isPending}
-          errorMessage={importFlow.error?.message}
-          onSubmit={importFlow.submit}
-          onClose={importFlow.reset}
-        />
-      )}
-
-      <DemoDialog open={promoDialogOpen} onOpenChange={setPromoDialogOpen} />
+      <div className="grid gap-8">
+        <WorkspaceInvitations />
+        <WorkspaceSuggestions />
+        <WorkspaceTrash />
+      </div>
     </div>
   )
 }
@@ -265,29 +188,6 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
         )}
       </Link>
     </div>
-  )
-}
-
-type SuggestedRowProps = {
-  suggestion: DiscoveredWorkspace
-  onAdd: (suggestion: DiscoveredWorkspace) => void
-}
-
-function SuggestedRow({ suggestion, onAdd }: SuggestedRowProps) {
-  const { path, harnesses } = suggestion
-  const name = workspaceDisplayName(suggestion)
-  return (
-    <li className="flex items-center gap-2 border-b border-border px-1 py-3">
-      <WorkspaceAgentIcons harnesses={harnesses} />
-      <span className="shrink-0 text-sm font-medium text-foreground">{name}</span>
-      <span title={path} className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-        {suggestion.displayPath ?? path}
-      </span>
-      <Button variant="outline" size="sm" onClick={() => onAdd(suggestion)}>
-        <IconPlus stroke={1.75} />
-        Add
-      </Button>
-    </li>
   )
 }
 

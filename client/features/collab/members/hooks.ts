@@ -2,7 +2,7 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import type { WorkspaceLayoutResponse } from '@/lib/types'
 import { useSyncExternalStore } from 'react'
 import { useMutation, useMutationState, useQueryClient } from '@tanstack/react-query'
-import { useWorkspaces } from '../../home/api'
+import { useRegisteredWorkspaces } from '../../home/api'
 import { getAccountGeneration } from '../../identity/store'
 import { useIdentity } from '../../identity/use-identity'
 import { getWorkspaceMembers, subscribeWorkspaceDirectory, updateWorkspaceMembers } from './store'
@@ -59,7 +59,7 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
   }
 }
 export function useMembershipAction(workspaceId: string) {
-  const workspaces = useWorkspaces()
+  const workspaces = useRegisteredWorkspaces()
 
   const identity = useIdentity()
   const accountGeneration = getAccountGeneration()

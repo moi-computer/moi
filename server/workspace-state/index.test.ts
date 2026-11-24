@@ -211,7 +211,7 @@ test('finds the id a folder had before it was removed', async () => {
   expect(await findStateIdForPath('/projects/other')).toBeUndefined()
 })
 
-test('startup drops state for removed workspaces whose folder is gone, and leftover temp files', async () => {
+test('startup drops state for unregistered workspaces whose folder is gone, and leftover temp files', async () => {
   const folder = await mkdtemp(join(tmpdir(), 'moi-workspace-folder-'))
   const registered = { id: 'registered', path: '/gone/but-registered' }
   const removedKept = { id: 'removed-kept', path: folder }

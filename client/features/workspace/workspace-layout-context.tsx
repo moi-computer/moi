@@ -1,8 +1,10 @@
-import { WorkspacePendingScreen } from './workspace-pending-screen'
-import { WorkspaceOpenError, WorkspaceLoadingState } from './setup/workspace-recovery-states'
+import { WorkspaceLoadingState, WorkspacePendingScreen } from './workspace-pending-screen'
+import { WorkspaceOpenError, WorkspaceUnavailableState } from './workspace-error-states'
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
+
+import { useLostRemoteAccess } from '@/client/features/home/remote-workspaces'
 
 import {
   type WorkspaceLayoutResponse,
@@ -14,6 +16,7 @@ import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { WorkspaceLayout, WorkspaceLayoutPatch, HarnessType } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
+import { getWorkspaceAddress } from './remote'
 import { useWorkspaceState } from './workspace-state'
 
 export type WorkspaceLayoutContextValue = {
@@ -131,9 +134,18 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
     [query.data, query.isLoading, setLayout, id]
   )
 
+  // The owner deleted the workspace or removed this member while it was open.
+  const lostAccess = useLostRemoteAccess(
+    query.data?.isRemote ? getWorkspaceAddress(id, qc) : undefined
+  )
+
   return (
     <WorkspaceLayoutContext value={value}>
-      {query.isPending || personal.isPending ? (
+      {lostAccess ? (
+        <WorkspacePendingScreen setupRequired>
+          <WorkspaceUnavailableState />
+        </WorkspacePendingScreen>
+      ) : query.isPending || personal.isPending ? (
         <WorkspacePendingScreen>
           <WorkspaceLoadingState />
         </WorkspacePendingScreen>

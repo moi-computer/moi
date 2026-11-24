@@ -6,6 +6,13 @@ export type RemoteWorkspaceTarget = {
   workspace_id: string
 }
 
+export function sameRemoteWorkspace(
+  actual: RemoteWorkspaceTarget | undefined,
+  expected: RemoteWorkspaceTarget
+): actual is RemoteWorkspaceTarget {
+  return actual?.user_id === expected.user_id && actual.workspace_id === expected.workspace_id
+}
+
 export type RemoteWorkspaceConfig = {
   version: 2
   remote: RemoteWorkspaceTarget
@@ -16,12 +23,14 @@ export type LocalWorkspaceConfig = WorkspaceLayout & { remote?: never }
 export type WorkspaceFileConfig = LocalWorkspaceConfig | RemoteWorkspaceConfig
 
 // Shared address format for workspace APIs, Cloud membership, and CLI operations.
-export function workspaceAddress(id: string, userId?: string): string {
-  return userId ? `${encodeURIComponent(userId)}:${encodeURIComponent(id)}` : encodeURIComponent(id)
+export function workspaceAddress(id: string, ownerId?: string): string {
+  return ownerId
+    ? `${encodeURIComponent(ownerId)}:${encodeURIComponent(id)}`
+    : encodeURIComponent(id)
 }
 
-export function workspaceApiBase(id: string, userId?: string): string {
-  return `/api/workspaces/${workspaceAddress(id, userId)}`
+export function workspaceApiBase(id: string, ownerId?: string): string {
+  return `/api/workspaces/${workspaceAddress(id, ownerId)}`
 }
 
 export function parseRemoteWorkspaceTarget(value: unknown): RemoteWorkspaceTarget {

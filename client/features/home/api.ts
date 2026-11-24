@@ -1,4 +1,8 @@
+import { useLocation } from 'wouter'
+import { homePath } from '@/client/api/app-config'
+import { toast } from '@/client/components/ui/toast'
 import { workspaceApiBase, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
+import { useRemoteWorkspaces, visibleWorkspaces } from './remote-workspaces'
 import { workspaceInfoOptions } from '../workspace/api'
 import {
   queryOptions,
@@ -9,18 +13,39 @@ import {
 } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
-import { workspaceKeys } from '@/client/api/workspace-keys'
+import {
+  remoteWorkspacesKey,
+  trashedWorkspacesKey,
+  workspaceKeys
+} from '@/client/api/workspace-keys'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
-import type { DiscoveredWorkspace, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
+import type {
+  WorkspaceSuggestion,
+  TrashedWorkspace,
+  WorkspaceEntry,
+  WorkspacePreview
+} from '@/lib/types'
+
+const registeredWorkspacesOptions = queryOptions({
+  queryKey: workspaceKeys.all,
+  queryFn: () => requestJson<WorkspaceEntry[]>('/api/workspaces'),
+  // Live events invalidate the list on every change. This only bounds how
+  // long a missed event (socket down) can leave it wrong; route switches
+  // within the window reuse the cache.
+  staleTime: 5 * 60_000
+})
+
+export function useRegisteredWorkspaces() {
+  return useQuery(registeredWorkspacesOptions)
+}
 
 export function useWorkspaces() {
-  return useQuery<WorkspaceEntry[]>({
-    queryKey: workspaceKeys.all,
-    queryFn: () => requestJson<WorkspaceEntry[]>('/api/workspaces'),
-    // Live events invalidate the list on every change. This only bounds how
-    // long a missed event (socket down) can leave it wrong; route switches
-    // within the window reuse the cache.
-    staleTime: 5 * 60_000
+  const remoteQuery = useRemoteWorkspaces()
+  const remoteWorkspaces =
+    remoteQuery.isEnabled && remoteQuery.isSuccess ? remoteQuery.data : undefined
+  return useQuery({
+    ...registeredWorkspacesOptions,
+    select: entries => visibleWorkspaces(entries, remoteWorkspaces)
   })
 }
 
@@ -68,10 +93,10 @@ export function useWorkspacePreview(workspaceId: string) {
   return useQuery({ ...workspacePreviewsOptions, select: previews => previews[workspaceId] })
 }
 
-export function useDiscoveredWorkspaces() {
-  return useQuery<DiscoveredWorkspace[]>({
-    queryKey: workspaceKeys.discover,
-    queryFn: () => requestJson('/api/workspaces/discover')
+export function useWorkspaceSuggestions() {
+  return useQuery<WorkspaceSuggestion[]>({
+    queryKey: workspaceKeys.suggestions,
+    queryFn: () => requestJson('/api/workspace-suggestions')
   })
 }
 
@@ -116,20 +141,58 @@ export function useReorderWorkspaces() {
   })
 }
 
-export function useRemoveWorkspace() {
+export function useDeleteWorkspace(action: 'delete' | 'leave' = 'delete') {
+  const [, navigate] = useLocation()
   const queryClient = useQueryClient()
   return useMutation<void, Error, string>({
     mutationFn: workspaceId =>
       requestVoid(
         `/api/workspaces/${workspaceId}`,
         { method: 'DELETE' },
-        'Failed to remove workspace'
+        `Failed to ${action} workspace`
       ),
     onSuccess: (_result, workspaceId) => {
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         (previous ?? []).filter(workspace => workspace.id !== workspaceId)
       )
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.discover })
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.suggestions })
+      queryClient.invalidateQueries({
+        queryKey: action === 'leave' ? remoteWorkspacesKey : trashedWorkspacesKey
+      })
+      navigate(homePath())
+    },
+    onError: error => {
+      if (action === 'leave')
+        toast.add({ title: 'Couldn’t leave workspace', description: error.message, type: 'error' })
     }
+  })
+}
+
+export function useTrashedWorkspaces(enabled: boolean) {
+  return useQuery<TrashedWorkspace[]>({
+    queryKey: trashedWorkspacesKey,
+    enabled,
+    queryFn: () => requestJson('/api/workspaces/trash'),
+    staleTime: 60_000
+  })
+}
+
+export function useRestoreWorkspace() {
+  const queryClient = useQueryClient()
+  return useMutation<WorkspaceEntry, Error, string>({
+    mutationFn: workspaceId =>
+      requestJson(
+        `/api/workspaces/trash/${encodeURIComponent(workspaceId)}/restore`,
+        { method: 'POST' },
+        'Failed to restore workspace'
+      ),
+    onSuccess: (_entry, workspaceId) => {
+      queryClient.setQueryData<TrashedWorkspace[]>(trashedWorkspacesKey, previous =>
+        (previous ?? []).filter(workspace => workspace.id !== workspaceId)
+      )
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
+    },
+    // A workspace that can no longer be restored is about to leave trash.
+    onError: () => void queryClient.invalidateQueries({ queryKey: trashedWorkspacesKey })
   })
 }

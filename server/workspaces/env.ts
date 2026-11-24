@@ -381,6 +381,14 @@ export function updateWorkspaceEnv(workspacePath: string, patch: EnvUpdate): Pro
   })
 }
 
+// Permanent deletion of a workspace: forget its stored secret values.
+export function clearWorkspaceEnv(workspacePath: string): Promise<void> {
+  return withWriteLock(resolve(workspacePath), async () => {
+    const store = await secretStore()
+    if (Object.keys(await store.get(workspacePath)).length) await store.set(workspacePath, {})
+  })
+}
+
 // The env view for the settings UI and `moi env`: every effective key with its
 // source, the discovered files (key counts only — values masked), the mode
 // flag, the secret backend, and declared-required keys with a satisfied flag.

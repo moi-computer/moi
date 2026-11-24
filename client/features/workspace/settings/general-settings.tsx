@@ -1,7 +1,6 @@
 import { IconChevronDown, IconLoader2 } from '@tabler/icons-react'
-import { useLocation } from 'wouter'
 
-import { homePath, useAppConfig } from '@/client/api/app-config'
+import { useAppConfig } from '@/client/api/app-config'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +14,7 @@ import {
 } from '@/client/components/ui/alert-dialog'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
-import { useRemoveWorkspace } from '@/client/features/home/api'
+import { useDeleteWorkspace } from '@/client/features/home/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import { harnessIcon, harnessLabel } from '@/client/features/harness/harness-presentation'
 import {
@@ -33,14 +32,7 @@ import { SettingsPage, SettingsRow, SettingsSection } from './settings-layout'
 
 export function GeneralSettings() {
   const { demo, environment } = useAppConfig()
-  const { name, cwd, workspaceId } = useWorkspaceLayoutCtx()
-  const [, navigate] = useLocation()
-  const removeWorkspace = useRemoveWorkspace()
-  const label = name ?? cwd ?? 'this space'
-
-  const remove = () => {
-    removeWorkspace.mutate(workspaceId, { onSuccess: () => navigate(homePath()) })
-  }
+  const { cwd } = useWorkspaceLayoutCtx()
 
   return (
     <SettingsPage title="General" description="Basic details for this space">
@@ -64,55 +56,80 @@ export function GeneralSettings() {
 
       {!demo && (
         <SettingsSection label="Danger zone">
-          <SettingsRow
-            title="Remove space"
-            description="Removes this space from Moi, its folder and chats stay on disk"
-            control={
-              <AlertDialog>
-                <AlertDialogTrigger
-                  render={<Button type="button" variant="destructive" />}
-                  disabled={removeWorkspace.isPending}
-                >
-                  Remove
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Remove “{label}” from your workspaces?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This only removes it from your list. The folder and its sessions stay on disk.
-                      You can add it back any time.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  {removeWorkspace.isError && (
-                    <p className="text-xs text-destructive">{removeWorkspace.error.message}</p>
-                  )}
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={removeWorkspace.isPending}>
-                      Cancel
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      type="button"
-                      variant="destructive"
-                      onClick={remove}
-                      disabled={removeWorkspace.isPending}
-                    >
-                      {removeWorkspace.isPending && (
-                        <IconLoader2
-                          data-icon="inline-start"
-                          stroke={1.75}
-                          className="animate-spin"
-                        />
-                      )}
-                      Remove
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            }
-          />
+          <WorkspaceActionRow />
         </SettingsSection>
       )}
     </SettingsPage>
+  )
+}
+
+function WorkspaceActionRow() {
+  const { workspaceId, isRemote, name } = useWorkspaceLayoutCtx()
+  const cloud = useAppConfig().environment === 'cloud'
+  const member = cloud && isRemote
+  const deleteWorkspace = useDeleteWorkspace(member ? 'leave' : 'delete')
+  const error = deleteWorkspace.error && (
+    <p role="alert" className="text-xs text-destructive">
+      {deleteWorkspace.error.message}
+    </p>
+  )
+  const ownerDescription = cloud
+    ? 'Workspaces in trash are automatically deleted after 30 days'
+    : 'Workspace files and chats stay on disk'
+
+  return (
+    <SettingsRow
+      title={member ? 'Leave workspace' : 'Delete workspace'}
+      description={member ? 'All local workspace data will be deleted' : ownerDescription}
+      control={
+        cloud && !member ? (
+          <AlertDialog>
+            <AlertDialogTrigger
+              render={<Button type="button" variant="destructive" />}
+              disabled={deleteWorkspace.isPending}
+            >
+              Delete
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete {name || 'this workspace'}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  The workspace will be moved to trash and all members and agents will lose access
+                  and their local data. You have 30 days to restore it.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              {error}
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleteWorkspace.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  type="button"
+                  variant="destructive"
+                  disabled={deleteWorkspace.isPending}
+                  onClick={() => deleteWorkspace.mutate(workspaceId)}
+                >
+                  {deleteWorkspace.isPending && (
+                    <IconLoader2 data-icon="inline-start" stroke={1.75} className="animate-spin" />
+                  )}
+                  Delete workspace
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : (
+          <div className="flex flex-col items-end gap-1">
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteWorkspace.isPending}
+              onClick={() => deleteWorkspace.mutate(workspaceId)}
+            >
+              {member ? 'Leave' : 'Delete'}
+            </Button>
+            {!member && error}
+          </div>
+        )
+      }
+    />
   )
 }
 

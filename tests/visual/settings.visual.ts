@@ -33,6 +33,25 @@ describe('Settings', () => {
     }
   )
 
+  for (const environment of ['local', 'cloud'] as const) {
+    test(
+      `workspace, ${environment} delete`,
+      async page => {
+        await page.goto(`/#/workspace/${WORKSPACE}`)
+        await page.getByRole('button', { name: 'Settings' }).click()
+        await page.getByRole('button', { name: 'General' }).click()
+        await page.getByRole('button', { name: 'Delete', exact: true }).click()
+        if (environment === 'local') {
+          await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
+        } else {
+          const dialog = page.getByRole('alertdialog', { name: `Delete ${WORKSPACE}`, exact: true })
+          await expect(dialog.getByText('You have 30 days to restore it.')).toBeVisible()
+        }
+      },
+      { api: { '/api/config': { environment, demo: false, demoInstallUrl: '/' } } }
+    )
+  }
+
   for (const section of ['General', 'Connectors', 'Environment']) {
     test(`workspace, ${section.toLowerCase()}`, async page => {
       await page.goto(`/#/workspace/${WORKSPACE}`)

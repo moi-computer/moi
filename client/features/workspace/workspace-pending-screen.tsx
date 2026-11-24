@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { ScreenShell } from '@/client/components/shared/screen-shell'
+import { Spinner } from '@/client/components/ui/spinner'
 import { WorkspacePane } from './workspace-pane'
 
 type WorkspacePendingScreenProps = {
@@ -21,6 +22,14 @@ export function WorkspacePendingScreen({
       ) : (
         children
       )}
+    </div>
+  )
+}
+
+export function WorkspaceLoadingState() {
+  return (
+    <div className="flex flex-1 items-center justify-center">
+      <Spinner className="size-6 text-muted-foreground" stroke={1.5} />
     </div>
   )
 }

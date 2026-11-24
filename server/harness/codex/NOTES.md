@@ -10,18 +10,18 @@ defines the protocol; generated types from the installed CLI define its exact wi
 
 ## Module ownership
 
-| Module                                 | Responsibility                                                                                                         |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `index.ts`                             | Implements the shared `Harness` contract.                                                                              |
-| `transport.ts`                         | Frames stdio, routes RPC replies and server requests, times out requests, and closes waiters on disconnect.            |
-| `client.ts`                            | Owns one app-server per workspace, initialization, catalogs, session/history queries, and bounded child-history reads. |
-| `session.ts`                           | Owns live session state, sends, steering, stop, replay hydration, previews, and notices.                               |
-| `adapter.ts`                           | Defines the consumed wire types and maps models, items, and history to display types.                                  |
-| `permissions.ts`                       | Defines sandbox access and the default approval policy; rejects unsupported requests.                                  |
-| `auth.ts`, `discovery.ts`, `status.ts` | Check login readiness, discover workspace paths from rollout heads, and report running processes.                      |
-| `session-title.ts`                     | Generates a title with a separate ephemeral `codex exec` call and applies it if the session is still unnamed.          |
-| `thread-list.ts`                       | Lists workspace threads from the state DB and hides agent-created tasks.                                               |
-| `probe.ts`                             | Runs standalone protocol diagnostics without Moi's session or workspace policy.                                        |
+| Module                                             | Responsibility                                                                                                         |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `index.ts`                                         | Implements the shared `Harness` contract.                                                                              |
+| `transport.ts`                                     | Frames stdio, routes RPC replies and server requests, times out requests, and closes waiters on disconnect.            |
+| `client.ts`                                        | Owns one app-server per workspace, initialization, catalogs, session/history queries, and bounded child-history reads. |
+| `session.ts`                                       | Owns live session state, sends, steering, stop, replay hydration, previews, and notices.                               |
+| `adapter.ts`                                       | Defines the consumed wire types and maps models, items, and history to display types.                                  |
+| `permissions.ts`                                   | Defines sandbox access and the default approval policy; rejects unsupported requests.                                  |
+| `auth.ts`, `workspace-suggestions.ts`, `status.ts` | Check login readiness, suggest workspaces from rollout heads, and report running processes.                            |
+| `session-title.ts`                                 | Generates a title with a separate ephemeral `codex exec` call and applies it if the session is still unnamed.          |
+| `thread-list.ts`                                   | Lists workspace threads from the state DB and hides agent-created tasks.                                               |
+| `probe.ts`                                         | Runs standalone protocol diagnostics without Moi's session or workspace policy.                                        |
 
 The shared contract and event layers are in [../README.md](../README.md).
 
@@ -99,7 +99,7 @@ thread is read once with `thread/read` and its source is cached by id.
 Child-history loading is limited to four concurrent reads. Home-card previews
 reuse an existing app-server and read the same listing; rendering the home page
 does not spawn one per card.
-Workspace import discovery separately reads up to 400 recent rollout heads
+Workspace suggestions use up to 400 recent rollout heads
 under the server's `$CODEX_HOME/sessions`, without requiring a CLI executable.
 
 ## Models, effort, and speed modes

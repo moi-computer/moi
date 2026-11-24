@@ -2,7 +2,7 @@ import { DEFAULT_VIEWPORT, expect, takeSnapshot } from '@uiverify/bun'
 
 import type { Identity } from '@/client/features/identity/types'
 import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
-import type { ClientAppConfig, WorkspaceLayoutResponse } from '@/lib/types'
+import type { ClientAppConfig, TrashedWorkspace, WorkspaceLayoutResponse } from '@/lib/types'
 
 import { API, HARNESSES, suite, WORKSPACE } from './fixtures'
 
@@ -33,7 +33,7 @@ test('floating chat keeps its open and closed state after reload', async page =>
 
 describe('Workspace', () => {
   test('home', async page => {
-    // Standalone Moi never asks Cloud for shared workspaces.
+    // Standalone Moi never asks Cloud for remote workspaces.
     const cloudRequests: string[] = []
     await page.route('**/cloud/api/workspaces/**', route => {
       cloudRequests.push(route.request().url())
@@ -59,14 +59,14 @@ describe('Workspace', () => {
   test(
     'home shows workspace cards while optional lists load',
     async page => {
-      await page.route('**/cloud/api/workspaces/shared', () => new Promise(() => {}))
-      await page.route('**/api/workspaces/discover', () => new Promise(() => {}))
+      await page.route('**/cloud/api/workspaces/remote', () => new Promise(() => {}))
+      await page.route('**/api/workspace-suggestions', () => new Promise(() => {}))
       await page.route('**/cloud/api/workspaces/invitations', () => new Promise(() => {}))
       await page.goto('/#/')
       await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
-      await expect(page.getByText('Loading shared workspaces…')).toHaveCount(0)
+      await expect(page.getByText('Loading remote workspaces…')).toHaveCount(0)
       await expect(page.getByRole('heading', { name: 'Invitations' })).toHaveCount(0)
-      await expect(page.getByRole('button', { name: 'Import other workspaces' })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Suggestions' })).toHaveCount(0)
     },
     { api: { '/api/config': { environment: 'cloud', demo: false } } }
   )
@@ -153,6 +153,9 @@ describe('Workspace', () => {
     'import preselects a detected connected agent',
     async page => {
       await page.goto('/#/')
+      const suggestions = page.getByRole('button', { name: 'Suggestions', exact: true })
+      await expect(suggestions).toHaveAttribute('aria-expanded', 'false')
+      await suggestions.click()
       await page.getByRole('button', { name: 'Add', exact: true }).click()
       const dialog = page.getByRole('dialog', { name: 'Import notes' })
       await expect(dialog.getByRole('button', { name: /ChatGPT/ })).toHaveAttribute(
@@ -161,7 +164,7 @@ describe('Workspace', () => {
       )
       await takeSnapshot('import agent')
     },
-    { api: { '/api/workspaces/discover': [{ path: '/projects/notes', harnesses: ['codex'] }] } }
+    { api: { '/api/workspace-suggestions': [{ path: '/projects/notes', harnesses: ['codex'] }] } }
   )
 })
 
@@ -372,13 +375,17 @@ test(
 )
 
 // Cloud browsers fetch owner content directly. Chats, the agent and preferences stay with the visitor.
-const REMOTE = 'shared-board'
-const remoteBase = `/api/workspaces/${REMOTE}`
+const REFERENCE_ID = 'remote-board'
+const referenceBase = `/api/workspaces/${REFERENCE_ID}`
 const ownerBase = '/api/workspaces/alice:owner-board'
-const remotePage = `/#/workspace/${REMOTE}`
+const remotePage = `/#/workspace/${REFERENCE_ID}`
 const remoteAnswers = {
   '/api/config': { environment: 'cloud', demo: false },
   '/cloud/api/me': sharingUser,
+  // A reference stays open only while Cloud lists its share.
+  '/cloud/api/workspaces/remote': {
+    workspaces: [{ id: 'owner-board', owner: { id: 'alice', name: 'Alice' } }]
+  },
   [ownerBase]: {
     apiBase: '/api/workspaces/owner-board',
     isRemote: false,
@@ -386,8 +393,8 @@ const remoteAnswers = {
     name: 'Shared board',
     widgetGrid: []
   },
-  [`${remoteBase}/skills`]: { skills: [], updateAvailable: false },
-  [remoteBase]: {
+  [`${referenceBase}/skills`]: { skills: [], updateAvailable: false },
+  [referenceBase]: {
     apiBase: ownerBase,
     isRemote: true,
     version: 2,
@@ -395,9 +402,9 @@ const remoteAnswers = {
     cwd: '/visitor',
     harness: 'claude-code'
   },
-  [`${remoteBase}/state`]: { revision: 1, selected: {}, sessions: {}, pendingViews: {} },
-  [`${remoteBase}/harness`]: API[`/api/workspaces/${WORKSPACE}/harness`],
-  [`${remoteBase}/sessions`]: [],
+  [`${referenceBase}/state`]: { revision: 1, selected: {}, sessions: {}, pendingViews: {} },
+  [`${referenceBase}/harness`]: API[`/api/workspaces/${WORKSPACE}/harness`],
+  [`${referenceBase}/sessions`]: [],
   [`${ownerBase}/widgets`]: { widgets: [] },
   [`${ownerBase}/views`]: { views: [] },
   [`${ownerBase}/applet-thumbnails`]: { thumbnails: [] }
@@ -410,6 +417,31 @@ const remoteOptions = {
     { id: 'alice:owner-board', members: [sharingUser], invitations: [] }
   ] satisfies WorkspaceMembersSnapshot[]
 }
+
+test(
+  'an open remote workspace shows the access-denied screen when Cloud confirms access ended',
+  async page => {
+    const accessCheck = Promise.withResolvers<void>()
+    await page.route('**/cloud/api/workspaces/remote', async route => {
+      await accessCheck.promise
+      return route.fulfill({ json: { workspaces: [] } })
+    })
+    await page.goto(remotePage)
+    try {
+      await expect(page.getByPlaceholder('Do anything')).toBeVisible()
+    } finally {
+      accessCheck.resolve()
+    }
+    await expect(
+      page.getByRole('heading', { name: 'Workspace not found or you don’t have access' })
+    ).toBeVisible()
+    await expect(page.getByPlaceholder('Do anything')).toHaveCount(0)
+    await takeSnapshot('lost workspace access')
+    await page.getByRole('button', { name: 'Back to home' }).click()
+    await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
+  },
+  remoteOptions
+)
 
 test(
   'remote workspace with the visitor’s own chat and settings',
@@ -433,7 +465,7 @@ test(
 )
 
 test(
-  'manage connected agents in shared workspace settings',
+  'manage connected agents in remote workspace settings',
   async page => {
     const requests: string[] = []
     await page.route(`**/cloud${ownerBase}/members/bot-membership`, route => {
@@ -458,7 +490,7 @@ test(
     await expect(page.getByText('Grok Bot', { exact: true })).toBeVisible()
     await takeSnapshot('connected workspace agents')
     await menu.click()
-    const remove = page.getByRole('menuitem', { name: 'Remove from workspace', exact: true })
+    const remove = page.getByRole('menuitem', { name: 'Remove', exact: true })
     await expect(remove).toBeVisible()
     await takeSnapshot('workspace agent options')
     await remove.click()
@@ -489,7 +521,7 @@ test(
 for (const failure of [
   {
     name: 'missing local reference',
-    path: remoteBase,
+    path: referenceBase,
     status: 404,
     message: 'Workspace not found'
   },
@@ -549,9 +581,90 @@ for (const failure of [
 }
 
 test(
-  'shared workspace list error',
+  'home trash lists deleted workspaces with restore',
   async page => {
-    await page.route('**/cloud/api/workspaces/shared', route =>
+    const restore = Promise.withResolvers<void>()
+    await page.route('**/api/workspaces/trash/old-store/restore', async route => {
+      await restore.promise
+      return route.fulfill({ json: { id: 'old-store', name: 'Old storefront' } })
+    })
+    await page.goto('/#/')
+    const trash = page.getByRole('button', { name: 'Trash', exact: true })
+    await expect(trash).toBeVisible()
+    // Collapsed by default.
+    await expect(page.getByText('Old storefront')).toHaveCount(0)
+    const note = page.getByText('Workspaces in trash are automatically deleted after 30 days')
+    await expect(note).not.toBeVisible()
+    await trash.click()
+    await expect(note).toBeVisible()
+    await expect(page.getByText('Old storefront')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Restore', exact: true })).toHaveCount(2)
+    const row = page.getByText('Old storefront').locator('..')
+    await row.getByRole('button', { name: 'Restore' }).click()
+    try {
+      await expect(row.locator('button[disabled][aria-busy="true"]')).toBeVisible()
+      await takeSnapshot('restore pending')
+    } finally {
+      restore.resolve()
+    }
+    await expect(page.getByText('Old storefront')).toHaveCount(0)
+    await expect(page.getByText('Launch notes')).toBeVisible()
+  },
+  {
+    api: {
+      '/api/config': { environment: 'cloud', demo: false },
+      '/api/workspaces/trash': [
+        { id: 'old-store', name: 'Old storefront', trashedAt: '2026-05-01T10:00:00Z' },
+        { id: 'notes', name: 'Launch notes', trashedAt: '2026-05-10T10:00:00Z' }
+      ] satisfies TrashedWorkspace[]
+    }
+  }
+)
+
+test(
+  'a member leaves a remote workspace from settings',
+  async page => {
+    let attempts = 0
+    await page.route(`**${referenceBase}`, route => {
+      if (route.request().method() !== 'DELETE') return route.fallback()
+      attempts++
+      if (attempts === 1)
+        return route.fulfill({ status: 503, json: { error: 'Cloud unavailable' } })
+      return route.fulfill({ json: { success: true } })
+    })
+    await page.goto(remotePage)
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await page.getByRole('button', { name: 'General' }).click()
+    const leave = page.getByRole('button', { name: 'Leave', exact: true })
+    await expect(page.getByText('All local workspace data will be deleted')).toBeVisible()
+    await takeSnapshot('leave workspace settings')
+    await leave.click()
+    await expect(page.getByText('Couldn’t leave workspace')).toBeVisible()
+    await leave.click()
+    await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
+    expect(attempts).toBe(2)
+  },
+  {
+    ...remoteOptions,
+    api: {
+      ...remoteAnswers,
+      '/api/workspaces': [
+        {
+          id: REFERENCE_ID,
+          path: '/visitor',
+          addedAt: '',
+          harness: 'claude-code',
+          remote: { user_id: 'alice', workspace_id: 'owner-board' }
+        }
+      ]
+    }
+  }
+)
+
+test(
+  'remote workspace list error',
+  async page => {
+    await page.route('**/cloud/api/workspaces/remote', route =>
       route.fulfill({ status: 503, json: { error: 'Cloud unavailable' } })
     )
     await page.goto('/#/')
@@ -561,7 +674,7 @@ test(
 )
 
 test(
-  'shared workspace opening',
+  'remote workspace opening',
   async page => {
     await page.route(`**${ownerBase}`, () => new Promise(() => {}))
     await page.goto('/#/workspace/alice:owner-board')
@@ -570,7 +683,7 @@ test(
   remoteOptions
 )
 test(
-  'shared workspace setup failure can be retried after access succeeds',
+  'remote workspace setup failure can be retried after access succeeds',
   async page => {
     let attempts = 0
     await page.route('**/api/workspaces', route => {
@@ -579,16 +692,13 @@ test(
       return route.fulfill(
         attempts === 1
           ? { status: 503, body: 'Could not initialize workspace' }
-          : { json: { id: REMOTE, path: '/visitor', addedAt: '' } }
+          : { json: { id: REFERENCE_ID, path: '/visitor', addedAt: '' } }
       )
     })
     await page.goto('/#/workspace/alice:owner-board')
-    await page.getByRole('button', { name: /Claude/ }).click()
-    const add = page.getByRole('button', { name: 'Add workspace', exact: true })
-    await add.click()
     await expect(page.getByText('Could not initialize workspace', { exact: false })).toBeVisible()
     await takeSnapshot('workspace registration failed')
-    await add.click()
+    await page.getByRole('button', { name: 'Try again' }).click()
     await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
     expect(attempts).toBe(2)
   },
@@ -596,7 +706,7 @@ test(
 )
 
 test(
-  'shared workspace access denied creates no reference and returns home',
+  'remote workspace access denied creates no reference and returns home',
   async page => {
     let registrations = 0
     await page.route(`**${ownerBase}`, route =>
@@ -605,7 +715,7 @@ test(
     await page.route('**/api/workspaces', route => {
       if (route.request().method() !== 'POST') return route.fallback()
       registrations++
-      return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
+      return route.fulfill({ json: { id: REFERENCE_ID, path: '/visitor', addedAt: '' } })
     })
     await page.goto('/#/workspace/alice:owner-board')
     await expect(
@@ -637,21 +747,9 @@ test(
       if (route.request().method() !== 'POST') return route.fallback()
       expect(checkedAccess).toBe(true)
       registrations++
-      return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
+      return route.fulfill({ json: { id: REFERENCE_ID, path: '/visitor', addedAt: '' } })
     })
     await page.goto('/#/workspace/alice:owner-board')
-    const dialog = page.getByRole('dialog', { name: 'Add shared workspace' })
-    await expect(dialog.getByText('Choose an agent for Shared board')).toBeVisible()
-    const add = dialog.getByRole('button', { name: 'Add workspace', exact: true })
-    await expect(dialog.getByRole('button', { name: /Claude/ })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
-    await expect(add).not.toBeDisabled()
-    expect(registrations).toBe(0)
-    await dialog.getByRole('button', { name: /ChatGPT/ }).click()
-    await takeSnapshot('choose an agent for a shared workspace')
-    await add.click()
     await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
     expect(registrations).toBe(1)
   },
@@ -659,18 +757,18 @@ test(
 )
 
 test(
-  'an already-added shared workspace opens without asking for an agent',
+  'an already-added remote workspace opens without asking for an agent',
   async page => {
-    let registrations = 0
+    let openRequests = 0
     await page.route('**/api/workspaces', route => {
       if (route.request().method() !== 'POST') return route.fallback()
-      registrations++
-      return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
+      openRequests++
+      return route.fulfill({ json: { id: REFERENCE_ID, path: '/visitor', addedAt: '' } })
     })
     await page.goto('/#/workspace/alice:owner-board')
     await expect(page.getByRole('button', { name: 'Shared board menu', exact: true })).toBeVisible()
     await expect(page.getByRole('dialog', { name: 'Add shared workspace' })).toHaveCount(0)
-    expect(registrations).toBe(0)
+    expect(openRequests).toBe(1)
   },
   {
     ...remoteOptions,
@@ -678,7 +776,7 @@ test(
       ...remoteAnswers,
       '/api/workspaces': [
         {
-          id: REMOTE,
+          id: REFERENCE_ID,
           path: '/visitor',
           addedAt: '',
           harness: 'claude-code',
@@ -690,35 +788,26 @@ test(
 )
 
 test(
-  'shared workspace opens before asking for the chosen agent login',
+  'remote workspace opens before asking for the chosen agent login',
   async page => {
     let registrations = 0
     await page.route('**/api/workspaces', route => {
       if (route.request().method() !== 'POST') return route.fallback()
       registrations++
-      return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
+      return route.fulfill({ json: { id: REFERENCE_ID, path: '/visitor', addedAt: '' } })
     })
     await page.goto('/#/workspace/alice:owner-board')
-    const picker = page.getByRole('dialog', { name: 'Add shared workspace' })
-    await expect(picker.getByRole('button', { name: /Claude/ })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
-    await picker.getByRole('button', { name: /ChatGPT/ }).click()
-    expect(registrations).toBe(0)
-    await picker.getByRole('button', { name: 'Add workspace', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Set up ChatGPT' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible()
-    await expect(picker).toHaveCount(0)
     expect(registrations).toBe(1)
-    await takeSnapshot('sign in after opening a shared workspace')
+    await takeSnapshot('sign in after opening a remote workspace')
   },
   {
     ...remoteOptions,
     api: {
       ...remoteAnswers,
-      [remoteBase]: { ...remoteAnswers[remoteBase], harness: 'codex' },
-      [`${remoteBase}/harness`]: {
+      [referenceBase]: { ...remoteAnswers[referenceBase], harness: 'codex' },
+      [`${referenceBase}/harness`]: {
         harness: 'codex',
         availability: { status: 'available' },
         models: []
@@ -748,7 +837,7 @@ test(
       '/api/workspaces': [
         { id: WORKSPACE, path: '/local', addedAt: '', name: 'Local workspace' },
         {
-          id: REMOTE,
+          id: REFERENCE_ID,
           path: '/visitor',
           addedAt: '',
           name: 'owner-board',
@@ -769,17 +858,9 @@ test(
     await expect(page.getByRole('link', { name: 'Open Bravo', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open Zebra', exact: true })).toBeVisible()
     await takeSnapshot('mixed workspace grid')
-    await page.getByRole('link', { name: 'Open Alpha', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Add shared workspace' })
-    await expect(dialog.getByRole('button', { name: /ChatGPT/ })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
     await expect(
-      dialog.getByRole('button', { name: 'Add workspace', exact: true })
-    ).not.toBeDisabled()
-    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
-    await expect(page.getByRole('link', { name: 'Open Alpha', exact: true })).toBeVisible()
+      page.locator('a[aria-label="Open Alpha"][href$="/workspace/bob:board"]')
+    ).toBeVisible()
   },
   {
     api: {
@@ -800,7 +881,7 @@ test(
         ...HARNESSES,
         'claude-code': { availability: { status: 'login-required', reason: 'Log in to Claude' } }
       },
-      '/cloud/api/workspaces/shared': {
+      '/cloud/api/workspaces/remote': {
         workspaces: [
           { id: 'board', owner: { id: 'alice', name: 'Alice' } },
           { id: 'board', owner: { id: 'bob', name: 'Bob' } }
@@ -831,7 +912,7 @@ test(
         json: { success: true, remote: { user_id: 'alice', workspace_id: 'owner-board' } }
       })
     })
-    await page.route('**/cloud/api/workspaces/shared', route =>
+    await page.route('**/cloud/api/workspaces/remote', route =>
       route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
@@ -852,13 +933,19 @@ test(
       if (route.request().method() !== 'POST') return route.fallback()
       expect(accepted && checkedAccess).toBe(true)
       registrations++
-      return route.fulfill({ json: { id: REMOTE, path: '/visitor', addedAt: '' } })
+      return route.fulfill({ json: { id: REFERENCE_ID, path: '/visitor', addedAt: '' } })
     })
     await page.goto('/#/')
     await expect(page.getByRole('button', { name: 'Add', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Invitations', exact: true })).toBeVisible()
-    await expect(page.getByText('Import other workspaces', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toBeVisible()
     await takeSnapshot('invitation below workspaces and above imports')
+    const invitations = page.getByRole('button', { name: 'Invitations', exact: true })
+    await expect(invitations).toHaveAttribute('aria-expanded', 'true')
+    await invitations.click()
+    await expect(page.getByText('Invited by Alice')).not.toBeVisible()
+    await invitations.click()
+    await expect(page.getByText('Invited by Alice')).toBeVisible()
     await page.getByRole('button', { name: 'Add', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Add shared workspace' })
     await expect(dialog.getByText('Choose an agent for Team notes')).toBeVisible()
@@ -871,7 +958,7 @@ test(
   {
     api: {
       ...remoteAnswers,
-      '/api/workspaces/discover': [{ path: '/projects/notes', harnesses: ['claude-code'] }]
+      '/api/workspace-suggestions': [{ path: '/projects/notes', harnesses: ['claude-code'] }]
     }
   }
 )
@@ -916,7 +1003,7 @@ test(
         JSON.stringify({
           state: {
             workspaces: {
-              'shared-board': {
+              'remote-board': {
                 activeTab: 'views/counter',
                 chatOpen: false
               }

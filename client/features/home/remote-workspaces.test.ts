@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
-import { homeWorkspaces } from './shared-workspaces'
+import { homeWorkspaces, visibleWorkspaces } from './remote-workspaces'
 
-test('keeps saved registration order with unopened shares first, deduplicated by owner and workspace', () => {
+test('lists unregistered remote workspaces first, deduplicated by owner and workspace ID', () => {
   const result = homeWorkspaces(
     [
       { id: 'local', path: '/Zebra', addedAt: '', name: 'Zebra' },
@@ -11,13 +11,6 @@ test('keeps saved registration order with unopened shares first, deduplicated by
         addedAt: '',
         name: 'Bravo',
         remote: { user_id: 'alice', workspace_id: 'board' }
-      },
-      {
-        id: 'manual',
-        path: '/manual',
-        addedAt: '',
-        name: 'Delta',
-        remote: { user_id: 'carol', workspace_id: 'board' }
       }
     ],
     [
@@ -25,16 +18,25 @@ test('keeps saved registration order with unopened shares first, deduplicated by
       { id: 'board', owner: { id: 'bob', name: 'Bob' }, name: 'alpha' }
     ]
   )
-  expect(result.map(item => item.name)).toEqual(['alpha', 'Zebra', 'Bravo', 'Delta'])
+  expect(result.map(item => item.name)).toEqual(['alpha', 'Zebra', 'Bravo'])
   expect(result.map(item => item.href)).toEqual([
     '/workspace/bob:board',
     '/workspace/local',
-    '/workspace/alias',
-    '/workspace/manual'
+    '/workspace/alias'
   ])
 })
 
-test('without unopened shares, preserves the registry order exactly', () => {
+test('hides a reference only when Cloud confirms the remote workspace is missing', () => {
+  const local = { remote: undefined }
+  const linked = { remote: { user_id: 'alice', workspace_id: 'board' } }
+  const entries = [local, linked]
+  const remote = { id: 'board', owner: { id: 'alice', name: 'Alice' } }
+  expect(visibleWorkspaces(entries, undefined)).toEqual(entries)
+  expect(visibleWorkspaces(entries, [])).toEqual([local])
+  expect(visibleWorkspaces(entries, [remote])).toEqual(entries)
+})
+
+test('preserves registry order when all workspaces are registered', () => {
   const entries = [
     { id: 'z', path: '/Zebra', addedAt: '' },
     { id: 'a', path: '/Alpha', addedAt: '' }

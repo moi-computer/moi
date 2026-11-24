@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { useImportWorkspace } from '@/client/features/workspace/add/api'
-import type { DiscoveredWorkspace, WorkspaceEntry, HarnessType } from '@/lib/types'
+import type { WorkspaceSuggestion, WorkspaceEntry, HarnessType } from '@/lib/types'
 
 type UseWorkspaceImportProps = {
   onSuccess: (entry: WorkspaceEntry) => void
@@ -9,9 +9,9 @@ type UseWorkspaceImportProps = {
 
 export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
   const mutation = useImportWorkspace()
-  const [workspace, setWorkspace] = useState<DiscoveredWorkspace>()
+  const [workspace, setWorkspace] = useState<WorkspaceSuggestion>()
 
-  function startImport(workspace: DiscoveredWorkspace) {
+  function startImport(workspace: WorkspaceSuggestion) {
     mutation.reset()
     setWorkspace(workspace)
   }

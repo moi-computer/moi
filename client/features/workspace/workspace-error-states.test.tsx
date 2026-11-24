@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { HarnessUnavailableState } from './workspace-recovery-states'
+import { HarnessUnavailableState } from './workspace-error-states'
 
 for (const [harness, label] of [
   ['codex', 'ChatGPT'],

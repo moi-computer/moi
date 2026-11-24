@@ -25,6 +25,8 @@ import { navigationRelay } from './navigation-relay'
 import { resolveScratchOp } from './scratchpad/relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace, listWorkspaces } from './workspaces/registry'
+import { startRemoteWorkspaceSync } from './workspaces/remote'
+import { startTrashSweeper } from './workspaces/trash'
 import { failInterruptedViewStarts } from './sessions/view-sessions'
 import { sendWorkspaceMessage } from './sessions/send-message'
 import { prepareWorkspaceStates } from './workspace-state'
@@ -322,6 +324,11 @@ setInterval(() => {
 // deleting an image in the browser (or an upload whose tab died) otherwise
 // leaves its file behind forever. See sweepOrphanAssets.
 startScratchpadSweeper()
+
+// Finish permanent deletions that came due while this machine was stopped, and
+// drop references to workspaces their owners have deleted.
+startTrashSweeper()
+startRemoteWorkspaceSync()
 
 // Under launchd the service log is a plain file nothing rotates — bound it
 // here. No-op outside the macOS service context.

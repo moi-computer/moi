@@ -1,5 +1,5 @@
 import { recordGatewayActivity } from '../collab/agent-activity'
-import { openSharedWorkspace } from '../workspaces/shared'
+import { leaveRemoteWorkspace, syncRemoteWorkspaces } from '../workspaces/remote'
 import { executeScratchOp } from '../scratchpad/executor'
 import type { ScratchOp, WorkspaceInfoResponse } from '@/lib/types'
 import { workspaceApiBase, parseRemoteWorkspaceTarget } from '@/lib/workspace-config'
@@ -34,7 +34,6 @@ import type {
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 
 import { proxyUserState } from '../collab/cloudflare-access'
-import { collabManager } from '../collab/manager'
 import { harnessStore } from '../harness/auth'
 import { harnesses } from './harnesses'
 import { clientAppConfig, createdWorkspacesRoot, getAppConfig } from '../app-config'
@@ -56,13 +55,15 @@ import { getClientFrameLog, getWireLog } from '../harness/debug'
 import { loginShellPath } from '../harness/shell-path'
 import { allHarnesses, harnessFor, isHarnessType } from '../harness/registry'
 import {
-  discoverWorkspaces,
+  listWorkspaceSuggestions,
   getWorkspace,
   listWorkspaces,
   registerWorkspace,
-  removeWorkspace,
+  listTrashedWorkspaces,
+  unregisterWorkspace,
   reorderWorkspaces
 } from '../workspaces/registry'
+import { changeWorkspaceTrash, stopWorkspaceActivity } from '../workspaces/trash'
 import { loadScratchpadDoc, saveScratchpadDoc } from '../scratchpad/document'
 import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from '../scratchpad/assets'
 import {
@@ -1046,11 +1047,22 @@ one.put('/', personalWorkspace, async c => {
 
 one.delete('/', personalWorkspace, async c => {
   const ws = c.get('ws')
-  if (ws.remote) return c.text('Leaving remote workspaces is not available yet', 403)
-  const ok = await removeWorkspace(ws.id)
+  if (ws.remote) {
+    try {
+      await leaveRemoteWorkspace(ws.id, ws.remote)
+    } catch (error) {
+      return c.text(error instanceof Error ? error.message : 'Could not leave workspace', 503)
+    }
+    return c.body(null, 204)
+  }
+  if (getAppConfig().environment === 'cloud') {
+    if ((await changeWorkspaceTrash(ws.id, true)).status !== 'updated')
+      return c.text('Workspace not found', 404)
+    return c.body(null, 204)
+  }
+  const ok = await unregisterWorkspace(ws.id)
   if (!ok) return c.text('Workspace not found', 404)
-  harnessFor(ws).stopWorkspace?.(ws.path)
-  await collabManager.stopWorkspace(ws.path)
+  await stopWorkspaceActivity(ws)
   return c.body(null, 204)
 })
 
@@ -1094,10 +1106,13 @@ workspaces.put('/order', async c => {
     return c.text('Expected { ids: string[] }', 400)
   }
   try {
-    // Hidden remote references keep their place after the visible ones.
-    const all = await listWorkspaces()
-    const visible = new Set(visibleWorkspaces(all).map(entry => entry.id))
-    const hiddenIds = all.filter(entry => !visible.has(entry.id)).map(entry => entry.id)
+    // Workspaces the client does not list keep their place after the listed
+    // ones: remote references in standalone Moi, and references to shares the
+    // person has left.
+    const listed = new Set<string>(body.ids)
+    const hiddenIds = (await listWorkspaces())
+      .filter(entry => !listed.has(entry.id))
+      .map(entry => entry.id)
     const entries = await reorderWorkspaces([...body.ids, ...hiddenIds])
     // List-only change: a narrow event so clients refetch just the sidebar
     // list, not every per-workspace query (`workspace-config:changed` also triggers
@@ -1121,7 +1136,7 @@ workspaces.post('/', async c => {
   const body = await c.req.json().catch(() => null)
   if (body && typeof body === 'object' && 'remote' in body) {
     if (getAppConfig().environment !== 'cloud')
-      return c.text('Shared workspaces require Cloud mode', 403)
+      return c.text('Remote workspaces require Cloud mode', 403)
     if (Object.keys(body).some(key => key !== 'remote' && key !== 'harness'))
       return c.text('Remote registration expects only remote and harness', 400)
     let remote
@@ -1140,7 +1155,8 @@ workspaces.post('/', async c => {
       if (availability.status !== 'available') return c.text(availability.reason, 400)
     }
     try {
-      return c.json(await openSharedWorkspace(remote, requested), 201)
+      const entry = await syncRemoteWorkspaces(remote, requested)
+      return entry ? c.json(entry, 201) : c.text('Workspace is not shared with this account', 404)
     } catch (error) {
       return c.text(error instanceof Error ? error.message : 'Could not open shared workspace', 503)
     }
@@ -1175,7 +1191,31 @@ workspaces.post('/', async c => {
   return c.json((await mergeWorkspaceList([entry]))[0], 201)
 })
 
-workspaces.get('/discover', async c => c.json(await discoverWorkspaces()))
+// Standalone Moi unregisters the workspace and keeps its folder. Only cloud owners have trash.
+workspaces.get('/trash', async c => {
+  if (getAppConfig().environment !== 'cloud') return c.json([])
+  const trashed = await mergeWorkspaceList(await listTrashedWorkspaces())
+  return c.json(
+    trashed.map(({ id, name, path, icon, theme, harness, trashedAt }) => ({
+      id,
+      name: name || basename(path),
+      icon,
+      theme,
+      harness,
+      trashedAt
+    }))
+  )
+})
+
+workspaces.post('/trash/:id/restore', async c => {
+  if (getAppConfig().environment !== 'cloud') return c.text('Workspace not found', 404)
+  const result = await changeWorkspaceTrash(c.req.param('id'), false)
+  if (result.status !== 'updated')
+    return result.status === 'missing'
+      ? c.text('Workspace not found', 404)
+      : c.text('This workspace can no longer be restored', 410)
+  return c.json((await mergeWorkspaceList([result.entry]))[0])
+})
 
 // Home-card previews for every workspace in one request, keyed by id, so the
 // home page fetches them beside the list instead of one per card after it.
@@ -1201,7 +1241,7 @@ workspaces.get('/previews', async c => {
 })
 
 // Backends the create dialog can provision from scratch. OpenClaw workspaces
-// belong to their agents and arrive via discovery.
+// belong to their agents and appear in workspace suggestions.
 const CREATABLE_HARNESSES = new Set<HarnessType>(['claude-code', 'codex'])
 
 async function harnessTypeAvailability(harness: HarnessType): Promise<HarnessAvailability> {
@@ -1219,7 +1259,7 @@ workspaces.post('/create', async c => {
   }
   const harness: HarnessType = requestedHarness
   if (!CREATABLE_HARNESSES.has(harness)) {
-    return c.text('Workspaces of this type arrive through discovery, not creation', 400)
+    return c.text('Add this type of workspace from Suggestions', 400)
   }
   const availability = await harnessTypeAvailability(harness)
   if (availability.status !== 'available') return c.text(availability.reason, 400)
@@ -1245,12 +1285,13 @@ workspaces.post('/create', async c => {
   return c.json(entry, 201)
 })
 
-// `/:id` is registered after the static `/discover` so the literal path wins.
+// Register workspace IDs after the collection routes.
 workspaces.route('/:id', one)
 
 // ---- top-level API ----------------------------------------------------------
 export const api = new Hono()
 
+api.get('/api/workspace-suggestions', async c => c.json(await listWorkspaceSuggestions()))
 api.route('/api/workspaces', workspaces)
 api.route('/api/harnesses', harnesses)
 api.route('/api/onboarding', onboarding)

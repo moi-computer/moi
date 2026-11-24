@@ -113,7 +113,7 @@ function RemoteMembersProbe() {
   return <pre data-members>{JSON.stringify(members.data)}</pre>
 }
 
-test('a shared workspace reads the list published under its owner address', async () => {
+test('a remote workspace reads the list published under its owner address', async () => {
   const ui = await mountAccount({ children: <RemoteMembersProbe /> })
   await ui.settle()
   const rendered = () => ui.document.querySelector('[data-members]')?.textContent

@@ -405,7 +405,7 @@ test('a ready demo opens the workspace normally', async () => {
   expect(document.body.textContent).not.toContain('Set up ChatGPT')
 })
 
-test('missing folder offers deletion and returns home after removing the workspace', async () => {
+test('deleting a workspace with a missing folder returns home', async () => {
   const { document, client, key, click, requests, destinations } = await mount({
     status: 'unavailable',
     reason: 'Workspace folder not found'

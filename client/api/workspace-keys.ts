@@ -1,6 +1,11 @@
+// Outside `workspaceKeys.all` on purpose: these lists change without any
+// per-workspace query needing a refetch.
+export const trashedWorkspacesKey = ['trashed-workspaces'] as const
+export const remoteWorkspacesKey = ['remote-workspaces'] as const
+
 export const workspaceKeys = {
   all: ['workspaces'] as const,
-  discover: ['workspaces', 'discover'] as const,
+  suggestions: ['workspaces', 'suggestions'] as const,
   // Every workspace's home-card preview, fetched in one batch.
   previews: ['workspaces', 'previews'] as const,
   layout: (id: string) => ['workspaces', 'layout', id] as const,
