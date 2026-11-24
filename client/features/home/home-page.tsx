@@ -31,7 +31,7 @@ export function HomePage() {
   usePreloadWorkspaceFonts()
   const workspacesQuery = useWorkspaces()
   useWorkspacePreviews()
-  const appConfig = useAppConfig()
+  const { demo, environment } = useAppConfig()
 
   const workspaces = useWorkspaceMetadata(workspacesQuery.data ?? [])
 
@@ -58,7 +58,7 @@ export function HomePage() {
       <HomeLogo className="mb-10" />
 
       {count > 0 ? (
-        <section className="mb-12">
+        <section>
           <div className="mb-4 flex items-center justify-between gap-2">
             <h1 className="text-sm font-medium text-foreground">Workspaces</h1>
             <CreateWorkspaceDialog
@@ -78,7 +78,7 @@ export function HomePage() {
           </div>
         </section>
       ) : (
-        <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
+        <div className="flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
           <IconEggCracked size={56} stroke={0.75} className="text-muted-foreground" />
           <div className="flex flex-col gap-1.5">
             <h2 className="font-medium">Create your first workspace</h2>
@@ -91,11 +91,13 @@ export function HomePage() {
         </div>
       )}
 
-      <div className="grid gap-8">
-        <WorkspaceInvitations />
-        {!appConfig.demo && <WorkspaceSuggestions />}
-        <WorkspaceTrash />
-      </div>
+      {!demo && (
+        <div className="mt-12 grid gap-8 empty:hidden">
+          {environment === 'cloud' && <WorkspaceInvitations />}
+          <WorkspaceSuggestions />
+          {environment === 'cloud' && <WorkspaceTrash />}
+        </div>
+      )}
     </div>
   )
 }

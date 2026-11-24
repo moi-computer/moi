@@ -375,6 +375,37 @@ describe('Workspace', () => {
   )
 
   test(
+    'home hides unavailable workspace sections',
+    async page => {
+      for (const endpoint of [
+        '/cloud/api/workspaces/invitations',
+        '/api/workspaces/suggestions',
+        '/api/workspaces/trash'
+      ]) {
+        await page.route(`**${endpoint}`, route =>
+          route.fulfill({ status: 401, body: 'Sign in required' })
+        )
+      }
+      await page.goto('/#/')
+      await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
+      await expect(page.getByText('Sign in required')).toHaveCount(0)
+      for (const name of ['Invitations', 'Suggestions', 'Trash', 'Retry', 'Try again']) {
+        await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
+      }
+    },
+    { api: { '/api/config': { environment: 'cloud', demo: false } } }
+  )
+
+  test('home opens when onboarding settings are unavailable', async page => {
+    await page.route('**/api/settings', route =>
+      route.fulfill({ status: 503, body: 'Settings unavailable' })
+    )
+    await page.goto('/#/')
+    await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0)
+  })
+
+  test(
     'onboarding',
     async page => {
       await page.goto('/#/')
@@ -422,11 +453,21 @@ describe('Workspace', () => {
   test(
     'demo home',
     async page => {
+      const optionalRequests: string[] = []
+      for (const list of ['invitations', 'suggestions', 'trash']) {
+        await page.route(`**/api/workspaces/${list}`, route => {
+          optionalRequests.push(list)
+          return route.fallback()
+        })
+      }
       // The demo serves home at /demo; a query string must not break the match.
       await page.goto('/#/demo?ref=launch')
       await expect(page.getByText('acme-store').first()).toBeVisible()
       await expect(page.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/demo')
-      await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toHaveCount(0)
+      for (const name of ['Invitations', 'Suggestions', 'Trash', 'Retry']) {
+        await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
+      }
+      expect(optionalRequests).toEqual([])
     },
     {
       api: {

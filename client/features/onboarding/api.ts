@@ -9,11 +9,8 @@ export function useOnboardingSettings() {
   const enabled = !config.demo
   const settings = useAppSettings()
   return {
-    ...settings,
-    enabled,
     loading: enabled && settings.isPending,
-    error: enabled ? settings.error : undefined,
-    retry: () => void settings.refetch()
+    showOnboarding: enabled && settings.isSuccess && settings.data.showOnboarding
   }
 }
 

@@ -13,9 +13,8 @@ export function OnboardingPage() {
   const save = useSaveAppSettings()
   const [destination, setDestination] = useState(homePath)
   const [harness, setHarness] = useState<OnboardingHarness>()
-  if (onboarding.loading || onboarding.error)
-    return <OnboardingStatus error={onboarding.error || undefined} onRetry={onboarding.retry} />
-  if (!onboarding.enabled || !onboarding.data?.showOnboarding) return <Redirect to={destination} />
+  if (onboarding.loading) return <OnboardingStatus />
+  if (!onboarding.showOnboarding) return <Redirect to={destination} />
 
   function finish(workspaceId?: string) {
     setDestination(workspaceId ? `/workspace/${workspaceId}/overview` : homePath())

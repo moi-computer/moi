@@ -145,7 +145,9 @@ function DemoDialogContent() {
                 stroke={0.75}
                 className="mt-0.5 size-8 shrink-0 text-muted-foreground"
               />
-              <span className="text-sm text-foreground">Share what you've built with anyone</span>
+              <span className="text-sm text-foreground">
+                Share what you've built with other people and bring your agents to Moi
+              </span>
             </li>
             <li className="flex items-center gap-3">
               <IconMessageChatbot

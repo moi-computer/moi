@@ -1,6 +1,5 @@
 import { IconLoader2 } from '@tabler/icons-react'
 
-import { useAppConfig } from '@/client/api/app-config'
 import { WorkspaceIcon } from '@/client/components/shared/workspace-icon'
 import { Button } from '@/client/components/ui/button'
 import { WorkspaceListRow, WorkspaceListSection } from './workspace-list-section'
@@ -11,9 +10,8 @@ import type { WorkspaceEntry } from '@/lib/types'
 import { useRestoreWorkspace, useTrashedWorkspaces } from './api'
 
 export function WorkspaceTrash() {
-  const { environment, demo } = useAppConfig()
-  const trash = useTrashedWorkspaces(environment === 'cloud' && !demo)
-  const workspaces = trash.data ?? []
+  const trash = useTrashedWorkspaces()
+  const workspaces = trash.isSuccess ? trash.data : []
   if (workspaces.length === 0) return null
   return (
     <WorkspaceListSection
