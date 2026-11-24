@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 
 import { ScreenShell } from '@/client/components/shared/screen-shell'
 import { Spinner } from '@/client/components/ui/spinner'
@@ -26,10 +26,12 @@ export function WorkspaceFallbackScreen({
   )
 }
 
-export function WorkspaceLoadingState() {
+type WorkspaceLoadingStateProps = Pick<ComponentProps<typeof Spinner>, 'aria-label'>
+
+export function WorkspaceLoadingState(props: WorkspaceLoadingStateProps) {
   return (
     <div className="flex flex-1 items-center justify-center">
-      <Spinner className="size-6 text-muted-foreground" stroke={1.5} />
+      <Spinner className="size-6 text-muted-foreground" stroke={1.5} {...props} />
     </div>
   )
 }

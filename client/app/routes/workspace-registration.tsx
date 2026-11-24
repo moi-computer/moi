@@ -46,9 +46,7 @@ export function WorkspaceRegistration({ userId, workspaceId }: WorkspaceRegistra
             onRetry={() => void opening.refetch()}
           />
         ) : (
-          <div className="flex flex-1" role="status" aria-label="Opening shared workspace">
-            <WorkspaceLoadingState />
-          </div>
+          <WorkspaceLoadingState aria-label="Opening shared workspace" />
         )}
       </WorkspaceFallbackScreen>
     </SidebarLayout>

@@ -123,6 +123,7 @@ describe('Workspace', () => {
       await page.goto('/#/demo?ref=launch')
       await expect(page.getByText('acme-store').first()).toBeVisible()
       await expect(page.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/demo')
+      await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toHaveCount(0)
     },
     {
       api: {
@@ -130,7 +131,8 @@ describe('Workspace', () => {
           environment: 'cloud',
           demo: true,
           demoInstallUrl: 'https://moi.computer'
-        } satisfies ClientAppConfig
+        } satisfies ClientAppConfig,
+        '/api/workspaces/suggestions': [{ path: '/projects/notes', harnesses: ['codex'] }]
       }
     }
   )

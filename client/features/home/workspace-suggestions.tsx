@@ -1,10 +1,7 @@
-import { useState } from 'react'
 import { IconPlus } from '@tabler/icons-react'
 import { useLocation } from 'wouter'
 
-import { useAppConfig } from '@/client/api/app-config'
 import { Button } from '@/client/components/ui/button'
-import { DemoDialog } from '@/client/features/demo/demo-dialog'
 import { AddWorkspaceDialog } from '@/client/features/workspace/add/add-workspace-dialog'
 import { useWorkspaceImport } from '@/client/features/workspace/add/use-workspace-import'
 import {
@@ -16,8 +13,6 @@ import { WorkspaceListRow, WorkspaceListSection } from './workspace-list-section
 
 export function WorkspaceSuggestions() {
   const { data: workspaces = [] } = useWorkspaceSuggestions()
-  const { demo } = useAppConfig()
-  const [promoOpen, setPromoOpen] = useState(false)
   const [, navigate] = useLocation()
   const importFlow = useWorkspaceImport({
     onSuccess: entry => navigate(`/workspace/${entry.id}`)
@@ -39,11 +34,7 @@ export function WorkspaceSuggestions() {
               >
                 {workspace.displayPath ?? workspace.path}
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => (demo ? setPromoOpen(true) : importFlow.startImport(workspace))}
-              >
+              <Button variant="outline" size="sm" onClick={() => importFlow.startImport(workspace)}>
                 <IconPlus stroke={1.75} />
                 Add
               </Button>
@@ -62,7 +53,6 @@ export function WorkspaceSuggestions() {
           onClose={importFlow.reset}
         />
       )}
-      <DemoDialog open={promoOpen} onOpenChange={setPromoOpen} />
     </>
   )
 }

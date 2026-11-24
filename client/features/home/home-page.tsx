@@ -109,7 +109,7 @@ export function HomePage() {
 
       <div className="grid gap-8">
         <WorkspaceInvitations />
-        <WorkspaceSuggestions />
+        {!appConfig.demo && <WorkspaceSuggestions />}
         <WorkspaceTrash />
       </div>
     </div>
