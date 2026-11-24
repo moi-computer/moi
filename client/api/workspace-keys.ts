@@ -1,7 +1,6 @@
-// Outside `workspaceKeys.all` on purpose: these lists change without any
+// Outside `workspaceKeys.all` on purpose: trash changes without any
 // per-workspace query needing a refetch.
 export const trashedWorkspacesKey = ['trashed-workspaces'] as const
-export const remoteWorkspacesKey = ['remote-workspaces'] as const
 
 export const workspaceKeys = {
   all: ['workspaces'] as const,

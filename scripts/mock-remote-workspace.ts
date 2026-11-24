@@ -431,7 +431,7 @@ export function createMockRemoteProxy(
         req.method === 'GET' && (path === '/api/workspaces' || path === '/api/workspaces/trash')
       let fixtureSession: Awaited<ReturnType<typeof authorize>> | undefined
       let fixturePosition: number | undefined
-      if (testWorkspaceEntry && (listing || reorder)) {
+      if ((testWorkspaceEntry && reorder) || (listing && (testWorkspaceEntry || mockWorkspaceId))) {
         const auth = await authorize(req)
         if (auth.response)
           return void res.writeHead(auth.response.status).end(await auth.response.text())
@@ -491,11 +491,18 @@ export function createMockRemoteProxy(
         { method: req.method, headers: upstreamHeaders },
         async reply => {
           const headers = { ...reply.headers }
-          if (fixtureSession?.testId && testWorkspaceEntry && reply.statusCode === 200) {
+          if (fixtureSession?.testId && reply.statusCode === 200) {
             const fixtureId = fixtureSession.testId
             try {
-              const entries = JSON.parse((await buffer(reply)).toString())
-              const owned = await testWorkspaceEntry(fixtureId, path === '/api/workspaces/trash')
+              const entries: { id: string }[] = JSON.parse((await buffer(reply)).toString())
+              const reference = entries.findIndex(entry => entry.id === mockWorkspaceId)
+              if (reference !== -1) {
+                const access = await cloud(
+                  new Request('http://localhost/mock/access', { headers: fixtureSession.headers })
+                )
+                if (!access.ok) entries.splice(reference, 1)
+              }
+              const owned = await testWorkspaceEntry?.(fixtureId, path === '/api/workspaces/trash')
               if (fixturePosition !== undefined) positions.set(fixtureId, fixturePosition)
               const index = positions.get(fixtureId) ?? -1
               if (owned) entries.splice(index < 0 ? entries.length : index, 0, owned)

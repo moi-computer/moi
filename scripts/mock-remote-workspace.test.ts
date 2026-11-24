@@ -243,7 +243,7 @@ async function setup(register?: (req: Request) => Promise<Response>) {
           headers: { 'content-type': 'text/html' }
         })
       forwarded.push(path)
-      if (register && path === '/api/workspaces' && req.method === 'POST') return register(req)
+      if (register && path === '/api/workspaces') return register(req)
       if (path === '/redirect')
         return new Response(null, {
           status: 302,
@@ -328,10 +328,14 @@ test('members can copy a fresh agent invite prompt for the mock workspace', asyn
 
 test('visitor can accept, open and leave the mock workspace', async () => {
   const { api } = await import('../server/api')
-  const { setRegistryPath, DEFAULT_REGISTRY_PATH } = await import('../server/workspaces/registry')
+  const { listWorkspaces, setRegistryPath, DEFAULT_REGISTRY_PATH } =
+    await import('../server/workspaces/registry')
   const { codexHarness } = await import('../server/harness/codex')
   const available = spyOn(codexHarness, 'availability').mockResolvedValue({ status: 'available' })
-  const { origin, request, forwarded, referencePath } = await setup(async req => api.fetch(req))
+  const { origin, request, forwarded, referencePath } = await setup(async req => {
+    if (req.method === 'POST') return api.fetch(req)
+    return Response.json(await listWorkspaces())
+  })
   setRegistryPath(referencePath + '.registry.json')
   cleanups.push(() => {
     setRegistryPath(DEFAULT_REGISTRY_PATH)
@@ -364,6 +368,7 @@ test('visitor can accept, open and leave the mock workspace', async () => {
   expect(registration.status).toBe(201)
   const entry = await registration.json()
   expect(entry).toMatchObject({ path: referencePath, remote, harness: 'codex' })
+  expect(await (await request('/api/workspaces')).json()).toMatchObject([{ id: entry.id }])
   expect(forwarded).toContain('/api/workspaces')
   const owner = await request(
     '/api/workspaces/alice:owner-board/rpc/counter/increment?revision=2',
@@ -389,6 +394,7 @@ test('visitor can accept, open and leave the mock workspace', async () => {
   expect((await fetch(origin + leavePath, leave)).status).toBe(401)
   expect((await request(leavePath, leave)).status).toBe(204)
   expect(forwarded).not.toContain(leavePath)
+  expect(await (await request('/api/workspaces')).json()).toEqual([])
   expect(await (await request('/cloud/api/workspaces/remote')).json()).toEqual({ workspaces: [] })
   expect((await request('/api/workspaces/alice:owner-board')).status).toBe(404)
   expect(await (await request('/cloud/api/workspaces/invitations')).json()).toEqual({

@@ -3,12 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import * as appConfig from '@/client/api/app-config'
-import { useRegisteredWorkspaces, useWorkspaces, useWorkspaceMetadata } from './api'
-import * as accountApi from '../account/api'
-import { cleanupAccount, mountAccount } from '../account/account-test-utils'
-import { remoteWorkspacesKey } from '@/client/api/workspace-keys'
-import { useLostRemoteAccess, useRemoteWorkspaces, homeWorkspaces } from './remote-workspaces'
+import { useWorkspaces, useWorkspaceMetadata } from './api'
 
 test.each(['ready', 'failed', 'slow'] as const)(
   'home deduplicates owner requests and keeps cards available (%s)',
@@ -47,19 +42,12 @@ test.each(['ready', 'failed', 'slow'] as const)(
                 remote: { user_id: 'alice', workspace_id: 'board' }
               },
               {
-                id: 'left',
-                path: '/left',
+                id: 'another',
+                path: '/another',
                 addedAt: '',
-                remote: { user_id: 'carol', workspace_id: 'board' }
+                remote: { user_id: 'bob', workspace_id: 'other' }
               }
             ])
-          if (path === '/cloud/api/workspaces/remote')
-            return Response.json({
-              workspaces: [
-                { id: 'board', owner: { id: 'alice', name: 'Alice' } },
-                { id: 'other', owner: { id: 'bob', name: 'Bob' } }
-              ]
-            })
           if (path === '/api/workspaces/alice:board') {
             if (state === 'slow') return sleepingOwner
             if (state === 'failed') return new Response('Owner unavailable', { status: 503 })
@@ -72,23 +60,12 @@ test.each(['ready', 'failed', 'slow'] as const)(
         { preconnect: fetch.preconnect }
       )
     )
-    const configSpy = spyOn(appConfig, 'useAppConfig').mockReturnValue({
-      environment: 'cloud',
-      demo: false,
-      demoInstallUrl: ''
-    })
     function Probe() {
-      const registry = useRegisteredWorkspaces()
-      const entries = useWorkspaces()
-      const remote = useRemoteWorkspaces()
-      const cards = useWorkspaceMetadata(homeWorkspaces(entries.data ?? [], remote.data ?? []))
+      const { data: entries = [] } = useWorkspaces()
+      const cards = useWorkspaceMetadata(entries)
       // Sidebar and home observe the same owner without issuing duplicate requests.
-      useWorkspaceMetadata(entries.data ?? [])
-      return (
-        <p data-registry={registry.data?.map(entry => entry.id).join(',')}>
-          {cards.map(card => card.name).join(',')}
-        </p>
-      )
+      useWorkspaceMetadata(entries)
+      return <p>{cards.map(card => card.name).join(',')}</p>
     }
     const root = createRoot(document.getElementById('root')!)
     try {
@@ -104,29 +81,25 @@ test.each(['ready', 'failed', 'slow'] as const)(
           await Bun.sleep(10)
         })
       expect(document.body.textContent).toContain(
-        state === 'ready' ? 'Other owner,Local,Fresh owner name' : 'Other owner,Local,board'
+        state === 'ready' ? 'Local,Fresh owner name,Other owner' : 'Local,board,Other owner'
       )
-      expect(document.querySelector('p')?.getAttribute('data-registry')).toBe('local,visitor,left')
-      expect(document.body.textContent).not.toContain('left')
       if (state === 'slow') {
         wakeOwner(Response.json({ name: 'Awake owner', isRemote: false }))
         for (let i = 0; i < 20 && !document.body.textContent?.includes('Awake owner'); i++)
           await act(async () => {
             await Bun.sleep(10)
           })
-        expect(document.body.textContent).toContain('Other owner,Local,Awake owner')
+        expect(document.body.textContent).toContain('Local,Awake owner,Other owner')
       }
       expect(calls.sort()).toEqual([
         '/api/workspaces',
         '/api/workspaces/alice:board',
-        '/api/workspaces/bob:other',
-        '/cloud/api/workspaces/remote'
+        '/api/workspaces/bob:other'
       ])
     } finally {
       await act(async () => root.unmount())
       client.clear()
       fetchSpy.mockRestore()
-      configSpy.mockRestore()
       for (const [key, descriptor] of descriptors) {
         if (descriptor) Object.defineProperty(globalThis, key, descriptor)
         else Reflect.deleteProperty(globalThis, key)
@@ -134,44 +107,3 @@ test.each(['ready', 'failed', 'slow'] as const)(
     }
   }
 )
-
-test('confirmed loss of access survives a pending or failed refresh until Cloud grants access again', async () => {
-  function Workspace() {
-    return <p>{useLostRemoteAccess('alice:board') ? 'Access denied' : 'Workspace open'}</p>
-  }
-  const first = Promise.withResolvers<Response>()
-  const refresh = Promise.withResolvers<Response>()
-  let response = first.promise
-  const cloudRequest = accountApi.cloudRequest
-  const request = spyOn(accountApi, 'cloudRequest').mockImplementation((path, ...args) =>
-    path === '/api/workspaces/remote' ? response : cloudRequest(path, ...args)
-  )
-  const ui = await mountAccount({ children: <Workspace /> })
-  const status = () => ui.document.querySelector('p')?.textContent
-  const refetch = () => ui.qc.refetchQueries({ queryKey: remoteWorkspacesKey })
-  try {
-    expect(status()).toBe('Workspace open')
-    first.resolve(Response.json({ workspaces: [] }))
-    await ui.settle()
-    expect(status()).toBe('Access denied')
-
-    response = refresh.promise
-    const pending = refetch()
-    await ui.settle()
-    expect(status()).toBe('Access denied')
-    refresh.reject(new Error('Offline'))
-    await pending
-    await ui.settle()
-    expect(status()).toBe('Access denied')
-
-    response = Promise.resolve(
-      Response.json({ workspaces: [{ id: 'board', owner: { id: 'alice' } }] })
-    )
-    await refetch()
-    await ui.settle()
-    expect(status()).toBe('Workspace open')
-  } finally {
-    await cleanupAccount()
-    request.mockRestore()
-  }
-})

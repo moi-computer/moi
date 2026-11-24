@@ -59,12 +59,10 @@ describe('Workspace', () => {
   test(
     'home shows workspace cards while optional lists load',
     async page => {
-      await page.route('**/cloud/api/workspaces/remote', () => new Promise(() => {}))
       await page.route('**/api/workspaces/suggestions', () => new Promise(() => {}))
       await page.route('**/cloud/api/workspaces/invitations', () => new Promise(() => {}))
       await page.goto('/#/')
       await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
-      await expect(page.getByText('Loading remote workspaces…')).toHaveCount(0)
       await expect(page.getByRole('heading', { name: 'Invitations' })).toHaveCount(0)
       await expect(page.getByRole('button', { name: 'Suggestions' })).toHaveCount(0)
     },
@@ -384,10 +382,14 @@ const remotePage = `/#/workspace/${REFERENCE_ID}`
 const remoteAnswers = {
   '/api/config': { environment: 'cloud', demo: false },
   '/cloud/api/me': sharingUser,
-  // A reference stays open only while Cloud lists its share.
-  '/cloud/api/workspaces/remote': {
-    workspaces: [{ id: 'owner-board', owner: { id: 'alice', name: 'Alice' } }]
-  },
+  '/api/workspaces': [
+    {
+      id: REFERENCE_ID,
+      path: '/visitor',
+      addedAt: '',
+      remote: { user_id: 'alice', workspace_id: 'owner-board' }
+    }
+  ],
   [ownerBase]: {
     apiBase: '/api/workspaces/owner-board',
     isRemote: false,
@@ -421,12 +423,12 @@ const remoteOptions = {
 }
 
 test(
-  'an open remote workspace shows the access-denied screen when Cloud confirms access ended',
+  'an open workspace shows the access-denied screen when it disappears from the server list',
   async page => {
     const accessCheck = Promise.withResolvers<void>()
-    await page.route('**/cloud/api/workspaces/remote', async route => {
+    await page.route('**/api/workspaces', async route => {
       await accessCheck.promise
-      return route.fulfill({ json: { workspaces: [] } })
+      return route.fulfill({ json: [] })
     })
     await page.goto(remotePage)
     try {
@@ -649,35 +651,9 @@ test(
     await leave.click()
     await expect(page.getByText('Couldn’t leave workspace')).toBeVisible()
     await leave.click()
-    await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Create your first workspace' })).toBeVisible()
   },
-  {
-    ...remoteOptions,
-    api: {
-      ...remoteAnswers,
-      '/api/workspaces': [
-        {
-          id: REFERENCE_ID,
-          path: '/visitor',
-          addedAt: '',
-          harness: 'claude-code',
-          remote: { user_id: 'alice', workspace_id: 'owner-board' }
-        }
-      ]
-    }
-  }
-)
-
-test(
-  'remote workspace list error',
-  async page => {
-    await page.route('**/cloud/api/workspaces/remote', route =>
-      route.fulfill({ status: 503, json: { error: 'Cloud unavailable' } })
-    )
-    await page.goto('/#/')
-    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
-  },
-  { api: { '/api/config': { environment: 'cloud', demo: false } } }
+  remoteOptions
 )
 
 test(
@@ -841,48 +817,6 @@ test(
 )
 
 test(
-  'home mixes unopened shares with registered workspaces',
-  async page => {
-    await page.goto('/#/')
-    const cards = page.getByRole('link', { name: /^Open / })
-    await expect(cards).toHaveCount(3)
-    await expect(
-      page.locator('a[aria-label="Open Alpha"][href$="/workspace/bob:board"]')
-    ).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Open Bravo', exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Open Zebra', exact: true })).toBeVisible()
-    await takeSnapshot('mixed workspace grid')
-  },
-  {
-    api: {
-      '/api/config': { environment: 'cloud', demo: false },
-      '/api/workspaces': [
-        { id: 'local', path: '/Zebra', name: 'Zebra', addedAt: '2026-01-01T00:00:00Z' },
-        {
-          id: 'registered',
-          path: '/visitor',
-          name: 'Bravo',
-          addedAt: '2026-01-01T00:00:00Z',
-          remote: { user_id: 'alice', workspace_id: 'board' }
-        }
-      ],
-      '/api/workspaces/alice:board': { name: 'Bravo' },
-      '/api/workspaces/bob:board': { name: 'Alpha' },
-      '/api/harnesses/status': {
-        ...HARNESSES,
-        'claude-code': { availability: { status: 'login-required', reason: 'Log in to Claude' } }
-      },
-      '/cloud/api/workspaces/remote': {
-        workspaces: [
-          { id: 'board', owner: { id: 'alice', name: 'Alice' } },
-          { id: 'board', owner: { id: 'bob', name: 'Bob' } }
-        ]
-      }
-    }
-  }
-)
-
-test(
   'accept invitation registers and opens the workspace',
   async page => {
     let accepted = false
@@ -903,14 +837,6 @@ test(
         json: { success: true, remote: { user_id: 'alice', workspace_id: 'owner-board' } }
       })
     })
-    await page.route('**/cloud/api/workspaces/remote', route =>
-      route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({
-          workspaces: accepted ? [{ id: 'owner-board', owner: { id: 'alice', name: 'Alice' } }] : []
-        })
-      })
-    )
     let checkedAccess = false
     await page.route(`**${ownerBase}`, route => {
       checkedAccess = accepted
@@ -921,7 +847,10 @@ test(
       )
     })
     await page.route('**/api/workspaces', route => {
-      if (route.request().method() !== 'POST') return route.fallback()
+      if (route.request().method() !== 'POST')
+        return route.fulfill({
+          json: registrations ? remoteAnswers['/api/workspaces'] : API['/api/workspaces']
+        })
       expect(accepted && checkedAccess).toBe(true)
       registrations++
       return route.fulfill({ json: { id: REFERENCE_ID, path: '/visitor', addedAt: '' } })

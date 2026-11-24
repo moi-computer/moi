@@ -54,10 +54,10 @@ Standalone Moi lists local workspaces. Requests for remote workspaces, invitatio
 
 ## Remote workspaces and collaboration
 
-In Cloud mode, home and the sidebar combine the local registry with the remote workspaces the account can access.
+Home and the sidebar use the workspace list from the Moi server.
 They reuse the workspace info query for names, icons, and themes. Each owner loads independently
 and wakes when needed; failed requests fall back to the registered name or workspace ID.
-Home and the sidebar hide a reference once Cloud confirms its membership has ended.
+When sync removes an open workspace from the list, the browser shows the access-denied screen.
 
 Shared updates and presence use one `${apiBase}/events` WebSocket. Cloud publishes the member list under the owner's address
 (`ownerId:workspaceId`); see [Cloud](cloud.md#methods-the-cloud-calls). Membership changes use
@@ -76,6 +76,7 @@ Both **Leave workspace** and **Delete workspace** call `DELETE /api/workspaces/{
 - **Standalone Moi** unregisters the workspace and keeps its folder and chats.
 
 Cloud Moi syncs memberships on startup, hourly, and on first open when a reference is missing.
+When someone joins or loses access, Batiok also asks their running Moi server to sync.
 It creates missing references and cleans up revoked ones after a successful membership check.
 Cleanup removes the workspace’s `.moi/` directory, personal workspace state, and stored secrets.
 Leaving a remote workspace and permanent deletion both remove the local `moi-workspace` skill and its Claude link. Moi removes their parent folders and the workspace folder only when empty. Other skills, files, and agent chat logs stored elsewhere stay on disk.

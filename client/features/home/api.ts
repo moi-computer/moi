@@ -2,7 +2,6 @@ import { useLocation } from 'wouter'
 import { homePath } from '@/client/api/app-config'
 import { toast } from '@/client/components/ui/toast'
 import { workspaceApiBase, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
-import { useRemoteWorkspaces, visibleWorkspaces } from './remote-workspaces'
 import { workspaceInfoOptions } from '../workspace/api'
 import {
   queryOptions,
@@ -13,34 +12,15 @@ import {
 } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
-import {
-  remoteWorkspacesKey,
-  trashedWorkspacesKey,
-  workspaceKeys
-} from '@/client/api/workspace-keys'
+import { trashedWorkspacesKey, workspaceKeys } from '@/client/api/workspace-keys'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import type { WorkspaceSuggestion, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
 
-const registeredWorkspacesOptions = queryOptions({
-  queryKey: workspaceKeys.all,
-  queryFn: () => requestJson<WorkspaceEntry[]>('/api/workspaces'),
-  // Live events invalidate the list on every change. This only bounds how
-  // long a missed event (socket down) can leave it wrong; route switches
-  // within the window reuse the cache.
-  staleTime: 5 * 60_000
-})
-
-export function useRegisteredWorkspaces() {
-  return useQuery(registeredWorkspacesOptions)
-}
-
 export function useWorkspaces() {
-  const remoteQuery = useRemoteWorkspaces()
-  const remoteWorkspaces =
-    remoteQuery.isEnabled && remoteQuery.isSuccess ? remoteQuery.data : undefined
   return useQuery({
-    ...registeredWorkspacesOptions,
-    select: entries => visibleWorkspaces(entries, remoteWorkspaces)
+    queryKey: workspaceKeys.all,
+    queryFn: ({ signal }) => requestJson<WorkspaceEntry[]>('/api/workspaces', { signal }),
+    staleTime: 5 * 60_000
   })
 }
 
@@ -151,9 +131,7 @@ export function useDeleteWorkspace(action: 'delete' | 'leave' = 'delete') {
         (previous ?? []).filter(workspace => workspace.id !== workspaceId)
       )
       queryClient.invalidateQueries({ queryKey: workspaceKeys.suggestions })
-      queryClient.invalidateQueries({
-        queryKey: action === 'leave' ? remoteWorkspacesKey : trashedWorkspacesKey
-      })
+      if (action === 'delete') queryClient.invalidateQueries({ queryKey: trashedWorkspacesKey })
       navigate(homePath())
     },
     onError: error => {

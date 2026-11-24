@@ -15,7 +15,14 @@ const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
 export const newWorkspaceId = customAlphabet(ALPHABET, 10)
 
 // Literal collection routes take precedence over workspace IDs.
-export const RESERVED_WORKSPACE_IDS = ['create', 'order', 'previews', 'suggestions', 'trash']
+export const RESERVED_WORKSPACE_IDS = [
+  'create',
+  'order',
+  'previews',
+  'suggestions',
+  'sync',
+  'trash'
+]
 
 // Ids may also be chosen by hand (`moi init --id <id>`), so they are validated
 // rather than assumed. Slightly wider than the generated alphabet — dashes and

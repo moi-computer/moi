@@ -4,7 +4,7 @@ import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef
 
 import { useQueryClient } from '@tanstack/react-query'
 
-import { useLostRemoteAccess } from '@/client/features/home/remote-workspaces'
+import { useWorkspaces } from '@/client/features/home/api'
 
 import {
   type WorkspaceLayoutResponse,
@@ -16,7 +16,6 @@ import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { WorkspaceLayout, WorkspaceLayoutPatch, HarnessType } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
-import { getWorkspaceAddress } from './remote'
 import { useWorkspaceState } from './workspace-state'
 
 export type WorkspaceLayoutContextValue = {
@@ -134,14 +133,12 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
     [query.data, query.isLoading, setLayout, id]
   )
 
-  // The owner deleted the workspace or removed this member while it was open.
-  const lostAccess = useLostRemoteAccess(
-    query.data?.isRemote ? getWorkspaceAddress(id, qc) : undefined
-  )
+  const { data: workspaces } = useWorkspaces()
+  const missing = workspaces && !workspaces.some(workspace => workspace.id === id)
 
   return (
     <WorkspaceLayoutContext value={value}>
-      {lostAccess ? (
+      {missing ? (
         <WorkspaceFallbackScreen showPanel>
           <WorkspaceUnavailableState />
         </WorkspaceFallbackScreen>

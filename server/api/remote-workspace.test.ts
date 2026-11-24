@@ -352,6 +352,7 @@ test('standalone hides remote registrations and refuses remote opening', async (
     environment: 'local'
   })
   try {
+    expect((await api.request('/api/workspaces/sync', { method: 'POST' })).status).toBe(403)
     for (const path of ['', '/state', '/widgets'])
       expect((await api.request(local + path)).status).toBe(403)
     expect(

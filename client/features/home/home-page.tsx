@@ -1,7 +1,8 @@
 import { WorkspaceSuggestions } from './workspace-suggestions'
 import { WorkspaceInvitations } from './workspace-invitations'
 import { WorkspaceTrash } from './workspace-trash'
-import { homeWorkspaces, useRemoteWorkspaces, type HomeWorkspace } from './remote-workspaces'
+import { workspaceDisplayName } from '@/client/features/workspace/workspace-presentation'
+import type { WorkspaceEntry } from '@/lib/types'
 
 import { IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
 import { Link } from 'wouter'
@@ -29,16 +30,10 @@ import { WorkspacePreview } from './workspace-preview'
 export function HomePage() {
   usePreloadWorkspaceFonts()
   const workspacesQuery = useWorkspaces()
-  const remoteQuery = useRemoteWorkspaces()
   useWorkspacePreviews()
   const appConfig = useAppConfig()
 
-  const workspaces = useWorkspaceMetadata(
-    homeWorkspaces(
-      workspacesQuery.data ?? [],
-      appConfig.environment === 'cloud' && !remoteQuery.isError ? remoteQuery.data : undefined
-    )
-  )
+  const workspaces = useWorkspaceMetadata(workspacesQuery.data ?? [])
 
   if (workspacesQuery.isPending) {
     return (
@@ -48,7 +43,7 @@ export function HomePage() {
     )
   }
 
-  if (workspacesQuery.isError) {
+  if (workspacesQuery.isError && !workspacesQuery.data) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <p className="text-sm text-muted-foreground">Could not load spaces.</p>
@@ -83,27 +78,16 @@ export function HomePage() {
           </div>
         </section>
       ) : (
-        (appConfig.environment !== 'cloud' || remoteQuery.isSuccess) && (
-          <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
-            <IconEggCracked size={56} stroke={0.75} className="text-muted-foreground" />
-            <div className="flex flex-col gap-1.5">
-              <h2 className="font-medium">Create your first workspace</h2>
-              <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-                Workspace is a place for all views and widgets that share the same context. Create a
-                new one or import an existing folder you&rsquo;ve worked in before.
-              </p>
-            </div>
-            <CreateWorkspaceDialog trigger={<Button>New workspace</Button>} />
+        <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
+          <IconEggCracked size={56} stroke={0.75} className="text-muted-foreground" />
+          <div className="flex flex-col gap-1.5">
+            <h2 className="font-medium">Create your first workspace</h2>
+            <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+              Workspace is a place for all views and widgets that share the same context. Create a
+              new one or import an existing folder you&rsquo;ve worked in before.
+            </p>
           </div>
-        )
-      )}
-
-      {appConfig.environment === 'cloud' && remoteQuery.isError && (
-        <div className="mb-12" role="alert">
-          <p className="text-sm text-muted-foreground">{remoteQuery.error.message}</p>
-          <Button variant="ghost" onClick={() => void remoteQuery.refetch()}>
-            Retry
-          </Button>
+          <CreateWorkspaceDialog trigger={<Button>New workspace</Button>} />
         </div>
       )}
 
@@ -117,11 +101,11 @@ export function HomePage() {
 }
 
 type WorkspaceCardProps = {
-  workspace: HomeWorkspace
+  workspace: WorkspaceEntry
 }
 
 function WorkspaceCard({ workspace }: WorkspaceCardProps) {
-  const name = workspace.name
+  const name = workspaceDisplayName(workspace)
   const previewQuery = useWorkspacePreview(workspace.id)
   const theme = workspace.theme ?? previewQuery.data?.theme
   const agent = resolveWorkspaceTheme(theme).agent
@@ -129,7 +113,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const updatedAt =
     previewQuery.data?.updatedAt ??
     (workspace.addedAt ? new Date(workspace.addedAt).getTime() : undefined)
-  const workspaceHref = workspace.href
+  const workspaceHref = `/workspace/${workspace.id}`
 
   return (
     <div className="group flex min-w-0 flex-col gap-3">
@@ -181,10 +165,8 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           />
           <span className="truncate text-sm font-medium text-foreground">{name}</span>
         </div>
-        {(updatedAt !== undefined || workspace.ownerName) && (
-          <span className="text-xs text-muted-foreground">
-            {updatedAt !== undefined ? formatUpdatedAt(updatedAt) : workspace.ownerName}
-          </span>
+        {updatedAt !== undefined && (
+          <span className="text-xs text-muted-foreground">{formatUpdatedAt(updatedAt)}</span>
         )}
       </Link>
     </div>

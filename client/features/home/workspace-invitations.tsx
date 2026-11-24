@@ -3,7 +3,6 @@ import { useLocation } from 'wouter'
 import { parseRemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppConfig } from '@/client/api/app-config'
-import { remoteWorkspacesKey } from '@/client/api/workspace-keys'
 import { jsonRequest } from '@/client/api/http'
 import { Button } from '@/client/components/ui/button'
 import { cloudRequest } from '@/client/features/account/api'
@@ -51,7 +50,6 @@ export function WorkspaceInvitations() {
       const { remote } = (await response.json()) as { remote: unknown }
       const target = parseRemoteWorkspaceTarget(remote)
       void client.invalidateQueries({ queryKey: invitationsKey })
-      void client.invalidateQueries({ queryKey: remoteWorkspacesKey })
       return openRemoteWorkspace(client, target, harness)
     },
     onSuccess: entry => {

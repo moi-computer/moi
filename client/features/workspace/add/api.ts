@@ -77,6 +77,11 @@ export async function openRemoteWorkspace(
     jsonRequest('POST', { remote, harness }),
     'Could not open shared workspace'
   )
+  await client.cancelQueries({ queryKey: workspaceKeys.all, exact: true })
+  client.setQueryData<WorkspaceEntry[]>(
+    workspaceKeys.all,
+    entries => entries && upsertWorkspaceEntry(entries, entry)
+  )
   void client.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
   return entry
 }
