@@ -1,16 +1,17 @@
-import { realpath, rm } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
+import { existsSync } from 'node:fs'
+import { lstat, rm, rmdir } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 
 import { sameRemoteWorkspace } from '@/lib/workspace-config'
 import type { WorkspaceEntry } from '@/lib/types'
 
-import { createdWorkspacesRoot, getAppConfig } from '../app-config'
+import { getAppConfig } from '../app-config'
 import { collabManager } from '../collab/manager'
 import { publishEvent } from '../events'
 import { harnessFor } from '../harness/registry'
 import { clearWorkspaceAccess } from '../remote/client'
+import { removeWorkspaceSkill, workspaceSkillDirectories } from '../skills/workspace'
 import { deleteWorkspaceState } from '../workspace-state'
-import { remoteReferenceFolderName } from './remote-workspace-reference'
 import { clearWorkspaceEnv } from './env'
 import { loadWorkspaceFileConfig } from './layout'
 import {
@@ -34,31 +35,46 @@ export async function changeWorkspaceTrash(id: string, trashed: boolean) {
   return result
 }
 
-// A folder Moi made is deleted whole: a direct child of the created-workspaces
-// root, and for a reference to someone else's workspace also one named as Moi
-// names them. Anywhere else the user's own files may sit beside `.moi/`.
-async function isMoiOwnedFolder({ path, remote }: WorkspaceEntry): Promise<boolean> {
-  const root = createdWorkspacesRoot()
-  if (dirname(resolve(path)) !== resolve(root)) return false
-  const [realRoot, realPath] = await Promise.all([
-    realpath(root).catch(() => undefined),
-    realpath(path).catch(() => undefined)
-  ])
-  // A symlink inside the root points at a folder Moi does not own.
-  if (!realRoot || !realPath || dirname(realPath) !== realRoot) return false
-  return !remote || basename(realPath) === remoteReferenceFolderName(remote)
+async function removeDirectoryIfEmpty(path: string) {
+  await rmdir(path).catch(error => {
+    if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error
+  })
+}
+
+function entryAt(path: string) {
+  return lstat(path).catch(error => {
+    if (error.code !== 'ENOENT') throw error
+    return undefined
+  })
 }
 
 async function deleteWorkspaceFiles(ws: WorkspaceEntry): Promise<void> {
+  const folder = await entryAt(ws.path)
+  // A replaced symlink can point at a different workspace.
+  if (folder?.isSymbolicLink()) return
+  const moiDir = join(ws.path, '.moi')
   if (ws.remote) {
-    // Cleanup can resume after the folder disappeared or was linked elsewhere.
-    const config = await loadWorkspaceFileConfig(ws.path)
-    if (!sameRemoteWorkspace(config.remote, ws.remote)) return
+    if (
+      existsSync(moiDir) &&
+      !sameRemoteWorkspace((await loadWorkspaceFileConfig(ws.path)).remote, ws.remote)
+    )
+      return
     await stopWorkspaceActivity(ws)
   }
   await clearWorkspaceEnv(ws.path)
-  const target = (await isMoiOwnedFolder(ws)) ? ws.path : join(ws.path, '.moi')
-  await rm(target, { recursive: true, force: true })
+  for (const skills of workspaceSkillDirectories(ws.path, ws.harness)) {
+    const parent = dirname(skills)
+    // Never follow a user symlink while removing the skill or its empty folders.
+    const parentEntry = await entryAt(parent)
+    if (parentEntry && !parentEntry.isDirectory()) continue
+    const directory = await entryAt(skills)
+    if (directory && !directory.isDirectory()) continue
+    await removeWorkspaceSkill(skills)
+    await removeDirectoryIfEmpty(skills)
+    if (parent !== ws.path) await removeDirectoryIfEmpty(parent)
+  }
+  await rm(moiDir, { recursive: true, force: true })
+  await removeDirectoryIfEmpty(ws.path)
 }
 
 async function purgeWorkspaces(pending: WorkspaceEntry[]) {

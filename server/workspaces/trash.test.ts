@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { installWorkspaceSkills } from '../skills/workspace'
 import * as remoteClient from '../remote/client'
-import { remoteReferenceFolderName } from './remote-workspace-reference'
+import { createRemoteWorkspaceReference } from './remote-workspace-reference'
 import { syncRemoteWorkspaces } from './remote'
 import * as appConfig from '../app-config'
 import {
@@ -82,10 +83,10 @@ async function suggestedPaths() {
     .filter(path => path.startsWith(dir))
 }
 
-async function workspace(path: string, id?: string) {
+async function workspace(path: string) {
   await mkdir(join(path, '.moi'), { recursive: true })
   await writeFile(join(path, 'notes.txt'), 'mine')
-  return registerWorkspace(path, id ? { id } : {})
+  return registerWorkspace(path)
 }
 
 test('a trashed workspace is gone from lookups and listings but keeps its place in the registry', async () => {
@@ -127,33 +128,42 @@ test('restore is refused once 30 days have passed, before cleanup has run', asyn
   expect((await restoreWorkspace(ws.id, early)).status).toBe('updated')
 })
 
-test('expiry deletes a Moi-created folder whole, with its state, without contacting Cloud', async () => {
-  const ws = await workspace(join(root, 'board'))
-  await updateWorkspaceState(ws, state => void (state.openTabs = ['views/board']))
-  const trashedAt = new Date('2026-01-01T00:00:00Z')
-  await trashWorkspace(ws.id, trashedAt)
+test.each(['codex', 'openclaw'] as const)(
+  'expiry removes a Moi-only %s workspace',
+  async harness => {
+    const path = join(root, 'board')
+    await mkdir(join(path, '.moi'), { recursive: true })
+    await installWorkspaceSkills(path, harness)
+    const ws = await registerWorkspace(path, { harness })
+    await updateWorkspaceState(ws, state => void (state.openTabs = ['views/board']))
+    const trashedAt = new Date('2026-01-01T00:00:00Z')
+    await trashWorkspace(ws.id, trashedAt)
 
-  await sweepTrash(new Date(trashedAt.getTime() + TRASH_RETENTION_MS - day))
-  expect(existsSync(ws.path)).toBe(true)
+    await sweepTrash(new Date(trashedAt.getTime() + TRASH_RETENTION_MS - day))
+    expect(existsSync(ws.path)).toBe(true)
 
-  await sweepTrash(new Date(trashedAt.getTime() + TRASH_RETENTION_MS))
-  expect(calls).toEqual([])
-  expect(existsSync(ws.path)).toBe(false)
-  expect(existsSync(join(dir, 'state', ws.id))).toBe(false)
-  expect(await listTrashedWorkspaces()).toEqual([])
-  expect((await restoreWorkspace(ws.id)).status).toBe('missing')
-})
+    await sweepTrash(new Date(trashedAt.getTime() + TRASH_RETENTION_MS))
+    expect(calls).toEqual([])
+    expect(existsSync(ws.path)).toBe(false)
+    expect(existsSync(join(dir, 'state', ws.id))).toBe(false)
+    expect(await listTrashedWorkspaces()).toEqual([])
+    expect((await restoreWorkspace(ws.id)).status).toBe('missing')
+  }
+)
 
-test('expiry outside the created-workspaces root deletes only .moi', async () => {
-  const path = join(dir, 'imported')
-  const ws = await workspace(path)
-  await trashWorkspace(ws.id, new Date(0))
+test.each(['inside', 'outside'])(
+  'expiry preserves an imported project %s the workspace root',
+  async where => {
+    const path = join(where === 'inside' ? root : dir, 'imported')
+    const ws = await workspace(path)
+    await trashWorkspace(ws.id, new Date(0))
 
-  await sweepTrash()
+    await sweepTrash()
 
-  expect(existsSync(join(path, '.moi'))).toBe(false)
-  expect(existsSync(join(path, 'notes.txt'))).toBe(true)
-})
+    expect(existsSync(join(path, '.moi'))).toBe(false)
+    expect(existsSync(join(path, 'notes.txt'))).toBe(true)
+  }
+)
 
 async function reference(path: string, workspaceId: string) {
   await mkdir(path, { recursive: true })
@@ -161,9 +171,26 @@ async function reference(path: string, workspaceId: string) {
   return registerWorkspace(path)
 }
 
+test('workspace cleanup unlinks the skill and preserves its target and linked parent directories', async () => {
+  const ws = await reference(join(root, 'board'), 'board')
+  const workspace = ws.path
+  const claude = join(workspace, '.claude/skills/moi-workspace')
+  const external = join(root, 'external')
+  const skill = Bun.file(join(external, 'skills/moi-workspace/SKILL.md'))
+  await Bun.write(skill, 'external')
+  await mkdir(join(workspace, '.claude/skills'), { recursive: true })
+  await symlink(external, join(workspace, '.agents'), 'dir')
+  await symlink(external, claude, 'dir')
+
+  await syncRemoteWorkspaces()
+  expect(await getWorkspace(ws.id)).toBeNull()
+  await expect(readlink(claude)).rejects.toMatchObject({ code: 'ENOENT' })
+  expect(await readlink(join(workspace, '.agents'))).toBe(external)
+  expect(await skill.text()).toBe('external')
+})
+
 test('sync removes references missing from the remote workspace list', async () => {
-  const name = remoteReferenceFolderName({ user_id: 'alice', workspace_id: 'board' })
-  const gone = await reference(join(root, name), 'board')
+  const gone = await createRemoteWorkspaceReference({ user_id: 'alice', workspace_id: 'board' })
   const retained = await reference(join(root, 'remote-notes-def'), 'notes')
   const linked = await reference(join(root, 'remote-personal-notes'), 'docs')
   await writeFile(join(linked.path, 'mine.txt'), 'keep')
@@ -171,6 +198,7 @@ test('sync removes references missing from the remote workspace list', async () 
   await updateWorkspaceEnv(retained.path, { set: { KEY: 'kept' } })
   await getWorkspaceState(gone)
   spyOn(remoteClient, 'fetchRemoteWorkspaces').mockResolvedValue([
+    { id: 'trash', owner: { id: 'alice', name: 'Alice', email: 'alice@example.com' } },
     { id: 'notes', owner: { id: 'alice', name: 'Alice', email: 'alice@example.com' } },
     { id: 'board', owner: { id: 'bob', name: 'Bob', email: 'bob@example.com' } }
   ])
@@ -221,9 +249,25 @@ test('a failed delete keeps the workspace available until revocation succeeds', 
   expect(await getWorkspace(ws.id)).toBeNull()
 })
 
+test('rejoining uses a fresh reference and preserves files in the old folder', async () => {
+  const target = { user_id: 'alice', workspace_id: 'board' }
+  const first = await createRemoteWorkspaceReference(target)
+  const note = Bun.file(join(first.path, 'notes.txt'))
+  await Bun.write(note, 'Keep this file')
+  await syncRemoteWorkspaces()
+  spyOn(remoteClient, 'fetchRemoteWorkspaces').mockResolvedValue([
+    { id: 'board', owner: { id: 'alice', name: 'Alice', email: 'alice@example.com' } }
+  ])
+  const reopened = (await syncRemoteWorkspaces(target))!
+  expect(reopened.path).not.toBe(first.path)
+  expect(await note.text()).toBe('Keep this file')
+  expect(await Bun.file(join(first.path, '.moi/.workspace.json')).exists()).toBe(false)
+})
+
 test('interrupted reference cleanup finishes after the folder is gone', async () => {
   const ws = await reference(join(root, 'remote-gone'), 'gone')
   await updateWorkspaceState(ws, state => void (state.openTabs = ['views/board']))
+  await updateWorkspaceEnv(ws.path, { set: { KEY: 'removed' } })
   await claimRevokedReferences([ws])
   await rm(ws.path, { recursive: true })
   expect(await getWorkspace(ws.id)).toBeNull()
@@ -231,6 +275,7 @@ test('interrupted reference cleanup finishes after the folder is gone', async ()
 
   await syncRemoteWorkspaces()
   expect(existsSync(join(dir, 'state', ws.id))).toBe(false)
+  expect(await Bun.file(join(dir, 'secrets.json')).json()).toEqual({})
   expect(JSON.parse(await Bun.file(join(dir, 'workspaces.json')).text())).toEqual([])
   expect(calls).toEqual([])
 })
@@ -240,7 +285,11 @@ test('reference cleanup preserves a folder that now points to another workspace'
   await claimRevokedReferences([ws])
   await rm(getLayoutPath(ws.path))
   await initializeRemoteWorkspaceConfig(ws.path, { user_id: 'bob', workspace_id: 'other' })
+  await updateWorkspaceEnv(ws.path, { set: { KEY: 'replacement' } })
   await syncRemoteWorkspaces()
+  expect(await Bun.file(join(dir, 'secrets.json')).json()).toEqual({
+    [ws.path]: { KEY: 'replacement' }
+  })
   expect(existsSync(join(ws.path, '.moi', '.workspace.json'))).toBe(true)
   expect(calls).toEqual([])
 })

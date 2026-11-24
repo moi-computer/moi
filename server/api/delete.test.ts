@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { api } from './index'
 import * as appConfig from '../app-config'
 import { initializeRemoteWorkspaceConfig } from '../workspaces/layout'
-import { remoteReferenceFolderName } from '../workspaces/remote-workspace-reference'
+import { installWorkspaceSkills } from '../skills/workspace'
 import {
   resetWorkspaceEnvForTest,
   setSecretStoreBackend,
@@ -98,20 +98,20 @@ test('restoring an unknown workspace answers 404', async () => {
   expect(response.status).toBe(404)
 })
 
-test.each(['generated', 'linked'])(
-  'leaving cleans up a %s reference after Cloud confirms',
-  async kind => {
+test.each([false, true])(
+  'leaving cleans up the reference after Cloud confirms (has personal files: %s)',
+  async hasFiles => {
     cloudMode()
     const target = { user_id: 'alice', workspace_id: 'board' }
-    const createdRoot = join(tempDir, 'created')
-    spyOn(appConfig, 'createdWorkspacesRoot').mockReturnValue(createdRoot)
-    const path = join(
-      createdRoot,
-      kind === 'generated' ? remoteReferenceFolderName(target) : 'remote-personal'
-    )
-    await mkdir(path, { recursive: true })
+    const path = join(tempDir, 'board')
     await initializeRemoteWorkspaceConfig(path, target)
-    await Bun.write(join(path, 'notes.txt'), 'keep my linked files')
+    await installWorkspaceSkills(path, 'codex')
+    const notes = Bun.file(join(path, 'notes.txt'))
+    const otherSkill = Bun.file(join(path, '.agents/skills/personal/SKILL.md'))
+    if (hasFiles) {
+      await Bun.write(notes, 'keep my linked files')
+      await Bun.write(otherSkill, 'keep my skill')
+    }
     const reference = await registerWorkspace(path, { harness: 'codex' })
     await updateWorkspaceState(reference, state => {
       state.openTabs = ['views/board']
@@ -127,6 +127,7 @@ test.each(['generated', 'linked'])(
     expect((await getWorkspace(reference.id))?.remote).toEqual(target)
     expect(stop).not.toHaveBeenCalled()
     expect(existsSync(join(path, '.moi'))).toBe(true)
+    expect(existsSync(join(path, '.claude/skills/moi-workspace/SKILL.md'))).toBe(true)
 
     expect((await request()).status).toBe(204)
     expect(leave).toHaveBeenCalledWith('alice', 'board')
@@ -134,7 +135,13 @@ test.each(['generated', 'linked'])(
     expect(stop).toHaveBeenCalledWith(path)
     expect(await getWorkspace(reference.id)).toBeNull()
     expect(existsSync(join(path, '.moi'))).toBe(false)
-    expect(existsSync(join(path, 'notes.txt'))).toBe(kind === 'linked')
+    expect(existsSync(path)).toBe(hasFiles)
+    if (hasFiles) {
+      expect(await notes.text()).toBe('keep my linked files')
+      expect(await otherSkill.text()).toBe('keep my skill')
+      expect(existsSync(join(path, '.agents/skills/moi-workspace'))).toBe(false)
+      expect(existsSync(join(path, '.claude'))).toBe(false)
+    }
     expect(existsSync(join(tempDir, 'state', reference.id))).toBe(false)
     expect(await Bun.file(join(tempDir, 'secrets.json')).json()).toEqual({})
   }

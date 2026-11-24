@@ -28,17 +28,16 @@ export async function syncRemoteWorkspaces(remote?: RemoteWorkspaceTarget, harne
       return { ...existing, harness }
     }
 
-    const remoteWorkspaces = new Map<string, RemoteWorkspaceTarget>()
+    const available = new Map<string, RemoteWorkspaceTarget>()
     for (const { id, owner } of await fetchRemoteWorkspaces()) {
-      const target = parseRemoteWorkspaceTarget({ workspace_id: id, user_id: owner.id })
-      remoteWorkspaces.set(workspaceAddress(id, owner.id), target)
+      available.set(workspaceAddress(id, owner.id), { workspace_id: id, user_id: owner.id })
     }
-    const missing = new Map(remoteWorkspaces)
+    const missing = new Map(available)
     const revoked: WorkspaceEntry[] = []
     for (const ws of registered) {
       if (!ws.remote) continue
       const address = workspaceAddress(ws.remote.workspace_id, ws.remote.user_id)
-      if (remoteWorkspaces.has(address)) missing.delete(address)
+      if (available.has(address)) missing.delete(address)
       else revoked.push(ws)
     }
     await purgeRevokedReferences(revoked)

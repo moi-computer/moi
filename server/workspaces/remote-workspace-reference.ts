@@ -1,4 +1,4 @@
-import { mkdir, rmdir } from 'node:fs/promises'
+import { lstat, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createdWorkspacesRoot } from '../app-config'
 import { workspaceIdFromName } from '@/lib/workspace-name'
@@ -41,20 +41,21 @@ export async function createRemoteWorkspaceReference(
   remote: RemoteWorkspaceTarget,
   harness?: HarnessType
 ) {
-  const path = join(createdWorkspacesRoot(), remoteReferenceFolderName(remote))
-  const created = await mkdir(path, { recursive: true })
-  if (!created && !(await Bun.file(getLayoutPath(path)).exists()))
-    throw new Error(
-      'The local folder for this workspace reference already contains different content'
-    )
-  try {
-    return await registerRemoteWorkspaceReference(path, remote, harness)
-  } catch (error) {
-    // Only remove an empty directory we created; keep a provisioned reference for retry.
-    if (created) {
-      await rmdir(join(path, '.moi')).catch(() => {})
-      await rmdir(path).catch(() => {})
+  remote = parseRemoteWorkspaceTarget(remote)
+  const root = createdWorkspacesRoot()
+  const name = remoteReferenceFolderName(remote)
+  await mkdir(root, { recursive: true })
+  for (let suffix = 1; ; suffix++) {
+    const path = join(root, suffix === 1 ? name : `${name}-${suffix}`)
+    try {
+      await mkdir(path)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+      // Reuse a matching reference after an interrupted registration. Leave other folders alone.
+      if (!(await lstat(path)).isDirectory()) continue
+      const config = await loadWorkspaceFileConfig(path).catch(() => undefined)
+      if (!sameRemoteWorkspace(config?.remote, remote)) continue
     }
-    throw error
+    return registerRemoteWorkspaceReference(path, remote, harness)
   }
 }

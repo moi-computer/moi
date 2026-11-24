@@ -39,7 +39,7 @@ Owner build events do not reach visitors; `moi refresh` re-reads the owner's wid
 Accepting an invitation in Moi opens the workspace with the chosen agent. An external link uses
 `/workspace/{ownerId}:{workspaceId}`. Moi checks access, opens or creates the local reference with
 `POST /api/workspaces`, and redirects to `/workspace/{localId}`, preserving the path and query.
-A 404 shows the access-denied screen. Temporary failures offer **Try again**.
+On first open, a member who hasn’t picked an agent yet chooses one. A 404 shows the access-denied screen. Temporary failures offer **Try again**.
 
 Registered workspaces use their local ID. Their info response provides `apiBase`, `isRemote`, and the visitor's `harness`; the loader fetches owner content when needed and exposes the prefix through context:
 
@@ -77,8 +77,8 @@ Both **Leave workspace** and **Delete workspace** call `DELETE /api/workspaces/{
 
 Cloud Moi syncs memberships on startup, hourly, and on first open when a reference is missing.
 It creates missing references and cleans up revoked ones after a successful membership check.
-Cleanup clears personal workspace state and stored secrets. It deletes generated folders and
-only the `.moi/` directory in linked folders. Agent chat logs stored elsewhere stay on disk.
+Cleanup removes the workspace’s `.moi/` directory, personal workspace state, and stored secrets.
+Leaving a remote workspace and permanent deletion both remove the local `moi-workspace` skill and its Claude link. Moi removes their parent folders and the workspace folder only when empty. Other skills, files, and agent chat logs stored elsewhere stay on disk.
 
 ## Local mock workspace
 
@@ -90,9 +90,7 @@ bun scripts/mock-remote-workspace.ts
 
 Open [localhost:9898](http://localhost:9898).
 
-Each start resets invitations and unregisters the mock. It deletes the generated visitor folder
-only if the reference and skill are unchanged and no extra files exist. Owner data and manually
-linked folders are preserved. Reload the mock page after restarting.
+Each start resets invitations and unregisters the mock. Reload the mock page after restarting.
 
 Moi defaults to `13337` (override with `MOCK_VISITOR_ORIGIN`). Pass its `MOI_DATA_DIR` if customized.
 

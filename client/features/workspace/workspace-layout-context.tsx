@@ -125,7 +125,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       setLayout,
       name: query.data?.name ?? null,
       cwd: query.data?.cwd ?? null,
-      harness: query.data ? (query.data.harness ?? 'claude-code') : null,
+      harness: query.data?.harness ?? (query.data && !query.data.isRemote ? 'claude-code' : null),
       workspaceId: id,
       apiBase: query.data?.apiBase ?? '',
       isRemote: query.data?.isRemote ?? false,

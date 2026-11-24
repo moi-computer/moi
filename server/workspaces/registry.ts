@@ -327,9 +327,7 @@ export async function listWorkspaceSuggestions(): Promise<WorkspaceSuggestion[]>
   return suggestions.filter((_, index) => importable[index]).map(withDisplayPath)
 }
 
-// Agent history outlives its folder, so a permanently deleted workspace would
-// otherwise be offered again. A reference to someone else's workspace is not
-// offered either: it is opened through its share, never imported.
+// Agent history can outlive its folder. Remote workspaces open through their share.
 async function isImportable(path: string): Promise<boolean> {
   const folder = await stat(path).catch(() => undefined)
   if (!folder?.isDirectory()) return false

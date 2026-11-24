@@ -1,6 +1,6 @@
 import type { Connection } from '../lib/collab/types'
 import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, cp, symlink } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -621,50 +621,17 @@ test('mock membership supports invites, revocation and removal while keeping the
   ])
 })
 
-test('startup reset unregisters only the mock and deletes only unmodified generated references', async () => {
+test('startup reset unregisters only the mock and preserves the visitor folder', async () => {
   const root = await mkdtemp(join(tmpdir(), 'moi-reset-test-'))
   const remote = { user_id: 'alice', workspace_id: 'owner-board' }
-  const hash = new Bun.CryptoHasher('sha256')
-    .update(JSON.stringify(['alice', 'owner-board']))
-    .digest('hex')
-    .slice(0, 12)
-  const name = `remote-owner-board-${hash}`
-  const paths = Object.fromEntries(
-    ['clean', 'extra', 'modified', 'linked', 'manual', 'owner', 'other'].map(id => [
-      id,
-      join(root, id, id === 'manual' ? 'my-project' : name)
-    ])
-  )
-  for (const path of Object.values(paths)) {
-    await mkdir(join(path, '.moi'), { recursive: true })
-    await Bun.write(join(path, '.moi/.workspace.json'), JSON.stringify({ version: 2, remote }))
-  }
-  await mkdir(join(paths.clean!, '.agents/skills'), { recursive: true })
-  await cp(join(import.meta.dir, '../skill'), join(paths.clean!, '.agents/skills/moi-workspace'), {
-    recursive: true
-  })
-  await mkdir(join(paths.clean!, '.claude/skills'), { recursive: true })
-  await symlink(
-    '../../.agents/skills/moi-workspace',
-    join(paths.clean!, '.claude/skills/moi-workspace')
-  )
-  await Bun.write(join(paths.extra!, 'notes.md'), 'Keep my notes')
-  await mkdir(join(paths.modified!, '.agents/skills/moi-workspace'), { recursive: true })
-  await Bun.write(
-    join(paths.modified!, '.agents/skills/moi-workspace/SKILL.md'),
-    'My custom instructions'
-  )
-  await symlink(paths.owner!, join(paths.linked!, 'owner-data'))
-  await Bun.write(
-    join(paths.owner!, '.moi/.workspace.json'),
-    '{"version":1,"name":"Product launch"}'
-  )
-  await Bun.write(join(paths.owner!, '.moi/launch-tasks.json'), '[{"done":true}]')
-  const entries = Object.entries(paths).map(([id, path]) => ({
-    id,
-    path,
-    remote: id === 'owner' ? undefined : id === 'other' ? { ...remote, user_id: 'bob' } : remote
-  }))
+  const path = join(root, 'visitor')
+  const config = Bun.file(join(path, '.moi/.workspace.json'))
+  await Bun.write(config, JSON.stringify({ version: 2, remote }))
+  const entries = [
+    { id: 'visitor', path, remote },
+    { id: 'owner', path: join(root, 'owner') },
+    { id: 'other', path: join(root, 'other'), remote: { ...remote, user_id: 'bob' } }
+  ]
   const registryPath = join(root, 'workspaces.json')
   await Bun.write(registryPath, JSON.stringify(entries))
   const visitor = Bun.serve({
@@ -680,16 +647,7 @@ test('startup reset unregisters only the mock and deletes only unmodified genera
       'owner',
       'other'
     ])
-    expect(await Bun.file(join(paths.clean!, '.moi/.workspace.json')).exists()).toBe(false)
-    expect(await Bun.file(join(paths.extra!, 'notes.md')).text()).toBe('Keep my notes')
-    expect(
-      await Bun.file(join(paths.modified!, '.agents/skills/moi-workspace/SKILL.md')).text()
-    ).toBe('My custom instructions')
-    expect(await Bun.file(join(paths.manual!, '.moi/.workspace.json')).exists()).toBe(true)
-    expect(await Bun.file(join(paths.linked!, '.moi/.workspace.json')).exists()).toBe(true)
-    expect(await Bun.file(join(paths.owner!, '.moi/launch-tasks.json')).json()).toEqual([
-      { done: true }
-    ])
+    expect(await config.json()).toEqual({ version: 2, remote })
     await resetMockRegistration(visitor.url.origin, registryPath)
     expect(await Bun.file(registryPath).json()).toHaveLength(2)
   } finally {

@@ -788,15 +788,53 @@ test(
 )
 
 test(
+  'opening a synced reference by local ID asks for an agent only until one is saved',
+  async page => {
+    let chosen: string | undefined
+    await page.route(`**${referenceBase}`, route =>
+      route.fulfill({ json: { ...remoteAnswers[referenceBase], harness: chosen } })
+    )
+    await page.route(`**${referenceBase}/harness`, route => {
+      if (route.request().method() !== 'PATCH') return route.fallback()
+      chosen = 'claude-code'
+      return route.fulfill({ json: { id: REFERENCE_ID, harness: chosen } })
+    })
+    await page.goto(`/#/workspace/${REFERENCE_ID}`)
+    const picker = page.getByRole('dialog', { name: 'Add shared workspace' })
+    await picker.getByRole('button', { name: /Claude/ }).click()
+    await picker.getByRole('button', { name: 'Add workspace', exact: true }).click()
+    const menu = page.getByRole('button', { name: 'Shared board menu', exact: true })
+    await expect(menu).toBeVisible()
+    await page.goto(`/#/workspace/${REFERENCE_ID}`)
+    await expect(menu).toBeVisible()
+    await expect(picker).toHaveCount(0)
+  },
+  remoteOptions
+)
+
+test(
   'remote workspace opens before asking for the chosen agent login',
   async page => {
     let registrations = 0
+    let chosen: string | undefined
+    await page.route(`**${referenceBase}`, route =>
+      route.fulfill({ json: { ...remoteAnswers[referenceBase], harness: chosen } })
+    )
+    await page.route(`**${referenceBase}/harness`, route => {
+      if (route.request().method() !== 'PATCH') return route.fallback()
+      chosen = 'codex'
+      return route.fulfill({ json: { id: REFERENCE_ID, harness: chosen } })
+    })
     await page.route('**/api/workspaces', route => {
       if (route.request().method() !== 'POST') return route.fallback()
       registrations++
       return route.fulfill({ json: { id: REFERENCE_ID, path: '/visitor', addedAt: '' } })
     })
     await page.goto('/#/workspace/alice:owner-board')
+    const picker = page.getByRole('dialog', { name: 'Add shared workspace' })
+    await picker.getByRole('button', { name: /ChatGPT/ }).click()
+    await takeSnapshot('choose an agent on first open')
+    await picker.getByRole('button', { name: 'Add workspace', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Set up ChatGPT' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible()
     expect(registrations).toBe(1)
@@ -806,7 +844,6 @@ test(
     ...remoteOptions,
     api: {
       ...remoteAnswers,
-      [referenceBase]: { ...remoteAnswers[referenceBase], harness: 'codex' },
       [`${referenceBase}/harness`]: {
         harness: 'codex',
         availability: { status: 'available' },

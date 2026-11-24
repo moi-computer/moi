@@ -6,11 +6,13 @@ import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider } from '@/client/features/collab'
 import { useQueryClient } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { useLocation } from 'wouter'
+import { AddWorkspaceDialog } from '@/client/features/workspace/add/add-workspace-dialog'
+import { useChangeWorkspaceHarness } from '@/client/features/workspace/api'
 import { useWorkspaceSocket } from '@/client/features/workspace/use-workspace-socket'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useAppConfig } from '@/client/api/app-config'
+import { homePath, useAppConfig } from '@/client/api/app-config'
 import { SidebarLayout } from '@/client/app/shell/sidebar-layout'
 import { useSelectedSession } from '@/client/features/chat/sessions/use-selected-session'
 import { useAppletCacheInvalidation } from '@/client/features/applets/use-applet'
@@ -45,27 +47,44 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
     <SidebarLayout>
       <Workspace id={id}>
         <WorkspaceLayoutProvider key={id} id={id}>
-          <WorkspaceLive id={id}>
-            <WorkspaceContent id={id} />
-          </WorkspaceLive>
+          <WorkspaceEntry id={id} />
         </WorkspaceLayoutProvider>
       </Workspace>
     </SidebarLayout>
   )
 }
 
-type WorkspaceLiveProps = {
-  id: string
-  children: ReactNode
+function WorkspaceEntry({ id }: WorkspaceRouteProps) {
+  const { isRemote, harness, name } = useWorkspaceLayoutCtx()
+  const [, navigate] = useLocation()
+  const change = useChangeWorkspaceHarness(id)
+  const client = useQueryClient()
+
+  if (isRemote && !harness) {
+    return (
+      <AddWorkspaceDialog
+        workspaceName={name || id}
+        isPending={change.isPending}
+        errorMessage={change.error?.message}
+        onClose={() => navigate(homePath())}
+        onSubmit={agent =>
+          change.mutate(agent, {
+            onSuccess: () => void client.invalidateQueries({ queryKey: workspaceKeys.layout(id) })
+          })
+        }
+      />
+    )
+  }
+  return <WorkspaceLive id={id} />
 }
 
 // One owner connection carries shared updates always and presence on Cloud.
-function WorkspaceLive({ id, children }: WorkspaceLiveProps) {
+function WorkspaceLive({ id }: WorkspaceRouteProps) {
   const { environment } = useAppConfig()
   const socket = useWorkspaceSocket(id)
   return (
     <CollabProvider workspaceId={id} enabled={environment === 'cloud'} socket={socket}>
-      {children}
+      <WorkspaceContent id={id} />
     </CollabProvider>
   )
 }

@@ -1,3 +1,4 @@
+import { changeWorkspaceHarness } from './change-harness'
 import { initializeRemoteWorkspace } from '../remote/workspace'
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
@@ -61,6 +62,14 @@ test('a chosen agent is saved in the registry and never in the remote workspace 
     remote: target
   })
 })
+test('a first-open choice of the default agent is saved on a synced reference', async () => {
+  await syncRemoteWorkspaces()
+  const entry = (await listWorkspaces())[0]
+  expect(entry.harness).toBeUndefined()
+  await changeWorkspaceHarness(entry, 'claude-code')
+  expect((await syncRemoteWorkspaces(entry.remote))?.harness).toBe('claude-code')
+})
+
 test('manual references are reused and malformed addresses create nothing', async () => {
   const path = join(root, 'manual')
   await initializeRemoteWorkspaceConfig(path, target)
@@ -74,7 +83,6 @@ test('manual references are reused and malformed addresses create nothing', asyn
 test('a matching reference left before registration is reused on retry', async () => {
   const path = join(root, 'spaces', remoteReferenceFolderName(target))
   await mkdir(path, { recursive: true })
-  await expect(syncRemoteWorkspaces(target)).rejects.toThrow('different content')
   await initializeRemoteWorkspaceConfig(path, target)
   expect((await syncRemoteWorkspaces(target))!.path).toBe(path)
 })
