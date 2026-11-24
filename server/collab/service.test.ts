@@ -63,6 +63,15 @@ describe('collab service', () => {
     })
   })
 
+  test('broadcasts an agent’s cloud ID and optional inviter', () => {
+    const profile = { id: 'assistant', type: 'agent', color: 'blue' } as const
+    service.receive('tab', { type: 'join', version: 1, profile })
+    expect(latest().users).toEqual([profile])
+    service.receive('tab', { type: 'profile', profile: { ...profile, ownerId: 'anna' } })
+    expect(latest().users).toEqual([{ ...profile, ownerId: 'anna' }])
+    expect(latest().connections[0]?.userId).toBe('assistant')
+  })
+
   test('multiple connections share a profile without sharing registration ownership', async () => {
     join('tab-one', 'anna')
     join('tab-two', 'anna')

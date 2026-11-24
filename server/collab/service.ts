@@ -19,6 +19,8 @@ type Client = {
 function cleanProfile(profile: UserProfile): UserProfile {
   return {
     id: profile.id,
+    ...(profile.type !== undefined && { type: profile.type }),
+    ...(profile.ownerId !== undefined && { ownerId: profile.ownerId }),
     ...(profile.name !== undefined ? { name: profile.name } : {}),
     color: profile.color,
     ...(profile.avatar !== undefined ? { avatar: profile.avatar } : {}),
