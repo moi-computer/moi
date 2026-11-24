@@ -25,7 +25,7 @@ import { navigationRelay } from './navigation-relay'
 import { resolveScratchOp } from './scratchpad/relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace, listWorkspaces } from './workspaces/registry'
-import { startRemoteWorkspaceSync } from './workspaces/remote'
+import { syncRemoteWorkspacesInBackground, startRemoteWorkspaceSync } from './workspaces/remote'
 import { startTrashSweeper } from './workspaces/trash'
 import { failInterruptedViewStarts } from './sessions/view-sessions'
 import { sendWorkspaceMessage } from './sessions/send-message'
@@ -245,7 +245,9 @@ export const app = Bun.serve<WsData>({
       if (ws.data.channel === 'events') {
         try {
           const data = JSON.parse(String(message))
-          if (data?.type === 'scratchpad:op-result' && typeof data.opId === 'string') {
+          if (data?.type === 'remote-workspaces:updated') {
+            void syncRemoteWorkspacesInBackground()
+          } else if (data?.type === 'scratchpad:op-result' && typeof data.opId === 'string') {
             resolveScratchOp(data.opId, data.result, data.error)
           } else {
             navigationRelay.receive(ws, data)

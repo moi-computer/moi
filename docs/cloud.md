@@ -98,6 +98,8 @@ window.moi.workspaceMembers.setAll([{ id: address, members, invitations }])
 window.moi.workspaceMembers.set(address, { members, invitations })
 window.moi.workspaceMembers.remove(address)
 window.moi.workspaceMembers.clear()
+
+window.moi.remoteWorkspaces.sync() // Relay a remote workspace membership change to this machine
 ```
 
 A workspace is named by its address: `workspaceId` on the account's own machine, and `ownerId:workspaceId` for a workspace someone shared with the account.

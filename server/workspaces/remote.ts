@@ -68,13 +68,15 @@ export function leaveRemoteWorkspace(id: string, remote: RemoteWorkspaceTarget) 
   })
 }
 
+export function syncRemoteWorkspacesInBackground() {
+  if (getAppConfig().environment !== 'cloud') return
+  return syncRemoteWorkspaces().catch(error => {
+    if (!(error instanceof CloudSignInRequired)) console.warn('Remote workspace sync failed', error)
+  })
+}
+
 export function startRemoteWorkspaceSync() {
   if (getAppConfig().environment !== 'cloud') return
-  const run = () =>
-    syncRemoteWorkspaces().catch(error => {
-      if (!(error instanceof CloudSignInRequired))
-        console.warn('Remote workspace sync failed', error)
-    })
-  void run()
-  setInterval(run, 60 * 60 * 1000).unref()
+  void syncRemoteWorkspacesInBackground()
+  setInterval(syncRemoteWorkspacesInBackground, 60 * 60 * 1000).unref()
 }

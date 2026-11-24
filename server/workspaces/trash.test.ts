@@ -4,7 +4,6 @@ import { mkdir, mkdtemp, readlink, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { api } from '../api'
 import { installWorkspaceSkills } from '../skills/workspace'
 import * as remoteClient from '../remote/client'
 import { createRemoteWorkspaceReference } from './remote-workspace-reference'
@@ -186,7 +185,7 @@ test('sync removes references missing from the remote workspace list', async () 
     { id: 'board', owner: { id: 'bob', name: 'Bob', email: 'bob@example.com' } }
   ])
 
-  expect((await api.request('/api/workspaces/sync', { method: 'POST' })).status).toBe(204)
+  await syncRemoteWorkspaces()
 
   const entries = await listWorkspaces()
   expect(entries).toHaveLength(2)
@@ -206,7 +205,7 @@ test('sync removes references missing from the remote workspace list', async () 
 test('sync keeps references when the remote workspace list is unavailable', async () => {
   const ref = await reference(join(root, 'remote-board-abc'), 'board')
   spyOn(remoteClient, 'fetchRemoteWorkspaces').mockRejectedValue(new Error('offline'))
-  expect((await api.request('/api/workspaces/sync', { method: 'POST' })).status).toBe(503)
+  await expect(syncRemoteWorkspaces()).rejects.toThrow('offline')
 
   expect((await listWorkspaces()).map(ws => ws.id)).toEqual([ref.id])
   expect(existsSync(ref.path)).toBe(true)

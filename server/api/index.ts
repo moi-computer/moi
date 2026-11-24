@@ -1100,17 +1100,6 @@ workspaces.get('/', async c => {
   return c.json(await mergeWorkspaceList(visibleWorkspaces(entries)))
 })
 
-workspaces.post('/sync', async c => {
-  if (getAppConfig().environment !== 'cloud')
-    return c.text('Remote workspaces require Cloud mode', 403)
-  try {
-    await syncRemoteWorkspaces()
-    return c.body(null, 204)
-  } catch (error) {
-    return c.text(error instanceof Error ? error.message : 'Could not sync remote workspaces', 503)
-  }
-})
-
 workspaces.put('/order', async c => {
   const body = await c.req.json()
   if (!Array.isArray(body?.ids) || body.ids.some((id: unknown) => typeof id !== 'string')) {

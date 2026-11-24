@@ -76,7 +76,7 @@ Both **Leave workspace** and **Delete workspace** call `DELETE /api/workspaces/{
 - **Standalone Moi** unregisters the workspace and keeps its folder and chats.
 
 Cloud Moi syncs memberships on startup, hourly, and on first open when a reference is missing.
-When someone joins or loses access, Batiok also asks their running Moi server to sync.
+An open tab also relays Batiok’s `remote-workspaces:updated` event over `/api/events` to trigger sync.
 It creates missing references and cleans up revoked ones after a successful membership check.
 Cleanup removes the workspace’s `.moi/` directory, personal workspace state, and stored secrets.
 Leaving a remote workspace and permanent deletion both remove the local `moi-workspace` skill and its Claude link. Moi removes their parent folders and the workspace folder only when empty. Other skills, files, and agent chat logs stored elsewhere stay on disk.
