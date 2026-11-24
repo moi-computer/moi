@@ -16,13 +16,13 @@ import {
 import { AppletPresenceProvider, CollabContext, pageFromPath } from './provider'
 import type { WorkspaceUser } from './hooks'
 
-const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
-const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
+const alice = { type: 'human', id: 'alice', name: 'Alice', color: 'emerald' } as const
+const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } as const
 
 test.each(['offline member', 'empty', 'missing'] as const)(
   '%s directory stays authoritative over connected users and self',
   kind => {
-    const offline = { id: 'offline', name: 'Offline user', color: 'blue' } as const
+    const offline = { type: 'human', id: 'offline', name: 'Offline user', color: 'blue' } as const
     const room = createFakeEngine({
       self: alice,
       users: [alice, bob],
@@ -166,13 +166,18 @@ test('identity does not provide a global member directory', () => {
 })
 
 test('user hooks preserve missing names for self, peers, and offline members', () => {
-  const self = { id: 'self', color: 'emerald', email: 'self@example.test' } as const
-  const peer = { id: 'bob', color: 'blue', email: 'bob@example.test' } as const
-  const offline = { id: 'offline', color: 'blue' } as const
+  const self = { type: 'agent', id: 'self', color: 'emerald' } as const
+  const peer = {
+    type: 'agent',
+    ownerId: 'inviter',
+    id: 'bob',
+    color: 'blue'
+  } as const
+  const offline = { type: 'human', id: 'offline', color: 'blue' } as const
   const room = createFakeEngine({
     self,
     page: 'board',
-    users: [self, peer, offline],
+    users: [{ ...self, ownerId: 'inviter' }, peer, offline],
     otherConnections: [
       {
         connectionId: 'b',
@@ -202,11 +207,11 @@ test('user hooks preserve missing names for self, peers, and offline members', (
     )
   ) as { me: WorkspaceUser; user: WorkspaceUser; peers: WorkspaceUser[]; users: WorkspaceUser[] }
   expect(snapshot).toEqual({
-    me: { ...self, status: 'active' },
+    me: { ...self, ownerId: 'inviter', status: 'active' },
     user: { ...peer, status: 'active' },
     peers: [{ ...peer, status: 'active' }],
     users: [
-      { ...self, status: 'active' },
+      { ...self, ownerId: 'inviter', status: 'active' },
       { ...peer, status: 'active' },
       { ...offline, status: 'offline' }
     ]
@@ -214,8 +219,8 @@ test('user hooks preserve missing names for self, peers, and offline members', (
 })
 
 test('workspace users include self and offline members with workspace-wide status filters', () => {
-  const carol = { id: 'carol', name: 'Carol', color: 'blue' } as const
-  const david = { id: 'david', name: 'David', color: 'emerald' } as const
+  const carol = { type: 'human', id: 'carol', name: 'Carol', color: 'blue' } as const
+  const david = { type: 'human', id: 'david', name: 'David', color: 'emerald' } as const
   const room = createFakeEngine({
     self: alice,
     page: 'board',

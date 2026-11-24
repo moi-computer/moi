@@ -1,5 +1,5 @@
 import { isRecord } from '@/lib/collab/protocol'
-import { identityKey, parseIdentity } from '../../identity/types'
+import { parseIdentity } from '../../identity/types'
 import type { Identity } from '../../identity/types'
 
 export type WorkspaceMember = Identity & { membershipId?: string }
@@ -41,7 +41,7 @@ export function parseWorkspaceMembers(value: unknown): WorkspaceMembers {
     return { id: invitation.id, email: invitation.email, expiresAt: invitation.expiresAt }
   })
   if (
-    new Set(members.map(identityKey)).size !== members.length ||
+    new Set(members.map(member => member.id)).size !== members.length ||
     new Set(invitations.map(invitation => invitation.id)).size !== invitations.length
   )
     throw new Error('Duplicate workspace member or invitation')

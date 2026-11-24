@@ -1,12 +1,11 @@
 import type { CollabServerMessage } from '@/lib/collab/types'
-import { agentProfileId } from '@/lib/ids'
 import { publishWorkspacePresence } from '../events'
 
 type AgentTimers = Map<string, ReturnType<typeof setTimeout>>
 const workspaces = new Map<string, AgentTimers>()
 
 export function agentActivitySnapshot(workspaceId: string) {
-  const agentIds = Array.from(workspaces.get(workspaceId)?.keys() ?? [], agentProfileId)
+  const agentIds = Array.from(workspaces.get(workspaceId)?.keys() ?? [])
   return { type: 'agent-activity:changed', agentIds } satisfies CollabServerMessage
 }
 

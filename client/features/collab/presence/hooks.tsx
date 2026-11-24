@@ -59,11 +59,20 @@ export function useWorkspaceUsers({ status }: UseWorkspaceUsersOptions = {}): Wo
   )
 }
 export function useMe(): WorkspaceUser | undefined {
-  const { state, self } = useUsersSource()
-  return useMemo(
-    () => (self ? { ...self, status: userStatus(state.connections, self.id) } : undefined),
-    [state, self]
-  )
+  const { state, self, users } = useUsersSource()
+  return useMemo(() => {
+    if (!self) return undefined
+    const ownerId =
+      self.type === 'agent'
+        ? (users.find(user => user.id === self.id)?.ownerId ?? self.ownerId)
+        : undefined
+    return {
+      ...self,
+      type: self.type ?? 'human',
+      ...(ownerId && { ownerId }),
+      status: userStatus(state.connections, self.id)
+    }
+  }, [state, self, users])
 }
 export function usePeers(options: UsePeersOptions = {}): WorkspaceUser[] {
   const { state, self, users, engine } = useUsersSource()

@@ -227,13 +227,7 @@ test(
                 new MessageEvent('message', {
                   data: JSON.stringify({
                     type: 'agent-activity:changed',
-                    agentIds: [
-                      'agent:pip',
-                      'agent:cleo',
-                      'agent:peach',
-                      'agent:frankie',
-                      'agent:shipmate'
-                    ]
+                    agentIds: ['pip', 'cleo', 'peach', 'frankie', 'shipmate']
                   })
                 })
               )
@@ -248,7 +242,7 @@ test(
                       { id: 'tony', name: 'Tony', email: 'tony@example.com', color: 'blue' }
                     ],
                     connections: [
-                      ...['lee', 'sam', 'pat', 'agent:cleo'].map(id => ({
+                      ...['lee', 'sam', 'pat', 'cleo'].map(id => ({
                         connectionId: id,
                         userId: id,
                         location: { page: 'overview', status: 'active' },

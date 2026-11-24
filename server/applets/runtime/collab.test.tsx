@@ -102,6 +102,7 @@ test('the bridge delegates when attached and falls back again when disposed', as
   const api = await loadModule()
   const warning = spyOn(console, 'warn').mockImplementation(() => {})
   const user: CollabApi.WorkspaceUser = {
+    type: 'human',
     id: 'alice',
     name: 'Alice',
     color: 'blue',

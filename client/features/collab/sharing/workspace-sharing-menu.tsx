@@ -18,8 +18,6 @@ import {
 import { UserAvatar } from '../components/user-avatar'
 import { AvatarGroupCount } from '@/ui-components/avatar'
 import { useWorkspaceMembers } from '../members/hooks'
-import { isAgentProfileId } from '@/lib/ids'
-import { collabIdentityId } from '../../identity/types'
 import { pageFromPath } from '../presence/provider'
 import { useConnectionState, useWorkspaceUsers, useMe } from '../presence/hooks'
 import { summarizeWorkspaceUsers, type WorkspaceUserInfo } from '../presence/users'
@@ -45,7 +43,7 @@ export function WorkspaceSharingMenu({
   const router = useRouter()
   const page = pageFromPath(usePathname(router), workspaceId, router.base)
   const membership = useWorkspaceMembers(workspaceId)
-  const memberIds = membership.members && new Set(membership.members.map(collabIdentityId))
+  const memberIds = membership.members && new Set(membership.members.map(member => member.id))
   const members = memberIds
     ? workspaceUsers.filter(user => user.id === currentUser?.id || memberIds.has(user.id))
     : workspaceUsers
@@ -59,10 +57,10 @@ export function WorkspaceSharingMenu({
   })
   const agents = users.filter(
     user =>
-      isAgentProfileId(user.profile.id) &&
+      user.profile.type === 'agent' &&
       (state.activeAgentIds.includes(user.profile.id) || user.status === 'active')
   )
-  const people = users.filter(user => !isAgentProfileId(user.profile.id))
+  const people = users.filter(user => user.profile.type !== 'agent')
   const headerUsers = people.filter(
     user => user.status === 'active' || (user.self && memberIds?.has(user.profile.id))
   )

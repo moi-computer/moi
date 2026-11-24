@@ -5,7 +5,6 @@ import { Blobatar } from '@blobatar/react'
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
 import { cn } from '@/client/lib/cn'
 import { userDisplayName } from '@/client/lib/user-display-name'
-import { isAgentProfileId } from '@/lib/ids'
 import { useUser } from '../presence/hooks'
 
 export function UserAvatarContainer({
@@ -38,7 +37,7 @@ export function UserAvatar({
   className,
   active
 }: UserAvatarProps) {
-  const agent = user && isAgentProfileId(user.id)
+  const agent = user?.type === 'agent'
   const name = user ? userDisplayName(user) : 'Unknown user'
 
   return (

@@ -1,6 +1,6 @@
 import { getIdentity, subscribeIdentity } from '../identity/store'
 import { agentIcon } from '@/client/lib/agent-client'
-import { collabIdentityId, type Identity } from '../identity/types'
+import type { Identity } from '../identity/types'
 import { isUserProfile } from '@/lib/collab/protocol'
 import { colorForId, isUserColor } from '@/lib/collab/colors'
 import type { AuthProvider, ProxyUserState, UserProfile } from '@/lib/collab/types'
@@ -31,6 +31,8 @@ export function normalizeUserProfile(value: UserProfileInput): UserProfile {
   const name = value.name?.trim()
   const normalized: UserProfile = {
     id,
+    type: value.type ?? 'human',
+    ...(value.ownerId !== undefined && { ownerId: value.ownerId }),
     ...(name ? { name } : {}),
     color: value.color ?? colorForId(id),
     ...(value.avatar !== undefined ? { avatar: value.avatar } : {}),
@@ -42,7 +44,9 @@ export function normalizeUserProfile(value: UserProfileInput): UserProfile {
 
 export function identityProfile(identity: Identity): UserProfile {
   return normalizeUserProfile({
-    id: collabIdentityId(identity),
+    id: identity.id,
+    type: identity.type === 'user' ? 'human' : 'agent',
+    ...(identity.type === 'agent' && identity.ownerId && { ownerId: identity.ownerId }),
     name: identity.name || undefined,
     avatar: identity.avatar ?? (identity.type === 'agent' ? agentIcon(identity.client) : undefined),
     email: identity.type === 'user' ? identity.email || undefined : undefined

@@ -14,6 +14,9 @@ declare module 'moi/collab' {
     | 'violet'
   export type UserProfile = {
     id: string
+    type: 'human' | 'agent'
+    // Human who invited this agent, when supplied by the cloud.
+    ownerId?: string
     color: UserColor
     name?: string
     email?: string

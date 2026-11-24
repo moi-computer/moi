@@ -1,7 +1,10 @@
 import type { JsonValue } from 'moi'
-import type { ConnectionStatus, UserProfile } from 'moi/collab'
+import type { ConnectionStatus, UserProfile as PublicUserProfile } from 'moi/collab'
 
-export type { ConnectionStatus, UserProfile } from 'moi/collab'
+export type { ConnectionStatus } from 'moi/collab'
+
+// Older peers and locally saved profiles may omit the participant type.
+export type UserProfile = Omit<PublicUserProfile, 'type'> & { type?: PublicUserProfile['type'] }
 
 // An authenticating proxy in front of the deployment that moi trusts.
 export type AuthProvider = 'cloudflare-access'

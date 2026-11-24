@@ -2,10 +2,6 @@ import { customAlphabet } from 'nanoid'
 
 export const agentClientPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
-const agentProfilePrefix = 'agent:'
-export const agentProfileId = (id: string) => agentProfilePrefix + id
-export const isAgentProfileId = (id: string) => id.startsWith(agentProfilePrefix)
-
 // Short, shell- and URL-safe ids: base36 (0-9a-z), no dashes — so an id never
 // looks like a CLI flag or reads oddly in a URL.
 const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'

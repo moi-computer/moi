@@ -583,4 +583,4 @@ This skill is installed with Moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.21.0" />
+<moi-skill version="0.22.0" />

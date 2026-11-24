@@ -7,9 +7,14 @@ import type { UserProfile } from '@/lib/collab/types'
 import type * as HostStateModule from './host-state'
 
 const PROFILE_KEY = 'moi:local-profile'
-const alice = { id: 'alice', name: 'Alice', color: 'emerald' } satisfies UserProfile
-const bob = { id: 'bob', name: 'Bob', color: 'blue' } satisfies UserProfile
-const carol = { id: 'cf-carol', color: 'emerald', email: 'carol@example.com' } as const
+const alice = { type: 'human', id: 'alice', name: 'Alice', color: 'emerald' } satisfies UserProfile
+const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } satisfies UserProfile
+const carol = {
+  type: 'human',
+  id: 'cf-carol',
+  color: 'emerald',
+  email: 'carol@example.com'
+} as const
 const accessed = { provider: 'cloudflare-access', profile: carol } as const
 const descriptors = new Map(
   ['window', 'localStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)])
@@ -196,7 +201,7 @@ test('agent identity and anonymous sign-in derive presence without restoring a l
   const collab = await setup({ profile: alice })
   restoreIdentity()
   identityStore.setIdentity({ id: 'helper', type: 'agent', name: 'Helper' })
-  expect(collab.getCurrentUser()).toMatchObject({ id: 'agent:helper', name: 'Helper' })
+  expect(collab.getCurrentUser()).toMatchObject({ id: 'helper', type: 'agent', name: 'Helper' })
   identityStore.setIdentity({ id: 'guest', type: 'user', name: '', email: '', isAnonymous: true })
   expect(collab.getCurrentUser()).toBeUndefined()
   expect(collab.getCurrentUserSource()).toBe('external')

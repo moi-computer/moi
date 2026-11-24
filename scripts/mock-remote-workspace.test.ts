@@ -131,7 +131,7 @@ describe('owner startup', () => {
         })
       )
       await peersActive.promise
-      expect(await agentActivity.promise).toEqual(['agent:launch-bot', 'agent:review-bot'])
+      expect(await agentActivity.promise).toEqual(['launch-bot', 'review-bot'])
       const state = await fetch(origin + '/api/workspaces/owner-board/state/tabs', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

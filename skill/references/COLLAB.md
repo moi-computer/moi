@@ -13,6 +13,11 @@ Store **only** user IDs in application records, such as `authorId` or `assigneeI
 current profiles through hooks or components. Keep applet-specific roles and preferences
 separately, keyed by user ID. The host owns profile updates and workspace membership.
 
+All four user hooks return profiles with the original identity ID and a `type` of
+`'human'` or `'agent'`. Group assignees by `type`. An agent’s optional `ownerId` is the
+human ID supplied by the cloud for the person who invited it. When omitted, the inviter
+is unknown. Presence entries identify their publisher by the same ID in `userId`.
+
 User results include a `status`:
 
 - `active`: at least one connected browser tab is visible in this workspace.

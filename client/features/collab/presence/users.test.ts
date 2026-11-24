@@ -4,9 +4,9 @@ import type { ConnectionStatus } from 'moi/collab'
 import type { Connection } from '@/lib/collab/types'
 import { summarizeWorkspaceUsers, resolvePeers, resolveUser } from './users'
 
-const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
-const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
-const eve = { id: 'eve', name: 'Eve', color: 'blue' } as const
+const alice = { type: 'human', id: 'alice', name: 'Alice', color: 'emerald' } as const
+const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } as const
+const eve = { type: 'human', id: 'eve', name: 'Eve', color: 'blue' } as const
 function connection(
   connectionId: string,
   userId: string,
@@ -128,4 +128,11 @@ test('summary prefers an active page, keeps the first active connection, and use
   expect(result[0]).toMatchObject({ self: true, page: 'current-page' })
   expect(result[1]).toMatchObject({ page: 'board', status: 'active' })
   expect(result[2]).toMatchObject({ page: undefined, status: 'away' })
+})
+
+test('stored agent references resolve to the current identity and its live status', () => {
+  const bot = { ...bob, type: 'agent' as const, ownerId: alice.id }
+  const members = { connections, users: [alice, bot] }
+  expect(resolveUser(members, 'agent:bob')).toEqual({ ...bot, status: 'active' })
+  expect(resolveUser(members, 'agent:alice')).toBeUndefined()
 })

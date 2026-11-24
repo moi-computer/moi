@@ -18,6 +18,10 @@ const presence = {
 
 test('profiles have bounded identifiers and optional avatar and email data', () => {
   expect(isUserProfile(profile)).toBe(true)
+  expect(isUserProfile({ ...profile, type: 'agent', ownerId: 'inviter' })).toBe(true)
+  expect(isUserProfile({ ...profile, type: 'human', ownerId: 'inviter' })).toBe(false)
+  expect(isUserProfile({ ...profile, type: 'agent', ownerId: 1 })).toBe(false)
+  expect(isUserProfile({ ...profile, type: 'unknown' })).toBe(false)
   expect(isUserProfile({ ...profile, color: '#7c3aed' })).toBe(false)
   expect(isUserProfile({ ...profile, color: 'red' })).toBe(false)
   expect(

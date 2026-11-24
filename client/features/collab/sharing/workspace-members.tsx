@@ -8,7 +8,7 @@ import { cn } from '@/client/lib/cn'
 import { colorForId } from '@/lib/collab/colors'
 import { CloudApiError } from '../../account/api'
 import { useIdentity } from '../../identity/use-identity'
-import { collabIdentityId, identityKey } from '../../identity/types'
+import { identityKey } from '../../identity/types'
 import { getAccountGeneration } from '../../identity/store'
 import { MembershipMenu } from './membership-menu'
 import { User } from '../components/user'
@@ -25,8 +25,7 @@ export type WorkspaceMembersProps = {
 export function WorkspaceMembers({ workspaceId, users, membership }: WorkspaceMembersProps) {
   const identity = useIdentity()
   const membersById =
-    membership.members &&
-    new Map(membership.members.map(member => [collabIdentityId(member), member]))
+    membership.members && new Map(membership.members.map(member => [member.id, member]))
   return (
     <div className="flex flex-col rounded-2xl bg-popover p-5 shadow-md">
       <PopoverTitle>Share this workspace</PopoverTitle>

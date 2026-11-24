@@ -22,17 +22,22 @@ const alex = {
   email: 'alex@example.com',
   isAnonymous: false
 } as const
-const bot = { id: 'alex', type: 'agent', name: 'Bot', client: 'grok-bot' } as const
+const bot = { id: 'bot', ownerId: 'alex', type: 'agent', name: 'Bot', client: 'grok-bot' } as const
 afterEach(() => {
   setIdentity(null)
   queryClient.clear()
 })
-test('pre-mount snapshots are stored and separate user and agent ids', () => {
+test('cloud members retain their IDs and expose type and agent owner', () => {
   setIdentity(alex)
   setWorkspaceMembers('one', { members: [alex, bot], invitations: [] })
   expect(getWorkspaceMembers('one')).toEqual({ members: [alex, bot], invitations: [] })
-  expect(getWorkspaceDirectory('one')?.map(user => user.id)).toEqual(['alex', 'agent:alex'])
-  expect(getWorkspaceDirectory('one')?.find(profile => profile.id === 'agent:alex')?.avatar).toBe(
+  expect(getWorkspaceDirectory('one')?.map(({ id, type, ownerId }) => [id, type, ownerId])).toEqual(
+    [
+      ['alex', 'human', undefined],
+      ['bot', 'agent', 'alex']
+    ]
+  )
+  expect(getWorkspaceDirectory('one')?.find(profile => profile.id === 'bot')?.avatar).toBe(
     grokBotIcon
   )
   expect(getCurrentUser()?.id).toBe('alex')
@@ -57,6 +62,12 @@ test('account switch removes previous membership snapshots', () => {
 test('invalid snapshot publishes nothing', () => {
   setIdentity(alex)
   expect(() => parseWorkspaceMembers({ members: [alex, alex], invitations: [] })).toThrow()
+  expect(() =>
+    parseWorkspaceMembers({ members: [alex, { ...bot, id: alex.id }], invitations: [] })
+  ).toThrow()
+  expect(() =>
+    parseWorkspaceMembers({ members: [{ ...bot, ownerId: 7 }], invitations: [] })
+  ).toThrow()
   expect(getWorkspaceDirectory('one')).toBeUndefined()
 })
 test('sharing snapshots replace members and omitted workspaces become owner-only', () => {
