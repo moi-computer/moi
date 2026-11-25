@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
 import { getIdentity, setIdentity } from '../identity/store'
-import { getCurrentUser } from '../collab/host-state'
+import { getCurrentProfile } from '../collab/host-state'
 import type { Identity } from '../identity/types'
 import { saveCloudProfile } from './profile-actions'
 
@@ -29,7 +29,7 @@ test('a profile response preserves newer pushed fields and updates the derived c
     name: 'Renamed',
     avatar: 'https://example.com/new-avatar.png'
   })
-  expect(getCurrentUser()).toMatchObject({
+  expect(getCurrentProfile()).toMatchObject({
     name: 'Renamed',
     avatar: 'https://example.com/new-avatar.png'
   })
@@ -43,7 +43,7 @@ test('a newer pushed name wins over a delayed name save', async () => {
   pending.resolve({ ...me, name: 'Older name' })
   await save
   expect(getIdentity()?.name).toBe('Newer name')
-  expect(getCurrentUser()?.name).toBe('Newer name')
+  expect(getCurrentProfile()?.name).toBe('Newer name')
 })
 
 test('switching away and back rejects a save from the previous account session', async () => {

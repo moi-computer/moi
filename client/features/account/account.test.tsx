@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { act } from 'react'
-import { getCurrentUser } from '../collab/host-state'
+import { getCurrentProfile } from '../collab/host-state'
 import { setIdentity } from '../identity/store'
 import { AccountMenu } from './account-menu'
 import { cleanupAccount, mountAccount } from './account-test-utils'
@@ -9,11 +9,11 @@ test('signout clears identity and navigates only on success', async () => {
   const ui = await mountAccount()
   ui.failures.signOut = true
   await ui.click('Sign out')
-  expect(getCurrentUser()?.id).toBe('me')
+  expect(getCurrentProfile()?.id).toBe('me')
   expect(ui.navigations).toEqual([])
   ui.failures.signOut = false
   await ui.click('Sign out')
-  expect(getCurrentUser()).toBeUndefined()
+  expect(getCurrentProfile()).toBeUndefined()
 
   expect(ui.navigations).toEqual(['/cloud/login'])
 })

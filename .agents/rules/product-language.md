@@ -12,6 +12,10 @@ alwaysApply: true
 - Keep Claude Code/Codex naming in internal harness identifiers, APIs, filenames, commands, and developer documentation. Preserve exact external setting names (for example, “Enable device code sign-in for Codex”), provider messages, and model names.
 - Use harness for internal integration and authentication names, including types, functions, files, API routes, and events: `HarnessLoginState`, `startHarnessLogin`, `/api/harnesses/:type/auth`.
 - Keep agent for actual agent identities, subagents, and provider-native terminology such as OpenClaw’s `agentId`; do not rename those to harness.
+- An **identity** represents a person or an agent. Use **person** and **people** in prose and UI copy. In code, their identity types are `'user'` and `'agent'`, respectively.
+- A **member** is an identity with workspace access, including the owner. Use **invitation** while access is pending and **membership** for the access relationship. An `identityId` identifies the person or agent across workspaces. A `membershipId` identifies one workspace access record.
+- Use **profile** for how an identity appears. A `MemberProfile` adds workspace presence status to a `Profile`.
+- A **peer** is another connected member on the current page or in the workspace. A **connection** is one live session. Each tab has its own connection and **presence**, such as its cursor position.
 - Use chat for user-facing language and UI concepts.
 - Use session for internal identifiers, state, persistence, protocols, and hooks that expose session state.
 - Use thread only when matching terminology from an external provider or SDK.

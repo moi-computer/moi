@@ -4,10 +4,10 @@ import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppConfig } from '@/client/api/app-config'
 import {
-  getCurrentUser,
-  getCurrentUserSource,
+  getCurrentProfile,
+  getCurrentProfileSource,
   setLocalUser,
-  subscribeCurrentUserStore
+  subscribeCurrentProfileStore
 } from '@/client/features/collab/host-state'
 import { setIdentity } from '../identity/store'
 import { saveCloudProfile } from './profile-actions'
@@ -23,11 +23,15 @@ import {
 function useAccountState() {
   const { environment, demo } = useAppConfig()
   const cloud = environment === 'cloud'
-  const profile = useSyncExternalStore(subscribeCurrentUserStore, getCurrentUser, getCurrentUser)
+  const profile = useSyncExternalStore(
+    subscribeCurrentProfileStore,
+    getCurrentProfile,
+    getCurrentProfile
+  )
   const source = useSyncExternalStore(
-    subscribeCurrentUserStore,
-    getCurrentUserSource,
-    getCurrentUserSource
+    subscribeCurrentProfileStore,
+    getCurrentProfileSource,
+    getCurrentProfileSource
   )
   const identity = useIdentity()
   const qc = useQueryClient()
@@ -48,8 +52,8 @@ function useAccountState() {
       await saveCloudProfile('name', () => updateCloudProfile({ name }))
       return name
     }
-    const local = getCurrentUser()
-    if (getCurrentUserSource() !== 'local' || !local || local.id !== profile?.id)
+    const local = getCurrentProfile()
+    if (getCurrentProfileSource() !== 'local' || !local || local.id !== profile?.id)
       throw new Error('This profile is managed by your sign-in provider')
     setLocalUser({ ...local, name })
     return name

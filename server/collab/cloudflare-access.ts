@@ -2,8 +2,8 @@ import { createRemoteJWKSet, customFetch, errors, jwtVerify } from 'jose'
 import type { FetchImplementation } from 'jose'
 
 import { colorForId } from '@/lib/collab/colors'
-import { isUserProfile } from '@/lib/collab/protocol'
-import type { ProxyUserState, UserProfile } from '@/lib/collab/types'
+import { isProfile } from '@/lib/collab/protocol'
+import type { ProxyUserState, Profile } from '@/lib/collab/types'
 
 import { type CloudflareAccessConfig, getAppConfig } from '../app-config'
 
@@ -54,9 +54,9 @@ export function accessVerifier(
 
 // Access tokens carry an id and an email but no display name, so the profile
 // has none and labels fall back to the email. The color is a stable pick from the id.
-export function accessProfile({ id, email }: AccessUser): UserProfile | null {
-  const profile: UserProfile = { id, color: colorForId(id), email }
-  return isUserProfile(profile) ? profile : null
+export function accessProfile({ id, email }: AccessUser): Profile | null {
+  const profile: Profile = { id, type: 'user', color: colorForId(id), email }
+  return isProfile(profile) ? profile : null
 }
 
 // The verifier and its key cache live as long as the resolved config object.

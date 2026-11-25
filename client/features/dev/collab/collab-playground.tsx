@@ -26,15 +26,15 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/ui-components/select'
-import type { UserProfile, Connection } from '@/lib/collab/types'
+import type { Profile as ProfileData, Connection } from '@/lib/collab/types'
 
 import { PresenceFrameContainer as PresenceFrame } from '@/client/features/collab/components/presence-frame'
 import { PresenceGroupContainer as PresenceGroup } from '@/client/features/collab/components/presence-group'
 import { PresenceAvatarsContainer as PresenceAvatars } from '@/client/features/collab/components/presence-avatars'
 import { CursorsContainer as Cursors } from '@/client/features/collab/components/cursors'
-import { UserAvatarGroupContainer as UserAvatarGroup } from '@/client/features/collab/components/user-avatar-group'
-import { UserContainer as User } from '@/client/features/collab/components/user'
-import { UserAvatarContainer as UserAvatar } from '@/client/features/collab/components/user-avatar'
+import { ProfileAvatarGroupContainer as ProfileAvatarGroup } from '@/client/features/collab/components/profile-avatar-group'
+import { ProfileContainer as Profile } from '@/client/features/collab/components/profile'
+import { ProfileAvatarContainer as ProfileAvatar } from '@/client/features/collab/components/profile-avatar'
 import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
 import type { FakeEngine } from '@/client/features/collab/testing/fake-engine'
 import {
@@ -42,42 +42,49 @@ import {
   usePeers,
   usePresence,
   usePublishPresence,
-  useUser,
-  useWorkspaceUsers
+  useMember,
+  useWorkspaceMembers
 } from '@/client/features/collab/presence/hooks'
 import { AppletPresenceProvider, CollabContext } from '@/client/features/collab/presence/provider'
-import { connectPlaygroundParticipants } from './playground-room'
+import { connectPlaygroundMembers } from './playground-room'
 
-const YOU: UserProfile = {
+const YOU: ProfileData = {
+  type: 'user',
   id: 'you',
   name: 'You',
   email: 'you@example.com',
   color: 'violet'
 }
-const USERS: UserProfile[] = [
+const MEMBERS: ProfileData[] = [
   YOU,
-  { id: 'fig', name: 'Fig', email: 'fig@example.com', color: 'amber' },
-  { id: 'alex', name: 'Alex Hao', email: 'alex@example.com', color: 'blue' },
-  { id: 'andrea', name: 'Andrea Lim', email: 'andrea@example.com', color: 'pink' },
-  { id: 'pierre', name: 'Pierre', email: 'pierre@example.com', color: 'orange' },
-  { id: 'david', name: 'David Tibbitts', email: 'david@example.com', color: 'emerald' }
+  { type: 'user', id: 'fig', name: 'Fig', email: 'fig@example.com', color: 'amber' },
+  { type: 'user', id: 'alex', name: 'Alex Hao', email: 'alex@example.com', color: 'blue' },
+  { type: 'user', id: 'andrea', name: 'Andrea Lim', email: 'andrea@example.com', color: 'pink' },
+  { type: 'user', id: 'pierre', name: 'Pierre', email: 'pierre@example.com', color: 'orange' },
+  {
+    type: 'user',
+    id: 'david',
+    name: 'David Tibbitts',
+    email: 'david@example.com',
+    color: 'emerald'
+  }
 ]
 const PAGE = 'kit'
 const APPLET_ID = 'views/kit'
 const BACKGROUND_CONNECTIONS: Connection[] = [
   {
     connectionId: 'sample-alex',
-    userId: 'alex',
+    identityId: 'alex',
     location: { page: PAGE, status: 'active' },
     presence: []
   },
   {
     connectionId: 'sample-pierre',
-    userId: 'pierre',
+    identityId: 'pierre',
     location: { page: 'views/board', status: 'active' },
     presence: []
   },
-  { connectionId: 'sample-andrea', userId: 'andrea', location: null, presence: [] }
+  { connectionId: 'sample-andrea', identityId: 'andrea', location: null, presence: [] }
 ]
 
 type CodeExampleProps = { code: string }
@@ -422,20 +429,20 @@ function ConnectedUsersDemo() {
 
   return (
     <Section
-      title="Connected users"
-      hint="Compose useMe and usePeers with UserAvatarGroup to choose who appears. Workspace scope includes other pages and away users. Offline users are excluded."
+      title="Connected members"
+      hint="Compose useMe and usePeers with ProfileAvatarGroup to choose who appears. Workspace scope includes other pages and away members. Offline members are excluded."
       code={
-        "const me = useMe()\nconst peers = usePeers() // Or { scope: 'workspace' }\nconst ids = [...(me ? [me.id] : []), ...peers.map(user => user.id)]\n<UserAvatarGroup ids={ids} max={ids.length} />"
+        "const me = useMe()\nconst peers = usePeers() // Or { scope: 'workspace' }\nconst ids = [...(me ? [me.id] : []), ...peers.map(user => user.id)]\n<ProfileAvatarGroup ids={ids} max={ids.length} />"
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col items-start gap-2">
           <p className="text-sm text-muted-foreground">This page</p>
-          <UserAvatarGroup ids={pageIds} max={pageIds.length} />
+          <ProfileAvatarGroup ids={pageIds} max={pageIds.length} />
         </div>
         <div className="flex flex-col items-start gap-2">
           <p className="text-sm text-muted-foreground">Workspace</p>
-          <UserAvatarGroup ids={workspaceIds} max={workspaceIds.length} />
+          <ProfileAvatarGroup ids={workspaceIds} max={workspaceIds.length} />
         </div>
       </div>
     </Section>
@@ -449,7 +456,7 @@ function MoodDemo() {
   return (
     <Section
       title="Custom presence"
-      hint="Change your mood here and watch it update in the other pane. Reading presence returns the other participants’ values."
+      hint="Change your mood here and watch it update in the other pane. Reading presence returns the other members’ values."
       code={"usePublishPresence('mood', mood)\nconst presence = usePresence<string>('mood')"}
     >
       <label className="flex flex-col gap-2 text-sm">
@@ -460,7 +467,7 @@ function MoodDemo() {
         <p className="text-sm text-muted-foreground">Received from the other pane</p>
         {presence.map(entry => (
           <div key={entry.connectionId} className="flex flex-col gap-1">
-            <User id={entry.userId} size="sm" />
+            <Profile id={entry.identityId} size="sm" />
             <p className="text-sm">{entry.value || '(empty)'}</p>
           </div>
         ))}
@@ -473,16 +480,16 @@ function MoodDemo() {
 function HooksInspector() {
   const me = useMe()
   const peers = usePeers({ scope: 'workspace' })
-  const workspaceUsers = useWorkspaceUsers()
-  const offline = useWorkspaceUsers({ status: 'offline' })
-  const user = useUser('david')
+  const memberProfiles = useWorkspaceMembers()
+  const offline = useWorkspaceMembers({ status: 'offline' })
+  const user = useMember('david')
   const presence = usePresence<string>('mood')
   const values = [
     ['useMe()', me],
     ["usePeers({ scope: 'workspace' })", peers],
-    ['useWorkspaceUsers()', workspaceUsers],
-    ["useWorkspaceUsers({ status: 'offline' })", offline],
-    ["useUser('david')", user],
+    ['useWorkspaceMembers()', memberProfiles],
+    ["useWorkspaceMembers({ status: 'offline' })", offline],
+    ["useMember('david')", user],
     ["usePresence('mood')", presence]
   ] as const
   return (
@@ -503,8 +510,8 @@ function HooksInspector() {
   )
 }
 
-type ParticipantPaneProps = { room: FakeEngine; user: UserProfile }
-function ParticipantPane({ room, user }: ParticipantPaneProps) {
+type MemberPaneProps = { room: FakeEngine; user: ProfileData }
+function MemberPane({ room, user }: MemberPaneProps) {
   return (
     <CollabContext value={room}>
       <AppletPresenceProvider appletId={APPLET_ID}>
@@ -512,7 +519,7 @@ function ParticipantPane({ room, user }: ParticipantPaneProps) {
           aria-label={user.id === YOU.id ? 'Your playground' : `${user.name}’s playground`}
           className="flex min-w-0 flex-col gap-4"
         >
-          <User id={user.id} description="Interact here; presence appears in the other pane" />
+          <Profile id={user.id} description="Interact here; presence appears in the other pane" />
           <div className="h-96 overflow-auto rounded-lg border border-border">
             <Cursors id="examples" className="flex min-h-full flex-col gap-8 p-4">
               <TargetPresenceDemo />
@@ -531,19 +538,19 @@ function ParticipantPane({ room, user }: ParticipantPaneProps) {
 
 export function CollabPlayground() {
   const [rooms] = useState(() =>
-    [YOU, USERS[1]!].map(self => createFakeEngine({ self, page: PAGE, users: USERS }))
+    [YOU, MEMBERS[1]!].map(self => createFakeEngine({ self, page: PAGE, profiles: MEMBERS }))
   )
   const room = rooms[0]!
   const [renamed, setRenamed] = useState(false)
   const [david, setDavid] = useState(true)
-  useEffect(() => connectPlaygroundParticipants(rooms, BACKGROUND_CONNECTIONS), [rooms])
+  useEffect(() => connectPlaygroundMembers(rooms, BACKGROUND_CONNECTIONS), [rooms])
   useEffect(() => {
-    const users = USERS.filter(user => david || user.id !== 'david').map(user =>
+    const profiles = MEMBERS.filter(user => david || user.id !== 'david').map(user =>
       user.id === 'fig' && renamed
         ? { ...user, name: 'Fig Newton', color: 'emerald' as const }
         : user
     )
-    rooms.forEach(room => room.setUsers(users))
+    rooms.forEach(room => room.setProfiles(profiles))
   }, [rooms, renamed, david])
   return (
     <CollabContext value={room}>
@@ -552,38 +559,39 @@ export function CollabPlayground() {
           <header>
             <h2 className="text-base font-medium">Presence playground</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Two participants share presence in memory. You control both panes. Alex is on this
-              page, Pierre is on another page, Andrea is away, and David is offline. No server
-              connection is used.
+              Two members share presence in memory. You control both panes. Alex is on this page,
+              Pierre is on another page, Andrea is away, and David is offline. No server connection
+              is used.
             </p>
           </header>
           <Section
-            title="User, UserAvatar, and UserAvatarGroup"
-            hint="User shows an avatar and name; UserAvatar shows the avatar alone. UserAvatarGroup groups avatars with an overflow count. Profile edits update all three; removed IDs become unknown."
+            title="Profile, ProfileAvatar, and ProfileAvatarGroup"
+            hint="Profile shows an avatar and name; ProfileAvatar shows the avatar alone. ProfileAvatarGroup groups avatars with an overflow count. ProfileData edits update all three; removed IDs become unknown."
             code={
-              '<User id="alex" size="xs" description="Online" />\n<User id="alex" size="sm" />\n<User id="alex" size="default" />\n<UserAvatar id="alex" size="sm" />\n<UserAvatarGroup ids={watcherIds} size="xs" />\n<UserAvatarGroup ids={watcherIds} size="sm" />\n<UserAvatarGroup ids={watcherIds} size="default" />\n<UserAvatarGroup ids={watcherIds} size="lg" />'
+              '<Profile id="alex" size="xs" description="Online" />\n<Profile id="alex" size="sm" />\n<Profile id="alex" size="default" />\n<ProfileAvatar id="alex" size="sm" />\n<ProfileAvatarGroup ids={watcherIds} size="xs" />\n<ProfileAvatarGroup ids={watcherIds} size="sm" />\n<ProfileAvatarGroup ids={watcherIds} size="default" />\n<ProfileAvatarGroup ids={watcherIds} size="lg" />'
             }
           >
             <div className="flex flex-wrap items-center gap-5">
-              <User id="fig" /> <User id="andrea" description="Away" />{' '}
-              <User id="david" description={david ? 'Offline' : 'Removed'} /> <User id="unknown" />
+              <Profile id="fig" /> <Profile id="andrea" description="Away" />{' '}
+              <Profile id="david" description={david ? 'Offline' : 'Removed'} />{' '}
+              <Profile id="unknown" />
             </div>
             <div className="flex flex-wrap items-center gap-5">
-              <User id="alex" size="xs" description="Online" />
-              <User id="alex" size="sm" description="Online" />
-              <User id="alex" size="default" description="Online" />
+              <Profile id="alex" size="xs" description="Online" />
+              <Profile id="alex" size="sm" description="Online" />
+              <Profile id="alex" size="default" description="Online" />
             </div>
             <div className="flex flex-wrap items-center gap-5">
-              <UserAvatar id="alex" size="xs" />
-              <UserAvatar id="alex" size="sm" />
-              <UserAvatar id="alex" size="default" />
-              <UserAvatar id="alex" size="lg" />
+              <ProfileAvatar id="alex" size="xs" />
+              <ProfileAvatar id="alex" size="sm" />
+              <ProfileAvatar id="alex" size="default" />
+              <ProfileAvatar id="alex" size="lg" />
             </div>
             <div className="flex flex-wrap items-center gap-4">
-              <UserAvatarGroup ids={USERS.map(user => user.id)} size="xs" />
-              <UserAvatarGroup ids={USERS.map(user => user.id)} size="sm" />
-              <UserAvatarGroup ids={USERS.map(user => user.id)} size="default" />
-              <UserAvatarGroup ids={USERS.map(user => user.id)} size="lg" />
+              <ProfileAvatarGroup ids={MEMBERS.map(user => user.id)} size="xs" />
+              <ProfileAvatarGroup ids={MEMBERS.map(user => user.id)} size="sm" />
+              <ProfileAvatarGroup ids={MEMBERS.map(user => user.id)} size="default" />
+              <ProfileAvatarGroup ids={MEMBERS.map(user => user.id)} size="lg" />
             </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={() => setRenamed(value => !value)}>
@@ -603,8 +611,8 @@ export function CollabPlayground() {
             }
           >
             <div className="grid gap-6 md:grid-cols-2">
-              <ParticipantPane room={rooms[0]!} user={YOU} />
-              <ParticipantPane room={rooms[1]!} user={USERS[1]!} />
+              <MemberPane room={rooms[0]!} user={YOU} />
+              <MemberPane room={rooms[1]!} user={MEMBERS[1]!} />
             </div>
           </Section>
         </div>

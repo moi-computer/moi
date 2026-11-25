@@ -230,13 +230,7 @@ test(
                 new MessageEvent('message', {
                   data: JSON.stringify({
                     type: 'agent-activity:changed',
-                    agentIds: [
-                      'agent:pip',
-                      'agent:cleo',
-                      'agent:peach',
-                      'agent:frankie',
-                      'agent:shipmate'
-                    ]
+                    agentIds: ['pip', 'cleo', 'peach', 'frankie', 'shipmate']
                   })
                 })
               )
@@ -244,28 +238,34 @@ test(
                 new MessageEvent('message', {
                   data: JSON.stringify({
                     type: 'welcome',
-                    version: 2,
+                    version: 1,
                     connectionId: 'self',
-                    users: [
+                    profiles: [
                       message.profile,
-                      { id: 'tony', name: 'Tony', email: 'tony@example.com', color: 'blue' }
+                      {
+                        type: 'user',
+                        id: 'tony',
+                        name: 'Tony',
+                        email: 'tony@example.com',
+                        color: 'blue'
+                      }
                     ],
                     connections: [
-                      ...['lee', 'sam', 'pat', 'agent:cleo'].map(id => ({
+                      ...['lee', 'sam', 'pat', 'cleo'].map(id => ({
                         connectionId: id,
-                        userId: id,
+                        identityId: id,
                         location: { page: 'overview', status: 'active' },
                         presence: []
                       })),
                       {
                         connectionId: 'self',
-                        userId: message.profile.id,
+                        identityId: message.profile.id,
                         location: { page: 'overview', status: 'active' },
                         presence: []
                       },
                       {
                         connectionId: 'tony',
-                        userId: 'tony',
+                        identityId: 'tony',
                         location: { page: 'scratchpad', status: 'active' },
                         presence: []
                       }
@@ -285,7 +285,7 @@ test(
       })
     })
     await page.goto(WORKSPACE_PAGE)
-    const agents = page.getByRole('group', { name: 'Recently active agents' })
+    const agents = page.getByRole('group', { name: 'Active agents' })
     await expect(agents.getByLabel('Pip')).toBeVisible()
     await expect(agents.getByLabel('Cleo')).toBeVisible()
     await expect(agents.getByText('+1')).toBeVisible()
@@ -305,11 +305,11 @@ test(
     await expect(tooltip.getByText('Active now', { exact: true })).not.toBeVisible()
     await agents.getByLabel('Pip').click()
     await expect(page.getByRole('textbox', { name: 'Email', exact: true })).not.toBeVisible()
-    const users = page.getByRole('group', { name: 'Active users', exact: true })
-    await expect(users.getByText('+1')).toBeVisible()
-    await page.getByRole('button', { name: 'Users in this workspace' }).locator('svg').hover()
-    await expect(users.getByText('+1')).not.toBeVisible()
-    await expect(users.getByRole('button', { name: 'pat', exact: true })).toBeVisible()
+    const profiles = page.getByRole('group', { name: 'Active people', exact: true })
+    await expect(profiles.getByText('+1')).toBeVisible()
+    await page.getByRole('button', { name: 'Members in this workspace' }).locator('svg').hover()
+    await expect(profiles.getByText('+1')).not.toBeVisible()
+    await expect(profiles.getByRole('button', { name: 'pat', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Tony', exact: true }).hover()
     await expect(
       page.locator('[data-slot="tooltip-content"]').getByText('Scratchpad', { exact: true })
@@ -454,7 +454,7 @@ test(
     await expect(page.getByPlaceholder('Do anything')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Create tab', exact: true })).toBeVisible()
     await expect(
-      page.getByRole('button', { name: 'Users in this workspace', exact: true })
+      page.getByRole('button', { name: 'Members in this workspace', exact: true })
     ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Alex (You), open sharing' })).toBeVisible()

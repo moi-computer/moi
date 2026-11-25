@@ -116,7 +116,7 @@ export function createOperationsHandler(resolveWorkspace = getWorkspace) {
         const input = execSchema.parse(await request.json())
         const key = JSON.stringify([
           workspace.id,
-          request.headers.get('x-moi-user-id'),
+          request.headers.get('x-moi-identity-id'),
           'cancel' in input ? input.cancel : input.id
         ])
         for (const [id, expires] of cancelled) if (expires < Date.now()) cancelled.delete(id)

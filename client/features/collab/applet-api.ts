@@ -1,7 +1,7 @@
 import type * as CollabApi from 'moi/collab'
-import { UserAvatarGroupContainer } from './components/user-avatar-group'
-import { UserContainer } from './components/user'
-import { UserAvatarContainer } from './components/user-avatar'
+import { ProfileAvatarGroupContainer } from './components/profile-avatar-group'
+import { ProfileContainer } from './components/profile'
+import { ProfileAvatarContainer } from './components/profile-avatar'
 import { CursorsContainer } from './components/cursors'
 import { PresenceFrameContainer } from './components/presence-frame'
 import { PresenceGroupContainer } from './components/presence-group'
@@ -11,8 +11,8 @@ import {
   usePeers,
   usePresence,
   usePublishPresence,
-  useUser,
-  useWorkspaceUsers
+  useMember,
+  useWorkspaceMembers
 } from './presence/hooks'
 
 export type AppletCollabApi = typeof CollabApi
@@ -20,16 +20,16 @@ export type AppletCollabApi = typeof CollabApi
 // SDK components resolve collaboration data; host UI can import the plain components.
 export const appletCollabApi = {
   Cursors: CursorsContainer,
-  User: UserContainer,
-  UserAvatar: UserAvatarContainer,
-  UserAvatarGroup: UserAvatarGroupContainer,
+  Profile: ProfileContainer,
+  ProfileAvatar: ProfileAvatarContainer,
+  ProfileAvatarGroup: ProfileAvatarGroupContainer,
   PresenceFrame: PresenceFrameContainer,
   PresenceAvatars: PresenceAvatarsContainer,
   PresenceGroup: PresenceGroupContainer,
   useMe,
   usePeers,
-  useUser,
-  useWorkspaceUsers,
+  useMember,
+  useWorkspaceMembers,
   usePresence,
   usePublishPresence
 } satisfies AppletCollabApi

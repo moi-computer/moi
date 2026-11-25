@@ -143,7 +143,7 @@ describe('owner startup', () => {
       if (message.type === 'welcome' || message.type === 'connections') {
         const active = message.connections
           .filter((connection: Connection) => connection.location?.status === 'active')
-          .map((connection: Connection) => connection.userId)
+          .map((connection: Connection) => connection.identityId)
         if (active.includes('alice')) peersActive.resolve()
       }
       if (message.type === 'workspace-config:changed') changed.resolve()
@@ -159,11 +159,11 @@ describe('owner startup', () => {
         JSON.stringify({
           type: 'join',
           version: 1,
-          profile: { id: 'visitor', name: 'Visitor', color: 'blue' }
+          profile: { type: 'user', id: 'visitor', name: 'Visitor', color: 'blue' }
         })
       )
       await peersActive.promise
-      expect(await agentActivity.promise).toEqual(['agent:launch-bot', 'agent:review-bot'])
+      expect(await agentActivity.promise).toEqual(['launch-bot', 'review-bot'])
       const state = await fetch(origin + '/api/workspaces/owner-board/state/tabs', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

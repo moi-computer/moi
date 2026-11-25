@@ -2,10 +2,10 @@ import { expect, test } from 'bun:test'
 import type { CollabClientMessage, Connection } from '@/lib/collab/types'
 import { CollabStore } from './store'
 
-const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
+const alice = { type: 'user', id: 'alice', name: 'Alice', color: 'emerald' } as const
 const connection: Connection = {
   connectionId: 'a',
-  userId: 'alice',
+  identityId: 'alice',
   location: { page: 'overview', status: 'active' },
   presence: []
 }
@@ -14,7 +14,7 @@ const welcome = {
   version: 1 as const,
   connectionId: 'a',
   connections: [connection],
-  users: [alice]
+  profiles: [alice]
 }
 const field = {
   registrationId: 'field',
@@ -29,7 +29,7 @@ test('reading and subscribing never publishes presence', () => {
   store.setSender(message => sent.push(message))
   store.receive(welcome)
   const unsubscribe = store.subscribe(() => {})
-  expect(store.getSnapshot().users).toEqual([alice])
+  expect(store.getSnapshot().profiles).toEqual([alice])
   unsubscribe()
   expect(sent).toEqual([])
 })
@@ -43,17 +43,17 @@ test('presence cleanup removes only its own registration and reconnect republish
   store.setPresence({ ...field, registrationId: 'second' })
   store.deletePresence('field')
   store.disconnect()
-  expect(store.getSnapshot()).toMatchObject({ connections: [], users: [], connectionId: null })
+  expect(store.getSnapshot()).toMatchObject({ connections: [], profiles: [], connectionId: null })
   sent.length = 0
   store.receive({ ...welcome, connectionId: 'reconnected' })
   expect(sent).toEqual([{ type: 'presence:set', ...field, registrationId: 'second' }])
 })
 
-test('live profile snapshots replace stale profiles instead of remembering disconnected users', () => {
+test('live profile snapshots replace stale profiles instead of remembering disconnected profiles', () => {
   const store = new CollabStore()
   store.receive(welcome)
-  store.receive({ type: 'connections', connections: [], users: [] })
-  expect(store.getSnapshot().users).toEqual([])
+  store.receive({ type: 'connections', connections: [], profiles: [] })
+  expect(store.getSnapshot().profiles).toEqual([])
 })
 
 test('location changes notify page observers immediately and identical presence does not republish', () => {
@@ -74,10 +74,10 @@ test('location changes notify page observers immediately and identical presence 
   expect(sent.filter(message => message.type === 'presence:set')).toHaveLength(2)
 })
 
-const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
+const bob = { type: 'user', id: 'bob', name: 'Bob', color: 'blue' } as const
 const remote: Connection = {
   connectionId: 'b',
-  userId: 'bob',
+  identityId: 'bob',
   location: { page: 'overview', status: 'active' },
   presence: [
     field,
@@ -85,17 +85,17 @@ const remote: Connection = {
   ]
 }
 
-test('cursor movement preserves the users and unrelated channel snapshots by reference', () => {
+test('cursor movement preserves the profiles and unrelated channel snapshots by reference', () => {
   const store = new CollabStore()
   store.setLocation({ page: 'overview', status: 'active' })
-  store.receive({ ...welcome, connections: [connection, remote], users: [alice, bob] })
-  const users = store.getUsersSnapshot()
+  store.receive({ ...welcome, connections: [connection, remote], profiles: [alice, bob] })
+  const profiles = store.getProfilesSnapshot()
   const title = store.getPresenceSnapshot('views/board', 'field:title')
   const cursor = store.getPresenceSnapshot('views/board', 'cursor:board')
   const absent = store.getPresenceSnapshot('views/board', 'custom:absent')
   store.receive({
     type: 'connections',
-    users: structuredClone([alice, bob]),
+    profiles: structuredClone([alice, bob]),
     connections: [
       connection,
       {
@@ -104,8 +104,10 @@ test('cursor movement preserves the users and unrelated channel snapshots by ref
       }
     ]
   })
-  expect(store.getUsersSnapshot()).toBe(users)
-  expect(store.getUsersSnapshot().connections.every(peer => peer.presence.length === 0)).toBe(true)
+  expect(store.getProfilesSnapshot()).toBe(profiles)
+  expect(store.getProfilesSnapshot().connections.every(peer => peer.presence.length === 0)).toBe(
+    true
+  )
   expect(store.getPresenceSnapshot('views/board', 'field:title')).toBe(title)
   expect(store.getPresenceSnapshot('views/board', 'custom:absent')).toBe(absent)
   expect(store.getPresenceSnapshot('views/board', 'cursor:board')).not.toBe(cursor)
@@ -121,14 +123,14 @@ test('presence selectors respond immediately to page and visibility changes, fil
   store.receive({
     ...welcome,
     connections: [{ ...connection, presence: [field] }, remote],
-    users: [alice, bob]
+    profiles: [alice, bob]
   })
   const getTitle = () => store.getPresenceSnapshot('views/board', 'field:title')
   expect(getTitle().map(entry => entry.connectionId)).toEqual(['b'])
-  const users = store.getUsersSnapshot()
+  const profiles = store.getProfilesSnapshot()
   store.setLocation({ page: 'views/other', status: 'active' })
   expect(getTitle()).toEqual([])
-  expect(store.getUsersSnapshot()).not.toBe(users)
+  expect(store.getProfilesSnapshot()).not.toBe(profiles)
   store.setLocation({ page: 'overview', status: 'away' })
   expect(getTitle()).toEqual([])
   store.setLocation({ page: 'overview', status: 'active' })
@@ -136,27 +138,27 @@ test('presence selectors respond immediately to page and visibility changes, fil
   store.receive({
     type: 'connections',
     connections: [{ ...remote, location: { page: 'overview', status: 'away' } }],
-    users: [bob]
+    profiles: [bob]
   })
   expect(getTitle()).toEqual([])
-  store.receive({ type: 'connections', connections: [remote], users: [bob] })
+  store.receive({ type: 'connections', connections: [remote], profiles: [bob] })
   expect(getTitle()).toHaveLength(1)
   store.disconnect()
   expect(getTitle()).toEqual([])
 })
 
-test('profile and status changes advance users snapshots without republishing unchanged presence', () => {
+test('profile and status changes advance profiles snapshots without republishing unchanged presence', () => {
   const store = new CollabStore()
   store.setLocation({ page: 'overview', status: 'active' })
-  store.receive({ ...welcome, connections: [connection, remote], users: [alice, bob] })
-  const users = store.getUsersSnapshot()
+  store.receive({ ...welcome, connections: [connection, remote], profiles: [alice, bob] })
+  const profiles = store.getProfilesSnapshot()
   const title = store.getPresenceSnapshot('views/board', 'field:title')
   store.receive({
     type: 'connections',
     connections: [connection, remote],
-    users: [alice, { ...bob, name: 'Robert' }]
+    profiles: [alice, { ...bob, name: 'Robert' }]
   })
-  expect(store.getUsersSnapshot()).not.toBe(users)
-  expect(store.getUsersSnapshot().users[1]?.name).toBe('Robert')
+  expect(store.getProfilesSnapshot()).not.toBe(profiles)
+  expect(store.getProfilesSnapshot().profiles[1]?.name).toBe('Robert')
   expect(store.getPresenceSnapshot('views/board', 'field:title')).toBe(title)
 })

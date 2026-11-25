@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from 'bun:test'
 import { act } from 'react'
-import { getCurrentUser } from '../collab/host-state'
+import { getCurrentProfile } from '../collab/host-state'
 import { setIdentity } from '../identity/store'
 import { cleanupAccount, mountAccount } from '../account/account-test-utils'
-import { useWorkspaceMembers } from '../collab/members/hooks'
+import { useWorkspaceMembership } from '../collab/members/hooks'
 import { useAccount } from '../account/account-provider'
 import { SettingsPage } from './settings-page'
 afterEach(cleanupAccount)
@@ -25,7 +25,7 @@ test('name saves preserve avatar and update the visible identity', async () => {
   await ui.type(input, 'New name')
   await act(async () => input.dispatchEvent(new ui.window.Event('focusout', { bubbles: true })))
   await ui.settle()
-  expect(getCurrentUser()).toMatchObject({
+  expect(getCurrentProfile()).toMatchObject({
     name: 'New name',
     avatar: 'https://example.com/avatar.png'
   })
@@ -46,7 +46,7 @@ test('a delayed name save cannot restore a previous account', async () => {
   )
   await act(async () => ui.mutationRequest.resolve())
   await ui.settle()
-  expect(getCurrentUser()).toMatchObject({ id: 'other', name: 'Other' })
+  expect(getCurrentProfile()).toMatchObject({ id: 'other', name: 'Other' })
 })
 test('local settings keep profile readonly and cloud email hidden', async () => {
   const ui = await mountAccount({ environment: 'local', children: <SettingsPage /> })
@@ -65,7 +65,7 @@ test('signed-out settings navigate to cloud login', async () => {
 })
 
 function MembershipProfileProbe() {
-  const snapshot = useWorkspaceMembers('one')
+  const snapshot = useWorkspaceMembership('one')
   const account = useAccount()
   return (
     <>

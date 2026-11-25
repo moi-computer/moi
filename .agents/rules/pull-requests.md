@@ -4,6 +4,7 @@ alwaysApply: true
 ---
 
 - Lead with 2–3 sentences of what changed and why, describing behavior the reviewer can observe — never a file-by-file or function-by-function inventory; the diff already shows that.
+- Omit test summaries, pass counts, validation claims, and development play-by-play. Include a process detail only if it changes what the reviewer needs to understand or do.
 - Language: concise, simple, easy to read by ACTUAL HUMANS. Formatting: less.
 - Show the artifact right after the intro: the rendered output, a screenshot for UI changes, a wire sample. One example explains more than any amount of prose.
 - Keep the whole body around 25 lines. Put deep detail in repo docs (`NOTES.md`, rules) or commit messages and link to it instead of duplicating.

@@ -11,8 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
-import { UserAvatar } from '@/client/features/collab/components/user-avatar'
-import { User } from '@/client/features/collab/components/user'
+import { ProfileAvatar } from '@/client/features/collab/components/profile-avatar'
+import { Profile } from '@/client/features/collab/components/profile'
 import { useAccount } from './account-provider'
 
 const FEEDBACK_URL = 'https://mlfrg.notion.site/3c678a44b6788042b734d775dd2e935e?pvs=105'
@@ -36,12 +36,12 @@ export function AccountMenu() {
       <DropdownMenuTrigger
         render={<Button variant="ghost" size="icon-lg" aria-label="User menu" />}
       >
-        <UserAvatar profile={account.profile} size="sm" />
+        <ProfileAvatar profile={account.profile} size="sm" />
       </DropdownMenuTrigger>
 
       <DropdownMenuContent side="right" align="end" sideOffset={8} className="w-52">
         <div className="px-2 py-1">
-          <User
+          <Profile
             profile={account.profile}
             size="sm"
             description={

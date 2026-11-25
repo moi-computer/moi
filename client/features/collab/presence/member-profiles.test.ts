@@ -1,19 +1,24 @@
-import { userDisplayName } from '@/client/lib/user-display-name'
+import { profileDisplayName } from '@/client/lib/profile-display-name'
 import { expect, test } from 'bun:test'
 import type { ConnectionStatus } from 'moi/collab'
 import type { Connection } from '@/lib/collab/types'
-import { summarizeWorkspaceUsers, resolvePeers, resolveUser } from './users'
+import { summarizeMemberPresence, resolvePeers, resolveMember } from './member-profiles'
 
-const alice = { id: 'alice', name: 'Alice', color: 'emerald' } as const
-const bob = { id: 'bob', name: 'Bob', color: 'blue' } as const
-const eve = { id: 'eve', name: 'Eve', color: 'blue' } as const
+const alice = { type: 'user', id: 'alice', name: 'Alice', color: 'emerald' } as const
+const bob = { type: 'user', id: 'bob', name: 'Bob', color: 'blue' } as const
+const eve = { type: 'user', id: 'eve', name: 'Eve', color: 'blue' } as const
 function connection(
   connectionId: string,
-  userId: string,
+  identityId: string,
   page: string | null,
   status: ConnectionStatus = 'active'
 ): Connection {
-  return { connectionId, userId, location: page === null ? null : { page, status }, presence: [] }
+  return {
+    connectionId,
+    identityId,
+    location: page === null ? null : { page, status },
+    presence: []
+  }
 }
 const connections = [
   connection('self', 'alice', 'board'),
@@ -22,24 +27,25 @@ const connections = [
   connection('b2', 'bob', null),
   connection('e1', 'eve', null)
 ]
-const source = { connections, users: [alice, bob, eve] }
+const source = { connections, profiles: [alice, bob, eve] }
 
 test('display names fall back to email or stable id without changing profile fields', () => {
   const nameless = {
+    type: 'user',
     id: 'user-id',
     color: 'emerald',
     name: '  ',
     email: '  user@example.test  '
   } as const
-  expect(userDisplayName({ ...nameless, name: '  Named user  ' })).toBe('Named user')
-  expect(userDisplayName(nameless)).toBe('user@example.test')
-  expect(userDisplayName({ ...nameless, email: '  ' })).toBe('user-id')
-  expect(userDisplayName({ id: 'only-id', color: 'emerald' })).toBe('only-id')
+  expect(profileDisplayName({ ...nameless, name: '  Named user  ' })).toBe('Named user')
+  expect(profileDisplayName(nameless)).toBe('user@example.test')
+  expect(profileDisplayName({ ...nameless, email: '  ' })).toBe('user-id')
+  expect(profileDisplayName({ type: 'user', id: 'only-id', color: 'emerald' })).toBe('only-id')
   expect(nameless.name).toBe('  ')
   expect(nameless.email).toBe('  user@example.test  ')
 })
 
-test('peers are other users, deduplicated across tabs, with page/workspace and status filters', () => {
+test('peers are other profiles, deduplicated across tabs, with page/workspace and status filters', () => {
   expect(resolvePeers(source, 'alice', { page: 'board', status: 'active' })).toEqual([
     { ...bob, status: 'active' }
   ])
@@ -62,7 +68,7 @@ test('hidden tabs stay in their page peers and support the away filter', () => {
     connection('b2', 'bob', 'notes', 'away'),
     connection('e1', 'eve', 'notes', 'away')
   ]
-  const source = { connections, users: [alice, bob, eve] }
+  const source = { connections, profiles: [alice, bob, eve] }
   expect(resolvePeers(source, 'alice', { page: 'board', status: 'active' })).toEqual([
     { ...bob, status: 'away' }
   ])
@@ -73,18 +79,18 @@ test('hidden tabs stay in their page peers and support the away filter', () => {
     resolvePeers(source, 'alice', { page: 'board', status: 'active' }, { status: 'active' })
   ).toEqual([])
   expect(
-    summarizeWorkspaceUsers(connections, {
-      currentUser: alice,
+    summarizeMemberPresence(connections, {
+      currentProfile: alice,
       page: 'board',
-      users: source.users
+      profiles: source.profiles
     }).find(user => user.profile.id === 'bob')
   ).toMatchObject({ page: undefined, status: 'away' })
 })
 
 test('a visible connection makes the user active across their away page connections', () => {
   const connections = [connection('b1', 'bob', 'board', 'away'), connection('b2', 'bob', 'notes')]
-  const source = { connections, users: [bob] }
-  expect(resolveUser(source, 'bob')?.status).toBe('active')
+  const source = { connections, profiles: [bob] }
+  expect(resolveMember(source, 'bob')?.status).toBe('active')
   expect(
     resolvePeers(source, 'alice', { page: 'board', status: 'active' }, { status: 'away' })
   ).toEqual([])
@@ -95,19 +101,19 @@ test('a visible connection makes the user active across their away page connecti
 
 test.each(['__proto__', 'constructor', 'toString'])('%s resolves as an ordinary user id', id => {
   const user = { ...alice, id }
-  expect(resolveUser({ connections: [], users: [user] }, user.id)).toEqual({
+  expect(resolveMember({ connections: [], profiles: [user] }, user.id)).toEqual({
     ...user,
     status: 'offline'
   })
-  expect(resolveUser({ connections: [], users: [] }, id)).toBeUndefined()
+  expect(resolveMember({ connections: [], profiles: [] }, id)).toBeUndefined()
 })
 
-test('member summary includes offline users and puts self first', () => {
-  const users = [...source.users, { ...eve, id: 'offline' }]
-  const result = summarizeWorkspaceUsers(connections, {
-    currentUser: alice,
+test('member summary includes offline profiles and puts self first', () => {
+  const profiles = [...source.profiles, { ...eve, id: 'offline' }]
+  const result = summarizeMemberPresence(connections, {
+    currentProfile: alice,
     page: 'board',
-    users
+    profiles
   })
   expect(result[0]).toMatchObject({ profile: alice, self: true, page: 'board' })
   expect(result[1]).toMatchObject({ profile: bob, page: 'board', status: 'active' })
@@ -115,7 +121,7 @@ test('member summary includes offline users and puts self first', () => {
 })
 
 test('summary prefers an active page, keeps the first active connection, and uses my current page', () => {
-  const result = summarizeWorkspaceUsers(
+  const result = summarizeMemberPresence(
     [
       connection('self-other', 'alice', 'notes'),
       connection('b-away', 'bob', 'old-page', 'away'),
@@ -123,7 +129,7 @@ test('summary prefers an active page, keeps the first active connection, and use
       connection('b-other', 'bob', 'notes'),
       connection('e-away', 'eve', 'notes', 'away')
     ],
-    { currentUser: alice, page: 'current-page', users: [alice, bob, eve] }
+    { currentProfile: alice, page: 'current-page', profiles: [alice, bob, eve] }
   )
   expect(result[0]).toMatchObject({ self: true, page: 'current-page' })
   expect(result[1]).toMatchObject({ page: 'board', status: 'active' })

@@ -1,7 +1,7 @@
 import { WorkspaceRegistration } from './workspace-registration'
 import { WorkspaceErrorMessage } from '@/client/features/workspace/workspace-error-states'
 import { WorkspaceFallbackScreen } from '@/client/features/workspace/workspace-fallback-screen'
-import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
+import { useWorkspaceMembership } from '@/client/features/collab/members/hooks'
 import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-transition'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider } from '@/client/features/collab'
@@ -90,7 +90,7 @@ function WorkspaceLive({ id }: WorkspaceRouteProps) {
 }
 
 function WorkspaceContent({ id }: WorkspaceRouteProps) {
-  useWorkspaceMembers(id)
+  useWorkspaceMembership(id)
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
   const { isLoading: layoutLoading, layout, harness } = useWorkspaceLayoutCtx()

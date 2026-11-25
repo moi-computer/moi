@@ -1,8 +1,8 @@
 import type { Connection } from '@/lib/collab/types'
 import type { FakeEngine } from '@/client/features/collab/testing/fake-engine'
 
-// Relay each participant's own connection, just as a room would broadcast it.
-export function connectPlaygroundParticipants(
+// Relay each member's own connection, just as a room would broadcast it.
+export function connectPlaygroundMembers(
   rooms: readonly FakeEngine[],
   background: readonly Connection[] = []
 ): () => void {
@@ -22,7 +22,7 @@ export function connectPlaygroundParticipants(
           const own = state.connections.find(
             connection => connection.connectionId === state.connectionId
           )
-          return own ? [{ ...own, connectionId: `preview:${own.userId}` }] : []
+          return own ? [{ ...own, connectionId: `preview:${own.identityId}` }] : []
         })
       room.setOtherConnections([...background, ...peers])
     }

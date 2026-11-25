@@ -1,8 +1,8 @@
 import { addChatAttachment } from 'moi'
-import { useWorkspaceUsers } from 'moi/collab'
+import { useWorkspaceMembers } from 'moi/collab'
 
 export default function CollaborationFixture() {
-  const users = useWorkspaceUsers()
+  const users = useWorkspaceMembers()
   return (
     <button
       onClick={() =>

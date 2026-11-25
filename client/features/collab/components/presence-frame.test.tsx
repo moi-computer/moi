@@ -19,7 +19,7 @@ import {
   renderCollab
 } from '../testing/component-fixtures'
 
-test('presence frames skip unresolved users and clear their identity after removal', () => {
+test('presence frames skip unresolved profiles and clear their identity after removal', () => {
   const backend = createFocusRoom()
   const frame = renderCollab(
     backend,
@@ -28,8 +28,8 @@ test('presence frames skip unresolved users and clear their identity after remov
     </PresenceFrame>
   )
   expect(frame).toContain('Ada')
-  expect(frame).not.toContain('Unknown user')
-  backend.setUsers([me])
+  expect(frame).not.toContain('Unknown member')
+  backend.setProfiles([me])
   const removed = renderCollab(
     backend,
     <PresenceFrame id="task:42:title">
@@ -38,7 +38,7 @@ test('presence frames skip unresolved users and clear their identity after remov
   )
   expect(removed).toContain('<input')
   expect(removed).not.toContain('Ada')
-  expect(removed).not.toContain('Unknown user')
+  expect(removed).not.toContain('Unknown member')
 })
 
 test('inactive applets retain content and hide remote focus', () => {
@@ -135,7 +135,7 @@ test('controlled presence uses group scope while preserving flexible children', 
   engine.setOtherConnections([
     {
       connectionId: 'remote',
-      userId: peer.id,
+      identityId: peer.id,
       location: { page: 'board', status: 'active' },
       presence: [
         {
@@ -179,7 +179,7 @@ test('both appearances reflect remote controlled presence clearing', () => {
       engine.setOtherConnections([
         {
           connectionId: 'remote',
-          userId: peer.id,
+          identityId: peer.id,
           location: { page: 'board', status: 'active' },
           presence: [
             {
@@ -205,14 +205,14 @@ test('both appearances reflect remote controlled presence clearing', () => {
 
 test('presence components render supplied profiles without a collaboration provider', () => {
   const frame = renderToStaticMarkup(
-    <PlainPresenceFrame users={[peer]}>
+    <PlainPresenceFrame profiles={[peer]}>
       <input aria-label="Title" />
     </PlainPresenceFrame>
   )
   expect(frame).toContain('Ada')
   expect(frame).toContain('aria-label="Title"')
   const avatars = renderToStaticMarkup(
-    <PlainPresenceAvatars users={[{ id: peer.id, connectionId: 'peer-tab', profile: peer }]}>
+    <PlainPresenceAvatars profiles={[{ id: peer.id, connectionId: 'peer-tab', profile: peer }]}>
       <input aria-label="Notes" />
     </PlainPresenceAvatars>
   )

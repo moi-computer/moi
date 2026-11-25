@@ -11,7 +11,7 @@ const welcome = {
   version: 1 as const,
   connectionId: 'self',
   connections: [],
-  users: []
+  profiles: []
 }
 const hasPresence = (value: JsonValue) => value !== false && value !== null
 

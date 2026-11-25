@@ -103,7 +103,12 @@ test('requests get a nameless Access profile only when Access is configured', as
     process.env.MOI_CLOUDFLARE_ACCESS_TEAM_DOMAIN = 'acme'
     process.env.MOI_CLOUDFLARE_ACCESS_AUD = 'aud-moi'
     resetAppConfig()
-    const profile = { id: SUB, color: colorForId(SUB), email: 'alex@example.com' }
+    const profile = {
+      type: 'user' as const,
+      id: SUB,
+      color: colorForId(SUB),
+      email: 'alex@example.com'
+    }
     expect(await proxyUserState(request({ [ACCESS_TOKEN_HEADER]: valid }))).toEqual({
       provider: 'cloudflare-access',
       profile

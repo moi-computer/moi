@@ -100,7 +100,7 @@ describe('collab HTTP integration', () => {
       JSON.stringify({
         type: 'join',
         version: 1,
-        profile: { id: 'anna', name: 'Anna', color: 'blue' }
+        profile: { type: 'user', id: 'anna', name: 'Anna', color: 'blue' }
       })
     )
     try {
@@ -211,7 +211,7 @@ describe('collab HTTP integration', () => {
           JSON.stringify({
             type: 'join',
             version: 1,
-            profile: { id: 'anna', name: 'Anna', color: 'blue' }
+            profile: { type: 'user', id: 'anna', name: 'Anna', color: 'blue' }
           })
         )
         await until(() => messages.some(message => message.type === 'welcome'))
@@ -268,7 +268,7 @@ describe('collab HTTP integration', () => {
       JSON.stringify({
         type: 'join',
         version: 1,
-        profile: { id: 'anna', name: 'Anna', color: 'blue' }
+        profile: { type: 'user', id: 'anna', name: 'Anna', color: 'blue' }
       })
     )
     await until(() => messages.some(message => message.type === 'welcome'))

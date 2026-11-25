@@ -6,7 +6,7 @@ import { getIdentity, getAccountGeneration } from '../../identity/store'
 import type { Identity } from '../../identity/types'
 import { identityKey } from '../../identity/types'
 import { identityProfile } from '../host-state'
-import type { UserProfile } from '@/lib/collab/types'
+import type { Profile } from '@/lib/collab/types'
 import { parseWorkspaceMembers, validWorkspaceAddress } from './types'
 import type { WorkspaceMembers, WorkspaceMembersSnapshot } from './types'
 
@@ -39,7 +39,7 @@ export const getWorkspaceMembersRevision = () => membersRevision
 
 const ownerSnapshots = new WeakMap<Identity, WorkspaceMembers>()
 const NO_ACCESS: WorkspaceMembers = { members: [], invitations: [] }
-const directoryCache = new WeakMap<WorkspaceMembers, readonly UserProfile[]>()
+const directoryCache = new WeakMap<WorkspaceMembers, readonly Profile[]>()
 
 // No sharing record means owner-only on the account's own machine, and no
 // access to someone else's. Unknown until the host has published its first snapshot.
@@ -117,7 +117,7 @@ export function getWorkspaceMembers(workspaceId: string): WorkspaceMembers | und
   const address = getWorkspaceAddress(workspaceId)
   return current().lists.get(address) ?? unlistedWorkspaceMembers(address)
 }
-export function getWorkspaceDirectory(workspaceId: string): readonly UserProfile[] | undefined {
+export function getWorkspaceDirectory(workspaceId: string): readonly Profile[] | undefined {
   const data = getWorkspaceMembers(workspaceId)
   if (!data) return undefined
   let profiles = directoryCache.get(data)

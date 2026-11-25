@@ -5,10 +5,10 @@ import {
   COLLAB_MAX_EMAIL_BYTES,
   COLLAB_MAX_PRESENCE_BYTES,
   isCollabClientMessage,
-  isUserProfile
+  isProfile
 } from './protocol'
 
-const profile = { id: 'anna', name: 'Anna', color: 'violet' } as const
+const profile = { type: 'user', id: 'anna', name: 'Anna', color: 'violet' } as const
 const presence = {
   type: 'presence:set',
   registrationId: 'field',
@@ -17,26 +17,30 @@ const presence = {
 }
 
 test('profiles have bounded identifiers and optional avatar and email data', () => {
-  expect(isUserProfile(profile)).toBe(true)
-  expect(isUserProfile({ ...profile, color: '#7c3aed' })).toBe(false)
-  expect(isUserProfile({ ...profile, color: 'red' })).toBe(false)
+  expect(isProfile(profile)).toBe(true)
+  expect(isProfile({ ...profile, type: 'agent', ownerId: 'inviter' })).toBe(true)
+  expect(isProfile({ ...profile, type: 'user', ownerId: 'inviter' })).toBe(false)
+  expect(isProfile({ ...profile, type: 'agent', ownerId: 1 })).toBe(false)
+  expect(isProfile({ ...profile, type: 'unknown' })).toBe(false)
+  expect(isProfile({ ...profile, color: '#7c3aed' })).toBe(false)
+  expect(isProfile({ ...profile, color: 'red' })).toBe(false)
   expect(
-    isUserProfile({
+    isProfile({
       ...profile,
       email: 'anna@example.com',
       avatar: 'https://example.com/avatar'
     })
   ).toBe(true)
-  expect(isUserProfile({ ...profile, id: '🙂'.repeat(100) })).toBe(false)
-  expect(isUserProfile({ ...profile, id: 'a\0b' })).toBe(false)
-  expect(isUserProfile({ ...profile, email: 'x'.repeat(COLLAB_MAX_EMAIL_BYTES) })).toBe(true)
-  expect(isUserProfile({ ...profile, email: 'x'.repeat(COLLAB_MAX_EMAIL_BYTES + 1) })).toBe(false)
-  expect(isUserProfile({ ...profile, email: '🙂'.repeat(81) })).toBe(false)
-  expect(isUserProfile({ ...profile, email: null })).toBe(false)
-  expect(isUserProfile({ ...profile, avatar: 'x'.repeat(COLLAB_MAX_AVATAR_BYTES + 1) })).toBe(false)
+  expect(isProfile({ ...profile, id: '🙂'.repeat(100) })).toBe(false)
+  expect(isProfile({ ...profile, id: 'a\0b' })).toBe(false)
+  expect(isProfile({ ...profile, email: 'x'.repeat(COLLAB_MAX_EMAIL_BYTES) })).toBe(true)
+  expect(isProfile({ ...profile, email: 'x'.repeat(COLLAB_MAX_EMAIL_BYTES + 1) })).toBe(false)
+  expect(isProfile({ ...profile, email: '🙂'.repeat(81) })).toBe(false)
+  expect(isProfile({ ...profile, email: null })).toBe(false)
+  expect(isProfile({ ...profile, avatar: 'x'.repeat(COLLAB_MAX_AVATAR_BYTES + 1) })).toBe(false)
 })
 
-test('only protocol v1 clients with a user profile can join', () => {
+test('only protocol v1 clients with a profile can join', () => {
   expect(isCollabClientMessage({ type: 'join', version: 1, profile })).toBe(true)
   expect(isCollabClientMessage({ type: 'join', version: 2, profile })).toBe(false)
   expect(
@@ -61,14 +65,14 @@ test('only protocol v1 clients with a user profile can join', () => {
 })
 
 test('join and profile updates accept missing names and reject blank names', () => {
-  const unnamed = { id: 'anna', color: 'violet' } as const
+  const unnamed = { type: 'user', id: 'anna', color: 'violet' } as const
   for (const profile of [
     unnamed,
     { ...unnamed, email: 'anna@example.com', avatar: 'https://example.com/avatar' }
   ]) {
-    expect(isUserProfile(profile)).toBe(true)
-    expect(isCollabClientMessage({ type: 'join', version: 1, profile: profile })).toBe(true)
-    expect(isCollabClientMessage({ type: 'profile', profile: profile })).toBe(true)
+    expect(isProfile(profile)).toBe(true)
+    expect(isCollabClientMessage({ type: 'join', version: 1, profile })).toBe(true)
+    expect(isCollabClientMessage({ type: 'profile', profile })).toBe(true)
   }
   for (const profile of [
     { color: unnamed.color },
@@ -83,11 +87,11 @@ test('join and profile updates accept missing names and reject blank names', () 
     { ...unnamed, name: '🙂'.repeat(65) },
     { id: unnamed.id }
   ]) {
-    expect(isUserProfile(profile)).toBe(false)
-    expect(isCollabClientMessage({ type: 'join', version: 1, profile: profile })).toBe(false)
-    expect(isCollabClientMessage({ type: 'profile', profile: profile })).toBe(false)
+    expect(isProfile(profile)).toBe(false)
+    expect(isCollabClientMessage({ type: 'join', version: 2, profile })).toBe(false)
+    expect(isCollabClientMessage({ type: 'profile', profile })).toBe(false)
   }
-  expect(isUserProfile({ ...unnamed, name: '🙂'.repeat(64) })).toBe(true)
+  expect(isProfile({ ...unnamed, name: '🙂'.repeat(64) })).toBe(true)
 })
 
 test('presence bounds JSON bytes, nesting and finite numbers', () => {

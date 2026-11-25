@@ -1,5 +1,5 @@
 import { isSpeedMode } from '@/lib/speed-mode'
-import type { UserProfile } from '@/lib/collab/types'
+import type { Profile } from '@/lib/collab/types'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
 import { isMoiContext } from '@/lib/moi-context'
@@ -48,7 +48,7 @@ type WsData = {
   workspaceId: string
   workspacePath?: string
   // The collab profile a proxy (Cloudflare Access) verified for the upgrade.
-  verifiedProfile?: UserProfile
+  verifiedProfile?: Profile
   presence?: boolean
 }
 
