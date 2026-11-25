@@ -348,6 +348,7 @@ export type AppEnvironment = 'local' | 'cloud'
 
 export type ClientAppConfig = {
   environment: AppEnvironment
+  localDevPresence?: true
   // Demo mode: workspace creation is blocked; the UI offers the
   // cloud-demo promo dialog instead.
   demo: boolean
@@ -542,9 +543,11 @@ export type WorkspaceEntry = {
   agentId?: string
   isDefault?: boolean
   lastRunAt?: string
+  // Set while the workspace is in trash. Only trash listings carry such entries.
+  trashedAt?: string
 }
 
-export type DiscoveredWorkspace = {
+export type WorkspaceSuggestion = {
   path: string
   displayPath?: string
   // Deduplicated in canonical provider order; empty for folders without agent history.

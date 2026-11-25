@@ -5,12 +5,16 @@ import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type {
   CollabClientMessage,
   CollabServerMessage,
-  UserProfile,
+  Profile,
   ConnectionLocation,
   PresenceRegistration
 } from '@/lib/collab/types'
 
-import { getCurrentUser, subscribeCurrentUserStore, getCurrentUserSource } from '../host-state'
+import {
+  getCurrentProfile,
+  subscribeCurrentProfileStore,
+  getCurrentProfileSource
+} from '../host-state'
 import { CollabStore, DISCONNECTED_STATE } from './store'
 import type { ClientState, PresenceEntry } from './store'
 
@@ -23,13 +27,13 @@ export type CollabEngineApi = {
   readonly enabled: boolean
   start: () => Unsubscribe
   getSnapshot: () => ClientState
-  getUsersSnapshot: () => ClientState
+  getProfilesSnapshot: () => ClientState
   getPresenceSnapshot: (appletId: string, channel: string) => readonly PresenceEntry[]
   subscribe: (listener: () => void) => Unsubscribe
-  getCurrentUser: () => UserProfile | undefined
-  subscribeCurrentUser: (listener: () => void) => Unsubscribe
+  getCurrentProfile: () => Profile | undefined
+  subscribeCurrentProfile: (listener: () => void) => Unsubscribe
   // Authoritative members of this workspace; never an app-wide directory.
-  getDirectory: () => readonly UserProfile[] | undefined
+  getDirectory: () => readonly Profile[] | undefined
   subscribeDirectory: (listener: () => void) => Unsubscribe
   getLocation: () => ConnectionLocation | null
   setLocation: (location: ConnectionLocation | null) => void
@@ -45,11 +49,11 @@ export const NO_ENGINE: CollabEngineApi = {
   enabled: false,
   start: () => noop,
   getSnapshot: () => DISCONNECTED_STATE,
-  getUsersSnapshot: () => DISCONNECTED_STATE,
+  getProfilesSnapshot: () => DISCONNECTED_STATE,
   getPresenceSnapshot: () => EMPTY_PRESENCE,
   subscribe: () => noop,
-  getCurrentUser,
-  subscribeCurrentUser: subscribeCurrentUserStore,
+  getCurrentProfile,
+  subscribeCurrentProfile: subscribeCurrentProfileStore,
   getDirectory: () => undefined,
   subscribeDirectory: () => noop,
   getLocation: () => null,
@@ -71,8 +75,8 @@ export class CollabClient implements CollabEngineApi {
   private queuedPresence = new Map<string, CollabClientMessage>()
   private stopped = true
   private attempts = 0
-  private localDirectory: readonly UserProfile[] | undefined
-  private userId = getCurrentUser()?.id
+  private localDirectory: readonly Profile[] | undefined
+  private identityId = getCurrentProfile()?.id
 
   constructor(
     readonly workspaceId: string,
@@ -83,29 +87,34 @@ export class CollabClient implements CollabEngineApi {
   }
 
   getSnapshot = (): ClientState => (this.enabled ? this.store.getSnapshot() : DISCONNECTED_STATE)
-  getUsersSnapshot = (): ClientState =>
-    this.enabled ? this.store.getUsersSnapshot() : DISCONNECTED_STATE
+  getProfilesSnapshot = (): ClientState =>
+    this.enabled ? this.store.getProfilesSnapshot() : DISCONNECTED_STATE
   getPresenceSnapshot = (appletId: string, channel: string): readonly PresenceEntry[] =>
     this.enabled ? this.store.getPresenceSnapshot(appletId, channel) : EMPTY_PRESENCE
   subscribe = (listener: () => void): Unsubscribe =>
     this.enabled ? this.store.subscribe(listener) : noop
-  getCurrentUser = getCurrentUser
-  subscribeCurrentUser = subscribeCurrentUserStore
+  getCurrentProfile = getCurrentProfile
+  subscribeCurrentProfile = subscribeCurrentProfileStore
   getDirectory = () => {
     const members = getWorkspaceDirectory(this.workspaceId)
     if (members !== undefined) return members
-    // Standalone Moi has one local viewer. Cloud membership never falls back.
-    const local = getCurrentUserSource() !== 'external' ? getCurrentUser() : undefined
+    const source = getCurrentProfileSource()
+    // Local dev learns its peers from live presence. Cloud keeps its published directory.
+    const profiles = this.getProfilesSnapshot().profiles
+    if (source === 'local' && profiles.length) return profiles
+    const local = source !== 'external' ? getCurrentProfile() : undefined
     if (!local) return undefined
     if (this.localDirectory?.[0] !== local) this.localDirectory = [local]
     return this.localDirectory
   }
   subscribeDirectory = (listener: () => void) => {
     const members = subscribeWorkspaceDirectory(listener)
-    const identity = subscribeCurrentUserStore(listener)
+    const identity = subscribeCurrentProfileStore(listener)
+    const presence = getCurrentProfileSource() === 'local' ? this.subscribe(listener) : noop
     return () => {
       members()
       identity()
+      presence()
     }
   }
   getLocation = (): ConnectionLocation | null => (this.enabled ? this.store.getLocation() : null)
@@ -123,11 +132,11 @@ export class CollabClient implements CollabEngineApi {
     if (!this.enabled) return noop
     if (!this.stopped) return () => {}
     this.stopped = false
-    this.userId = getCurrentUser()?.id
-    this.unsubscribeCurrentUser = subscribeCurrentUserStore(() => {
-      const profile = getCurrentUser()
-      if (profile?.id !== this.userId) {
-        this.userId = profile?.id
+    this.identityId = getCurrentProfile()?.id
+    this.unsubscribeCurrentUser = subscribeCurrentProfileStore(() => {
+      const profile = getCurrentProfile()
+      if (profile?.id !== this.identityId) {
+        this.identityId = profile?.id
         this.leave()
         this.connect()
       } else if (profile) this.send({ type: 'profile', profile })
@@ -146,7 +155,7 @@ export class CollabClient implements CollabEngineApi {
   }
 
   private wantsConnection(): boolean {
-    const viewer = getCurrentUser()
+    const viewer = getCurrentProfile()
     return (
       !this.stopped &&
       viewer !== undefined &&
@@ -166,7 +175,7 @@ export class CollabClient implements CollabEngineApi {
   }
 
   private join(): void {
-    const profile = getCurrentUser()
+    const profile = getCurrentProfile()
     if (!this.release || !profile || !this.socket.isOpen) return
     this.socket.send({
       type: 'join',
@@ -207,7 +216,7 @@ export class CollabClient implements CollabEngineApi {
 
   private send(message: CollabClientMessage): void {
     if (
-      !getCurrentUser() &&
+      !getCurrentProfile() &&
       (message.type === 'location' ||
         message.type === 'presence:set' ||
         message.type === 'presence:delete')

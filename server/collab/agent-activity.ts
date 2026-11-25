@@ -1,12 +1,11 @@
 import type { CollabServerMessage } from '@/lib/collab/types'
-import { agentProfileId } from '@/lib/ids'
 import { publishWorkspacePresence } from '../events'
 
 type AgentTimers = Map<string, ReturnType<typeof setTimeout>>
 const workspaces = new Map<string, AgentTimers>()
 
 export function agentActivitySnapshot(workspaceId: string) {
-  const agentIds = Array.from(workspaces.get(workspaceId)?.keys() ?? [], agentProfileId)
+  const agentIds = Array.from(workspaces.get(workspaceId)?.keys() ?? [])
   return { type: 'agent-activity:changed', agentIds } satisfies CollabServerMessage
 }
 
@@ -26,6 +25,6 @@ export function recordAgentActivity(workspaceId: string, agentId: string) {
 
 // Batiok overwrites this header on the managed gateway. Agent IDs are a_ + a JWK thumbprint.
 export function recordGatewayActivity(workspaceId: string, request: Request) {
-  const actor = request.headers.get('x-moi-user-id')
+  const actor = request.headers.get('x-moi-identity-id')
   if (actor && /^a_[A-Za-z0-9_-]{43}$/.test(actor)) recordAgentActivity(workspaceId, actor)
 }

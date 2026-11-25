@@ -61,8 +61,8 @@ test('nested groups scope composed children and keep sibling groups independent'
     )
   }
   const html = renderCollab(
-    createFocusRoom(presenceTarget('users', 'user:42', 'address')),
-    <PresenceGroup id="users">
+    createFocusRoom(presenceTarget('profiles', 'user:42', 'address')),
+    <PresenceGroup id="profiles">
       <div className="grid gap-4">
         <PresenceGroup id="user:42">
           <PresenceAvatars id="address">
@@ -79,9 +79,9 @@ test('nested groups scope composed children and keep sibling groups independent'
   )
   const children = html.split('data-presence-target=')
   expect(children).toHaveLength(3)
-  expect(children[1]).toStartWith('"users/user%3A42/address"')
+  expect(children[1]).toStartWith('"profiles/user%3A42/address"')
   expect(children[1]).toContain('Ada')
-  expect(children[2]).toStartWith('"users/user%3A43/address"')
+  expect(children[2]).toStartWith('"profiles/user%3A43/address"')
   expect(children[2]).not.toContain('Ada')
   expect(html).toContain('Street')
   expect(html).toContain('City')

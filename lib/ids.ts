@@ -2,10 +2,6 @@ import { customAlphabet } from 'nanoid'
 
 export const agentClientPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
-const agentProfilePrefix = 'agent:'
-export const agentProfileId = (id: string) => agentProfilePrefix + id
-export const isAgentProfileId = (id: string) => id.startsWith(agentProfilePrefix)
-
 // Short, shell- and URL-safe ids: base36 (0-9a-z), no dashes — so an id never
 // looks like a CLI flag or reads oddly in a URL.
 const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
@@ -15,7 +11,7 @@ const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
 export const newWorkspaceId = customAlphabet(ALPHABET, 10)
 
 // Literal collection routes take precedence over workspace IDs.
-export const RESERVED_WORKSPACE_IDS = ['create', 'discover', 'order', 'previews']
+export const RESERVED_WORKSPACE_IDS = ['create', 'order', 'previews', 'suggestions', 'trash']
 
 // Ids may also be chosen by hand (`moi init --id <id>`), so they are validated
 // rather than assumed. Slightly wider than the generated alphabet — dashes and

@@ -3,9 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import * as appConfig from '@/client/api/app-config'
 import { useWorkspaces, useWorkspaceMetadata } from './api'
-import { useSharedWorkspaces, homeWorkspaces } from './shared-workspaces'
 
 test.each(['ready', 'failed', 'slow'] as const)(
   'home deduplicates owner requests and keeps cards available (%s)',
@@ -42,15 +40,14 @@ test.each(['ready', 'failed', 'slow'] as const)(
                 name: 'board',
                 addedAt: '',
                 remote: { user_id: 'alice', workspace_id: 'board' }
+              },
+              {
+                id: 'another',
+                path: '/another',
+                addedAt: '',
+                remote: { user_id: 'bob', workspace_id: 'other' }
               }
             ])
-          if (path === '/cloud/api/workspaces/shared')
-            return Response.json({
-              workspaces: [
-                { id: 'board', owner: { id: 'alice', name: 'Alice' } },
-                { id: 'other', owner: { id: 'bob', name: 'Bob' } }
-              ]
-            })
           if (path === '/api/workspaces/alice:board') {
             if (state === 'slow') return sleepingOwner
             if (state === 'failed') return new Response('Owner unavailable', { status: 503 })
@@ -63,17 +60,11 @@ test.each(['ready', 'failed', 'slow'] as const)(
         { preconnect: fetch.preconnect }
       )
     )
-    const configSpy = spyOn(appConfig, 'useAppConfig').mockReturnValue({
-      environment: 'cloud',
-      demo: false,
-      demoInstallUrl: ''
-    })
     function Probe() {
-      const entries = useWorkspaces()
-      const shares = useSharedWorkspaces()
-      const cards = useWorkspaceMetadata(homeWorkspaces(entries.data ?? [], shares.data ?? []))
+      const { data: entries = [] } = useWorkspaces()
+      const cards = useWorkspaceMetadata(entries)
       // Sidebar and home observe the same owner without issuing duplicate requests.
-      useWorkspaceMetadata(entries.data ?? [])
+      useWorkspaceMetadata(entries)
       return <p>{cards.map(card => card.name).join(',')}</p>
     }
     const root = createRoot(document.getElementById('root')!)
@@ -90,7 +81,7 @@ test.each(['ready', 'failed', 'slow'] as const)(
           await Bun.sleep(10)
         })
       expect(document.body.textContent).toContain(
-        state === 'ready' ? 'Other owner,Local,Fresh owner name' : 'Other owner,Local,board'
+        state === 'ready' ? 'Local,Fresh owner name,Other owner' : 'Local,board,Other owner'
       )
       if (state === 'slow') {
         wakeOwner(Response.json({ name: 'Awake owner', isRemote: false }))
@@ -98,19 +89,17 @@ test.each(['ready', 'failed', 'slow'] as const)(
           await act(async () => {
             await Bun.sleep(10)
           })
-        expect(document.body.textContent).toContain('Other owner,Local,Awake owner')
+        expect(document.body.textContent).toContain('Local,Awake owner,Other owner')
       }
       expect(calls.sort()).toEqual([
         '/api/workspaces',
         '/api/workspaces/alice:board',
-        '/api/workspaces/bob:other',
-        '/cloud/api/workspaces/shared'
+        '/api/workspaces/bob:other'
       ])
     } finally {
       await act(async () => root.unmount())
       client.clear()
       fetchSpy.mockRestore()
-      configSpy.mockRestore()
       for (const [key, descriptor] of descriptors) {
         if (descriptor) Object.defineProperty(globalThis, key, descriptor)
         else Reflect.deleteProperty(globalThis, key)

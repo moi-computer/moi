@@ -38,6 +38,17 @@ export async function installWorkspaceSkills(
   )
 }
 
+export function workspaceSkillDirectories(root: string, harness?: HarnessType) {
+  const directories = [join(root, '.agents', 'skills'), join(root, '.claude', 'skills')]
+  const localSkills = join(root, 'skills')
+  if (skillsDirFor(root, harness) === localSkills) directories.unshift(localSkills)
+  return directories
+}
+
+export function removeWorkspaceSkill(skills: string) {
+  return withSkillLock(skills, () => rm(join(skills, SKILL_NAME), { recursive: true, force: true }))
+}
+
 export function workspaceSkillLockPath(root: string, harness?: HarnessType): string {
   return usesSharedWorkspaceSkill(harness)
     ? join(root, '.agents', 'skills')

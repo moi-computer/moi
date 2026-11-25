@@ -1,6 +1,6 @@
 import type { JsonValue } from 'moi'
-import { isUserColor } from './colors'
-import type { CollabClientMessage, ConnectionLocation, UserProfile } from './types'
+import { isProfileColor } from './colors'
+import type { CollabClientMessage, ConnectionLocation, Profile } from './types'
 
 export const COLLAB_PROTOCOL_VERSION = 1
 export const COLLAB_MAX_CONNECTIONS = 64
@@ -32,13 +32,16 @@ export function isCollabJson(value: unknown, depth = 0): value is JsonValue {
   return Object.values(value).every(item => isCollabJson(item, depth + 1))
 }
 
-export function isUserProfile(value: unknown): value is UserProfile {
+export function isProfile(value: unknown): value is Profile {
   return (
     isRecord(value) &&
     isCollabString(value.id, 240) &&
     value.id.trim().length > 0 &&
     (value.name === undefined || (isCollabString(value.name) && value.name.trim().length > 0)) &&
-    isUserColor(value.color) &&
+    (value.type === 'user' || value.type === 'agent') &&
+    (value.ownerId === undefined ||
+      (value.type === 'agent' && isCollabString(value.ownerId, 240))) &&
+    isProfileColor(value.color) &&
     (value.avatar === undefined || isCollabString(value.avatar, COLLAB_MAX_AVATAR_BYTES)) &&
     (value.email === undefined || isCollabString(value.email, COLLAB_MAX_EMAIL_BYTES))
   )
@@ -59,11 +62,11 @@ export function isCollabClientMessage(value: unknown): value is CollabClientMess
     case 'join':
       return (
         value.version === COLLAB_PROTOCOL_VERSION &&
-        isUserProfile(value.profile) &&
+        isProfile(value.profile) &&
         (value.location === undefined || isLocation(value.location))
       )
     case 'profile':
-      return isUserProfile(value.profile)
+      return isProfile(value.profile)
     case 'location':
       return isLocation(value.location)
     case 'presence:set':

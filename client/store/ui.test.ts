@@ -45,7 +45,6 @@ describe('composer drafts', () => {
       'moi:ui',
       JSON.stringify({
         state: {
-          discoveredWorkspacesOpen: false,
           workspaceIdsPendingAnalysis: []
         },
         version: 0

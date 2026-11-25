@@ -12,10 +12,17 @@ alwaysApply: true
 - Keep Claude Code/Codex naming in internal harness identifiers, APIs, filenames, commands, and developer documentation. Preserve exact external setting names (for example, “Enable device code sign-in for Codex”), provider messages, and model names.
 - Use harness for internal integration and authentication names, including types, functions, files, API routes, and events: `HarnessLoginState`, `startHarnessLogin`, `/api/harnesses/:type/auth`.
 - Keep agent for actual agent identities, subagents, and provider-native terminology such as OpenClaw’s `agentId`; do not rename those to harness.
+- An **identity** represents a person or an agent. Use **person** and **people** in prose and UI copy. In code, their identity types are `'user'` and `'agent'`, respectively.
+- A **member** is an identity with workspace access, including the owner. Use **invitation** while access is pending and **membership** for the access relationship. An `identityId` identifies the person or agent across workspaces. A `membershipId` identifies one workspace access record.
+- Use **profile** for how an identity appears. A `MemberProfile` adds workspace presence status to a `Profile`.
+- A **peer** is another connected member on the current page or in the workspace. A **connection** is one live session. Each tab has its own connection and **presence**, such as its cursor position.
 - Use chat for user-facing language and UI concepts.
 - Use session for internal identifiers, state, persistence, protocols, and hooks that expose session state.
 - Use thread only when matching terminology from an external provider or SDK.
 - Apply the same boundary to code names and filenames. Session metadata uses names such as `sessionTitle`, `generateSessionTitle`, and `session-title.ts`. Use `chatTitle` and `chat-title.ts` only for client or UI label formatting.
 - Translate provider-native thread terminology to session terminology at the adapter boundary. Keep thread naming only in native wire types, RPC methods, and provider-facing variables.
-- Name actions precisely, such as `Remove workspace` or `Start new chat`.
+- Name actions precisely, such as `Start new chat`.
+- Use **local workspace** and **remote workspace** from the current user’s perspective. A workspace stays local to its owner after they share it. Members who access it on the owner’s machine see it as remote. Use **shared workspace** when describing collaboration from either side, and **remote workspace reference** for the pointer in a member’s local folder.
+- Use **Delete workspace** for a workspace you own, **Leave workspace** for one you joined, and **Remove** to end another person’s or agent’s access. In code and docs, **unregister** means dropping the local registry entry while keeping the folder.
+- “trash” is a popular concept, so write it in lowercase.
 - Avoid generic confirmations, hype, “please,” and “successfully.”

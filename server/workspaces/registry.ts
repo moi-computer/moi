@@ -4,13 +4,14 @@ import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
 
+import { sameRemoteWorkspace, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { newWorkspaceId, validateWorkspaceId } from '@/lib/ids'
-import type { DiscoveredWorkspace, WorkspaceEntry, HarnessType } from '@/lib/types'
+import type { WorkspaceSuggestion, WorkspaceEntry, HarnessType } from '@/lib/types'
 import { orderHarnesses } from '@/lib/harness-types'
 
 import { DATA_DIR } from '../data-dir'
 import { allHarnesses } from '../harness/registry'
-import type { DiscoveredWorkspaceCandidate } from '../harness/types'
+import type { HarnessWorkspaceSuggestion } from '../harness/types'
 import { createdWorkspacesRoot } from '../app-config'
 import { findStateIdForPath } from '../workspace-state'
 
@@ -37,7 +38,15 @@ export function setRegistryPath(p: string) {
   _registryPath = p
 }
 
-async function readRegistry(): Promise<WorkspaceEntry[]> {
+// A workspace in trash stays in the registry file with `trashedAt`, and is left
+// out of every lookup and listing except the trash ones below. The API, the CLI
+// and agents therefore all see it as gone. `deleting` marks an entry whose
+// permanent deletion has started, so it can only finish, never be restored.
+type StoredEntry = WorkspaceEntry & { deleting?: true | RemoteWorkspaceTarget }
+
+export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+
+async function readRegistry(): Promise<StoredEntry[]> {
   // A fresh install reads the registry before anything has written it. Skip
   // the read while the file is missing: on Windows, a Bun.file() read under a
   // not-yet-created data dir can exit the CLI before its ENOENT rejection is
@@ -48,7 +57,7 @@ async function readRegistry(): Promise<WorkspaceEntry[]> {
   try {
     const text = await Bun.file(_registryPath).text()
     // `type` is the field's name in registries written before it became `harness`.
-    const entries = JSON.parse(text) as (WorkspaceEntry & { type?: HarnessType })[]
+    const entries = JSON.parse(text) as (StoredEntry & { type?: HarnessType })[]
     return entries.map(({ remote: _storedRemote, type, ...entry }) =>
       type && !entry.harness ? { ...entry, harness: type } : entry
     )
@@ -64,7 +73,7 @@ async function withRemote(entry: WorkspaceEntry): Promise<WorkspaceEntry> {
   return config?.remote ? { ...entry, remote: config.remote } : entry
 }
 
-async function writeRegistry(entries: WorkspaceEntry[]): Promise<void> {
+async function writeRegistry(entries: StoredEntry[]): Promise<void> {
   const temporaryPath = `${_registryPath}.${crypto.randomUUID()}.tmp`
   try {
     // Owner routing is derived from each folder's config, never persisted here.
@@ -86,7 +95,7 @@ function locked<T>(operation: () => Promise<T>): Promise<T> {
   return run
 }
 
-// A removed workspace keeps its state folder. Re-adding the same folder takes
+// An unregistered workspace keeps its state folder. Re-adding the same folder takes
 // its old id back, and with it the pinned chat, selections and chat settings.
 async function previousWorkspaceId(
   entries: WorkspaceEntry[],
@@ -149,13 +158,12 @@ export async function registerWorkspace(
       if (error) throw new Error(error)
     }
     const existing = entries.find(e => e.path === normalPath)
+    if (existing?.trashedAt) throw new Error('This workspace is in trash. Restore it from Home')
     if (existing) return remote ? { ...existing, remote } : existing
     if (remote) {
       // One registration per owner workspace, whichever folder points at it.
-      const duplicate = (await Promise.all(entries.map(withRemote))).find(
-        entry =>
-          entry.remote?.user_id === remote.user_id &&
-          entry.remote.workspace_id === remote.workspace_id
+      const duplicate = (await Promise.all(entries.filter(e => !e.trashedAt).map(withRemote))).find(
+        entry => sameRemoteWorkspace(entry.remote, remote)
       )
       if (duplicate) return withDisplayPath(duplicate)
     }
@@ -176,14 +184,14 @@ export async function registerWorkspace(
 }
 
 export async function getWorkspace(id: string): Promise<WorkspaceEntry | null> {
-  const entry = (await readRegistry()).find(e => e.id === id)
+  const entry = (await readRegistry()).find(e => e.id === id && !e.trashedAt)
   return entry ? withRemote(entry) : null
 }
 
-export async function removeWorkspace(id: string): Promise<boolean> {
+export async function unregisterWorkspace(id: string): Promise<boolean> {
   return locked(async () => {
     const entries = await readRegistry()
-    const next = entries.filter(e => e.id !== id)
+    const next = entries.filter(e => e.id !== id || e.trashedAt)
     if (next.length === entries.length) return false
     await writeRegistry(next)
     return true
@@ -191,13 +199,14 @@ export async function removeWorkspace(id: string): Promise<boolean> {
 }
 
 export async function listWorkspaces(): Promise<WorkspaceEntry[]> {
-  const entries = await Promise.all((await readRegistry()).map(withRemote))
-  return entries.map(withDisplayPath)
+  const active = (await readRegistry()).filter(e => !e.trashedAt)
+  return (await Promise.all(active.map(withRemote))).map(withDisplayPath)
 }
 
 export async function reorderWorkspaces(ids: string[]): Promise<WorkspaceEntry[]> {
   return locked(async () => {
-    const entries = await readRegistry()
+    const stored = await readRegistry()
+    const entries = stored.filter(e => !e.trashedAt)
     if (ids.length !== entries.length)
       throw new Error('Workspace order must include every workspace')
 
@@ -209,7 +218,7 @@ export async function reorderWorkspaces(ids: string[]): Promise<WorkspaceEntry[]
     if (next.some(e => !e)) throw new Error('Workspace order contains unknown ids')
 
     const ordered = next as WorkspaceEntry[]
-    await writeRegistry(ordered)
+    await writeRegistry([...ordered, ...stored.filter(e => e.trashedAt)])
     return (await Promise.all(ordered.map(withRemote))).map(withDisplayPath)
   })
 }
@@ -254,23 +263,23 @@ export function liftToWorkspaceRoot(p: string): string {
   return segments.slice(0, i).join(sep) || sep
 }
 
-async function discoverHarnessWorkspaces(
+async function listHarnessWorkspaceSuggestions(
   registeredPaths: Set<string>
-): Promise<DiscoveredWorkspaceCandidate[]> {
+): Promise<HarnessWorkspaceSuggestion[]> {
   const perHarness = await Promise.all(
     allHarnesses().map(
-      h => h.discoverWorkspaces?.(registeredPaths).catch(() => []) ?? Promise.resolve([])
+      h => h.listWorkspaceSuggestions?.(registeredPaths).catch(() => []) ?? Promise.resolve([])
     )
   )
   return perHarness.flat()
 }
 
 // Only inspect immediate children of the workspace root, never the whole disk.
-export async function discoverWorkspaceFolders(
+export async function listWorkspaceFolders(
   root = createdWorkspacesRoot()
 ): Promise<{ path: string }[]> {
   const entries = await readdir(root, { withFileTypes: true }).catch(() => [])
-  const candidates = await Promise.all(
+  const suggestions = await Promise.all(
     entries
       .filter(entry => entry.isDirectory() || entry.isSymbolicLink())
       .map(async entry => {
@@ -279,21 +288,21 @@ export async function discoverWorkspaceFolders(
         return moi?.isDirectory() ? { path } : undefined
       })
   )
-  return candidates.filter(candidate => candidate !== undefined)
+  return suggestions.filter(suggestion => suggestion !== undefined)
 }
 
-export function mergeWorkspaceCandidates(
-  candidates: { path: string; harness?: HarnessType }[],
+export function mergeWorkspaceSuggestions(
+  suggestions: { path: string; harness?: HarnessType }[],
   registeredPaths: Set<string> = new Set()
-): DiscoveredWorkspace[] {
+): WorkspaceSuggestion[] {
   const normalizedRegisteredPaths = new Set([...registeredPaths].map(path => resolve(path)))
   const byPath = new Map<string, Set<HarnessType>>()
 
-  for (const candidate of candidates) {
-    const path = resolve(candidate.path)
+  for (const suggestion of suggestions) {
+    const path = resolve(suggestion.path)
     if (normalizedRegisteredPaths.has(path)) continue
     const types = byPath.get(path) ?? new Set<HarnessType>()
-    if (candidate.harness) types.add(candidate.harness)
+    if (suggestion.harness) types.add(suggestion.harness)
     byPath.set(path, types)
   }
 
@@ -304,15 +313,107 @@ export function mergeWorkspaceCandidates(
 }
 
 // Combine agent history with Moi folders that may not have any chats yet.
-export async function discoverWorkspaces(): Promise<DiscoveredWorkspace[]> {
+export async function listWorkspaceSuggestions(): Promise<WorkspaceSuggestion[]> {
   const registeredPaths = new Set((await readRegistry()).map(e => e.path))
   const [harnessWorkspaces, workspaceFolders] = await Promise.all([
-    discoverHarnessWorkspaces(registeredPaths),
-    discoverWorkspaceFolders()
+    listHarnessWorkspaceSuggestions(registeredPaths),
+    listWorkspaceFolders()
   ])
-  return mergeWorkspaceCandidates([...harnessWorkspaces, ...workspaceFolders], registeredPaths).map(
-    withDisplayPath
+  const suggestions = mergeWorkspaceSuggestions(
+    [...harnessWorkspaces, ...workspaceFolders],
+    registeredPaths
   )
+  const importable = await Promise.all(suggestions.map(suggestion => isImportable(suggestion.path)))
+  return suggestions.filter((_, index) => importable[index]).map(withDisplayPath)
+}
+
+// Agent history can outlive its folder. Remote workspaces open through their share.
+async function isImportable(path: string): Promise<boolean> {
+  const folder = await stat(path).catch(() => undefined)
+  if (!folder?.isDirectory()) return false
+  const config = await loadWorkspaceFileConfig(path).catch(() => undefined)
+  return !config?.remote
+}
+
+export async function listTrashedWorkspaces(now = new Date()): Promise<WorkspaceEntry[]> {
+  return (await readRegistry())
+    .filter(e => e.trashedAt && !e.deleting && !trashExpired(e, now))
+    .map(({ deleting: _deleting, ...entry }) => withDisplayPath(entry))
+}
+
+function trashExpired(entry: StoredEntry, now: Date): boolean {
+  return !!entry.trashedAt && now.getTime() - Date.parse(entry.trashedAt) >= TRASH_RETENTION_MS
+}
+
+type TrashUpdateResult =
+  | { status: 'updated'; entry: WorkspaceEntry }
+  | { status: 'missing' | 'expired' }
+
+// Restore and permanent deletion both decide under the registry lock, so a
+// workspace is either restored or deleted, never both.
+export async function setWorkspaceTrashed(
+  id: string,
+  trashed: boolean,
+  clearAccess: (id: string) => Promise<unknown>,
+  now = new Date()
+): Promise<TrashUpdateResult> {
+  return locked(async () => {
+    const entries = await readRegistry()
+    const entry = entries.find(e => e.id === id)
+    if (!entry || Boolean(entry.trashedAt) === trashed) return { status: 'missing' }
+    if (entry.deleting || trashExpired(entry, now)) return { status: 'expired' }
+    if (trashed) {
+      await clearAccess(id)
+      entry.trashedAt = now.toISOString()
+    } else delete entry.trashedAt
+    await writeRegistry(entries)
+    return { status: 'updated', entry: withDisplayPath(entry) }
+  })
+}
+
+// Claim under the same lock as restore. Include unfinished deletions from earlier sweeps.
+export function claimExpiredWorkspaces(now: Date) {
+  return locked(async () => {
+    const entries = await readRegistry()
+    const expired = entries.filter(
+      entry => entry.deleting === true || (!entry.deleting && trashExpired(entry, now))
+    )
+    if (expired.some(entry => !entry.deleting)) {
+      for (const entry of expired) entry.deleting = true
+      await writeRegistry(entries)
+    }
+    return expired
+  })
+}
+
+export function claimRevokedReferences(references: WorkspaceEntry[]) {
+  return locked(async () => {
+    const entries = await readRegistry()
+    const byId = new Map(entries.map(entry => [entry.id, entry]))
+    let changed = false
+    for (const reference of references) {
+      const entry = byId.get(reference.id)
+      if (!entry || entry.trashedAt || entry.path !== reference.path || !reference.remote) continue
+      if (!sameRemoteWorkspace((await withRemote(entry)).remote, reference.remote)) continue
+      entry.trashedAt = new Date().toISOString()
+      entry.deleting = reference.remote
+      changed = true
+    }
+    if (changed) await writeRegistry(entries)
+    // The saved address lets us retry even if the reference folder is already gone.
+    return entries.flatMap(({ deleting, ...entry }) =>
+      deleting && deleting !== true ? [{ ...entry, remote: deleting }] : []
+    )
+  })
+}
+
+// Drop a workspace whose permanent deletion has finished.
+export async function finishWorkspaceDeletion(id: string): Promise<void> {
+  return locked(async () => {
+    const entries = await readRegistry()
+    const next = entries.filter(e => !(e.id === id && e.deleting))
+    if (next.length !== entries.length) await writeRegistry(next)
+  })
 }
 
 export async function updateWorkspaceHarness(
@@ -321,7 +422,7 @@ export async function updateWorkspaceHarness(
 ): Promise<WorkspaceEntry> {
   return locked(async () => {
     const entries = await readRegistry()
-    const entry = entries.find(entry => entry.id === id)
+    const entry = entries.find(entry => entry.id === id && !entry.trashedAt)
     if (!entry) throw new Error('Workspace not found')
     entry.harness = harness
     await writeRegistry(entries)

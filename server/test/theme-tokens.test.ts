@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { join } from 'path'
 import postcss from 'postcss'
 import type { Root } from 'postcss'
-import { USER_COLORS } from '../../lib/collab/colors'
+import { PROFILE_COLORS } from '../../lib/collab/colors'
 
 type ColorMapping = {
   property: string
@@ -45,7 +45,7 @@ describe('semantic color token CSS', () => {
 
     const userColorScopes = [
       '[data-collab-color]',
-      ...USER_COLORS.map(color => `[data-collab-color='${color}']`)
+      ...PROFILE_COLORS.map(color => `[data-collab-color='${color}']`)
     ]
     for (const { variable } of mappings) {
       // Collaboration colors belong to the user element and inherit its palette in both modes.

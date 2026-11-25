@@ -1,7 +1,7 @@
 import type { JsonValue } from 'moi'
 import type {
   CollabClientMessage,
-  UserProfile,
+  Profile,
   ConnectionLocation,
   Connection,
   PresenceRegistration,
@@ -14,7 +14,7 @@ export type ClientState = {
   activeAgentIds: string[]
   connections: Connection[]
   // Current live profiles only. The host owns the full workspace directory.
-  users: readonly UserProfile[]
+  profiles: readonly Profile[]
   error: string | null
 }
 
@@ -23,14 +23,14 @@ export const DISCONNECTED_STATE: ClientState = {
   connectionId: null,
   activeAgentIds: [],
   connections: [],
-  users: [],
+  profiles: [],
   error: null
 }
 
 export type PresenceEntry = {
   registrationId: string
   connectionId: string
-  userId: string
+  identityId: string
   value: JsonValue
 }
 
@@ -40,7 +40,7 @@ const channelKey = (appletId: string, channel: string) => JSON.stringify([applet
 // Sockets and timers live in client.ts; this model owns ephemeral registrations.
 export class CollabStore {
   private state: ClientState = DISCONNECTED_STATE
-  private usersState: ClientState = DISCONNECTED_STATE
+  private profilesState: ClientState = DISCONNECTED_STATE
   private channels = new Map<string, readonly PresenceEntry[]>()
   private listeners = new Set<() => void>()
   private registrations = new Map<string, PresenceRegistration>()
@@ -49,7 +49,7 @@ export class CollabStore {
 
   getSnapshot = (): ClientState => this.state
   // User hooks never need cursor coordinates or other publication payloads.
-  getUsersSnapshot = (): ClientState => this.usersState
+  getProfilesSnapshot = (): ClientState => this.profilesState
   getPresenceSnapshot = (appletId: string, channel: string): readonly PresenceEntry[] =>
     this.channels.get(channelKey(appletId, channel)) ?? EMPTY_PRESENCE
   subscribe = (listener: () => void): (() => void) => {
@@ -97,7 +97,7 @@ export class CollabStore {
           status: 'connected',
           connectionId: message.connectionId,
           connections: message.connections,
-          users: message.users,
+          profiles: message.profiles,
           error: null
         })
         for (const registration of this.registrations.values()) {
@@ -105,7 +105,7 @@ export class CollabStore {
         }
         break
       case 'connections':
-        this.publish({ connections: message.connections, users: message.users })
+        this.publish({ connections: message.connections, profiles: message.profiles })
         break
       case 'error':
         this.publish({ error: message.message })
@@ -116,12 +116,12 @@ export class CollabStore {
   }
   private publish(patch: Partial<ClientState>, locationChanged = false): void {
     this.state = { ...this.state, ...patch }
-    const users = {
+    const profiles = {
       ...this.state,
       connections: this.state.connections.map(connection => ({ ...connection, presence: [] }))
     }
-    if (locationChanged || JSON.stringify(users) !== JSON.stringify(this.usersState)) {
-      this.usersState = users
+    if (locationChanged || JSON.stringify(profiles) !== JSON.stringify(this.profilesState)) {
+      this.profilesState = profiles
     }
     const channels = new Map<string, PresenceEntry[]>()
     if (this.location?.status === 'active') {
@@ -138,7 +138,7 @@ export class CollabStore {
           entries.push({
             registrationId: registration.registrationId,
             connectionId: connection.connectionId,
-            userId: connection.userId,
+            identityId: connection.identityId,
             value: registration.value
           })
           channels.set(key, entries)

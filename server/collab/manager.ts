@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
 import { COLLAB_MAX_MESSAGE_BYTES, isCollabClientMessage } from '@/lib/collab/protocol'
-import type { CollabClientMessage, CollabServerMessage, UserProfile } from '@/lib/collab/types'
+import type { CollabClientMessage, CollabServerMessage, Profile } from '@/lib/collab/types'
 
 import { agentActivitySnapshot } from './agent-activity'
-import { getAppConfig } from '../app-config'
+import { getAppConfig, localDevPresenceEnabled } from '../app-config'
 import type { ParentMessage, WorkerMessage } from './worker-messages'
 
 export type ClientSocket = {
@@ -25,7 +25,7 @@ type Binding = {
   lastSeen: number
   joined: boolean
   // Set when a proxy (Cloudflare Access) verified who opened this socket.
-  verifiedProfile?: UserProfile
+  verifiedProfile?: Profile
   slot?: Slot
   queue: Promise<void>
 }
@@ -66,7 +66,7 @@ export class CollabRuntimeError extends Error {
 // never see someone other than the person the browser shows.
 function verifiedMessage(
   message: CollabClientMessage,
-  verifiedProfile: UserProfile | undefined
+  verifiedProfile: Profile | undefined
 ): CollabClientMessage | null {
   if (!verifiedProfile || (message.type !== 'join' && message.type !== 'profile')) return message
   return message.profile.id === verifiedProfile.id ? { ...message, profile: verifiedProfile } : null
@@ -112,7 +112,7 @@ export class CollabManager {
     if (binding.closed) throw new CollabRuntimeError('unavailable', 'Collab connection closed')
     const enabled = this.options.enabled
       ? await this.options.enabled(canonicalPath)
-      : getAppConfig().environment === 'cloud'
+      : getAppConfig().environment === 'cloud' || localDevPresenceEnabled()
     if (!enabled) {
       throw new CollabRuntimeError(
         'unavailable',
@@ -263,7 +263,7 @@ export class CollabManager {
   open(
     socket: ClientSocket,
     workspacePath: string,
-    options: { workspaceId?: string; verifiedProfile?: UserProfile } = {}
+    options: { workspaceId?: string; verifiedProfile?: Profile } = {}
   ) {
     const binding: Binding = {
       socket,

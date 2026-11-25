@@ -8,7 +8,7 @@ import { getCollabReferencePath } from './config'
 import { collabSkillReferencePath } from './skill'
 
 let workspacePath: string
-const envKeys = ['MOI_COLLAB', 'MOI_DEV', 'MOI_ENVIRONMENT']
+const envKeys = ['HOST', 'MOI_COLLAB', 'MOI_DEMO', 'MOI_DEV', 'MOI_ENVIRONMENT']
 let savedEnv: Record<string, string | undefined>
 beforeEach(async () => {
   workspacePath = await mkdtemp(join(tmpdir(), 'moi-collab-config-'))
@@ -27,9 +27,21 @@ afterEach(async () => {
 })
 
 describe('collab startup configuration', () => {
-  test('dev mode, old environment settings and legacy workspace flags do not enable runtime', async () => {
+  test('local dev presence is limited to standalone loopback servers', () => {
+    expect(clientAppConfig().localDevPresence).toBeUndefined()
     process.env.MOI_DEV = '1'
+    process.env.HOST = '127.0.0.1'
+    expect(clientAppConfig().localDevPresence).toBe(true)
+    process.env.HOST = '0.0.0.0'
+    expect(clientAppConfig().localDevPresence).toBeUndefined()
+    process.env.HOST = '127.0.0.1'
+    process.env.MOI_ENVIRONMENT = 'cloud'
+    initializeAppConfig()
+    expect(clientAppConfig().localDevPresence).toBeUndefined()
+  })
 
+  test('local dev and legacy workspace flags keep cloud instructions hidden', async () => {
+    process.env.MOI_DEV = '1'
     await Bun.write(
       join(workspacePath, '.moi', '.workspace.json'),
       JSON.stringify({ version: 1, experimental: { collab: true } })

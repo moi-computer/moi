@@ -1,5 +1,5 @@
 import { isSpeedMode } from '@/lib/speed-mode'
-import type { UserProfile } from '@/lib/collab/types'
+import type { Profile } from '@/lib/collab/types'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
 import { isMoiContext } from '@/lib/moi-context'
@@ -11,7 +11,7 @@ import { startOperations, stopOperations } from './operations/server'
 import index from '../client/index.html'
 import devSandbox from '../client/dev/index.html'
 import { api } from './api'
-import { getAppConfig } from './app-config'
+import { getAppConfig, isLoopbackHost, localDevPresenceEnabled } from './app-config'
 import { harnessStore } from './harness/auth'
 import { PORT } from './constants'
 import { control } from './control'
@@ -25,6 +25,8 @@ import { navigationRelay } from './navigation-relay'
 import { resolveScratchOp } from './scratchpad/relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace, listWorkspaces } from './workspaces/registry'
+import { syncRemoteWorkspacesInBackground, startRemoteWorkspaceSync } from './workspaces/remote'
+import { startTrashSweeper } from './workspaces/trash'
 import { failInterruptedViewStarts } from './sessions/view-sessions'
 import { sendWorkspaceMessage } from './sessions/send-message'
 import { prepareWorkspaceStates } from './workspace-state'
@@ -46,7 +48,7 @@ type WsData = {
   workspaceId: string
   workspacePath?: string
   // The collab profile a proxy (Cloudflare Access) verified for the upgrade.
-  verifiedProfile?: UserProfile
+  verifiedProfile?: Profile
   presence?: boolean
 }
 
@@ -119,7 +121,8 @@ await Promise.all(registeredWorkspaces.map(failInterruptedViewStarts))
 // machine's gateway can open, so nothing else running there reaches the API
 // meant for people (docs/config.md). A socket file left by a previous
 // run would make the bind fail.
-const { unixSocket } = getAppConfig()
+const { environment, unixSocket } = getAppConfig()
+const localDevPresence = localDevPresenceEnabled()
 if (unixSocket) await rm(unixSocket, { force: true })
 const listen = unixSocket
   ? { unix: unixSocket }
@@ -179,7 +182,15 @@ export const app = Bun.serve<WsData>({
       upgrade(server, req, { channel: 'events', workspaceId: '' }),
 
     '/api/workspaces/:id/events': async (req: Request, server: Bun.Server<WsData>) => {
-      const workspaceId = decodeURIComponent(new URL(req.url).pathname.split('/')[3] ?? '')
+      const url = new URL(req.url)
+      const origin = req.headers.get('origin')
+      if (
+        localDevPresence &&
+        (!isLoopbackHost(url.hostname) || (origin && origin !== url.origin))
+      ) {
+        return new Response('Invalid origin', { status: 403 })
+      }
+      const workspaceId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
       const workspace = await getWorkspace(workspaceId)
       if (!workspace) return new Response('Workspace not found', { status: 404 })
       if (workspace.remote) return new Response('Use the owner workspace address', { status: 404 })
@@ -191,7 +202,7 @@ export const app = Bun.serve<WsData>({
       return upgrade(server, req, {
         channel: 'workspace',
         workspaceId,
-        workspacePath: workspace.path,
+        workspacePath: environment === 'cloud' || localDevPresence ? workspace.path : undefined,
         ...(profile ? { verifiedProfile: profile } : {})
       })
     }
@@ -228,7 +239,7 @@ export const app = Bun.serve<WsData>({
         // Presence starts with the first presence message; until then the socket only pings.
         if (!ws.data.presence && String(message) === '{"type":"ping"}') {
           ws.send('{"type":"pong"}')
-        } else if (getAppConfig().environment === 'cloud' && ws.data.workspacePath) {
+        } else if (ws.data.workspacePath) {
           if (!ws.data.presence) {
             collabManager.open(ws, ws.data.workspacePath, {
               workspaceId: ws.data.workspaceId,
@@ -243,7 +254,9 @@ export const app = Bun.serve<WsData>({
       if (ws.data.channel === 'events') {
         try {
           const data = JSON.parse(String(message))
-          if (data?.type === 'scratchpad:op-result' && typeof data.opId === 'string') {
+          if (data?.type === 'remote-workspaces:updated') {
+            void syncRemoteWorkspacesInBackground()
+          } else if (data?.type === 'scratchpad:op-result' && typeof data.opId === 'string') {
             resolveScratchOp(data.opId, data.result, data.error)
           } else {
             navigationRelay.receive(ws, data)
@@ -322,6 +335,11 @@ setInterval(() => {
 // deleting an image in the browser (or an upload whose tab died) otherwise
 // leaves its file behind forever. See sweepOrphanAssets.
 startScratchpadSweeper()
+
+// Finish permanent deletions that came due while this machine was stopped, and
+// drop references to workspaces their owners have deleted.
+startTrashSweeper()
+startRemoteWorkspaceSync()
 
 // Under launchd the service log is a plain file nothing rotates — bound it
 // here. No-op outside the macOS service context.

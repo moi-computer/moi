@@ -3,7 +3,7 @@ import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-ut
 import { afterEach, expect, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
 import { setIdentity, getIdentity } from '../../identity/store'
-import { getCurrentUser } from '../host-state'
+import { getCurrentProfile } from '../host-state'
 import {
   setWorkspaceMembers,
   setAllWorkspaceMembers,
@@ -22,20 +22,25 @@ const alex = {
   email: 'alex@example.com',
   isAnonymous: false
 } as const
-const bot = { id: 'alex', type: 'agent', name: 'Bot', client: 'grok-bot' } as const
+const bot = { id: 'bot', ownerId: 'alex', type: 'agent', name: 'Bot', client: 'grok-bot' } as const
 afterEach(() => {
   setIdentity(null)
   queryClient.clear()
 })
-test('pre-mount snapshots are stored and separate user and agent ids', () => {
+test('cloud members retain their IDs and expose type and agent owner', () => {
   setIdentity(alex)
   setWorkspaceMembers('one', { members: [alex, bot], invitations: [] })
   expect(getWorkspaceMembers('one')).toEqual({ members: [alex, bot], invitations: [] })
-  expect(getWorkspaceDirectory('one')?.map(user => user.id)).toEqual(['alex', 'agent:alex'])
-  expect(getWorkspaceDirectory('one')?.find(profile => profile.id === 'agent:alex')?.avatar).toBe(
+  expect(getWorkspaceDirectory('one')?.map(({ id, type, ownerId }) => [id, type, ownerId])).toEqual(
+    [
+      ['alex', 'user', undefined],
+      ['bot', 'agent', 'alex']
+    ]
+  )
+  expect(getWorkspaceDirectory('one')?.find(profile => profile.id === 'bot')?.avatar).toBe(
     grokBotIcon
   )
-  expect(getCurrentUser()?.id).toBe('alex')
+  expect(getCurrentProfile()?.id).toBe('alex')
 })
 test('per-workspace directory does not leak members or replace viewer', () => {
   setIdentity(alex)
@@ -57,6 +62,12 @@ test('account switch removes previous membership snapshots', () => {
 test('invalid snapshot publishes nothing', () => {
   setIdentity(alex)
   expect(() => parseWorkspaceMembers({ members: [alex, alex], invitations: [] })).toThrow()
+  expect(() =>
+    parseWorkspaceMembers({ members: [alex, { ...bot, id: alex.id }], invitations: [] })
+  ).toThrow()
+  expect(() =>
+    parseWorkspaceMembers({ members: [{ ...bot, ownerId: 7 }], invitations: [] })
+  ).toThrow()
   expect(getWorkspaceDirectory('one')).toBeUndefined()
 })
 test('sharing snapshots replace members and omitted workspaces become owner-only', () => {
@@ -105,7 +116,7 @@ test('optimistic pending actions are derived over the newest snapshot without mu
   expect(applyPendingMembership(pushed, [])).toEqual(pushed)
 })
 
-test('shared workspaces are listed under the owner address and lose access when omitted', () => {
+test('remote workspaces are listed under the owner address and lose access when omitted', () => {
   setIdentity(alex)
   const id = 'visitor-board'
   seedWorkspaceInfo(id, { user_id: 'host', workspace_id: 'board' })

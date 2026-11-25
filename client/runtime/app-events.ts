@@ -1,3 +1,4 @@
+import { wsUrl } from '@/client/lib/ws-url'
 import type { ClientEvent } from '@/lib/events'
 
 import { ReconnectingSocket } from './reconnecting-socket'
@@ -17,11 +18,15 @@ export class AppEventsClient {
   private readonly socket: ReconnectingSocket
   private release: (() => void) | undefined
   private shownWorkspace: string | undefined
+  private remoteSyncPending = false
 
-  constructor(url: string, options: AppEventsClientOptions = {}) {
-    this.socket = new ReconnectingSocket(() => url, { baseDelayMs: options.reconnectBaseDelayMs })
+  constructor(url?: string, options: AppEventsClientOptions = {}) {
+    this.socket = new ReconnectingSocket(() => url ?? wsUrl('/api/events'), {
+      baseDelayMs: options.reconnectBaseDelayMs
+    })
     this.socket.subscribe({
       open: () => {
+        if (this.remoteSyncPending) this.syncRemoteWorkspaces()
         this.sendNavigationPresence()
         this.emit({ type: 'app:connected' })
       },
@@ -49,6 +54,11 @@ export class AppEventsClient {
     for (const handler of this.listeners) handler(event)
   }
 
+  // Cloud can notify us before React mounts or while the machine socket reconnects.
+  syncRemoteWorkspaces() {
+    this.remoteSyncPending = !this.socket.send({ type: 'remote-workspaces:updated' })
+  }
+
   send(message: object) {
     this.socket.send(message)
   }
@@ -73,3 +83,5 @@ export class AppEventsClient {
     })
   }
 }
+
+export const appEvents = new AppEventsClient()

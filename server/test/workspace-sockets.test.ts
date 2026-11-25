@@ -1,3 +1,4 @@
+import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type { ServerEvent } from '@/lib/events'
 import { expect, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -79,7 +80,9 @@ test('real socket routes isolate shared workspaces, personal state, harness even
       cwd: join(import.meta.dir, '../..'),
       env: {
         ...process.env,
+        HOST: '127.0.0.1',
         MOI_DATA_DIR: root,
+        MOI_DEV: '1',
         MOI_ENVIRONMENT: 'local',
         MOI_SECRET_BACKEND: 'file',
         PORT: String(port),
@@ -228,7 +231,8 @@ test('real socket routes isolate shared workspaces, personal state, harness even
     )
     expect(await scratch.promise).toEqual({ ok: true })
     expect(harness!.messages).toEqual([])
-    expect(one!.messages).toEqual([])
+    await until(() => one!.messages.some(message => message.code === 'invalid_message'))
+    expect(one!.messages.map(message => message.type)).toEqual(['error'])
     expect(two!.messages).toEqual([])
 
     // Register on both transports. Only the machine channel can become a navigation target.
@@ -251,6 +255,33 @@ test('real socket routes isolate shared workspaces, personal state, harness even
     expect(one!.messages.some(message => message.type === 'navigation:request')).toBe(false)
     expect(two!.messages.some(message => message.type === 'navigation:request')).toBe(false)
     expect((await fetch(`http://127.0.0.1:${port}/api/workspaces/visitor/events`)).status).toBe(404)
+
+    const workspaceSocket = '/api/workspaces/one/events'
+    const response = await fetch(`http://127.0.0.1:${port}${workspaceSocket}`, {
+      headers: { Origin: 'https://other.example' }
+    })
+    expect(response.status).toBe(403)
+    const second = await connect(base + workspaceSocket)
+    sockets.push(second.socket)
+    const profiles = ['anna', 'boris'].map(id => ({ id, type: 'user', color: 'blue' }))
+    for (const [index, connection] of [one!, second].entries()) {
+      connection.socket.send(
+        JSON.stringify({ type: 'join', version: COLLAB_PROTOCOL_VERSION, profile: profiles[index] })
+      )
+    }
+    for (const { messages } of [one!, second]) {
+      await until(() =>
+        messages.some(
+          message =>
+            message.type === 'connections' &&
+            Array.isArray(message.profiles) &&
+            message.profiles.length === 2
+        )
+      )
+      expect(messages).toContainEqual(
+        expect.objectContaining({ type: 'connections', profiles: expect.arrayContaining(profiles) })
+      )
+    }
   } finally {
     for (const socket of sockets) socket.close()
     child.kill('SIGTERM')

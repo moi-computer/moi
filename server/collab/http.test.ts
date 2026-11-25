@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -9,6 +9,7 @@ import type { WorkspaceEntry } from '@/lib/types'
 import { api } from '../api'
 import { clientAppConfig, initializeAppConfig, resetAppConfig } from '../app-config'
 import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../workspaces/registry'
+import * as remote from '../remote/client'
 import { collabManager, type ClientSocket } from './manager'
 import { collabSkillReferencePath } from './skill'
 
@@ -49,6 +50,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  mock.restore()
   await collabManager.stopWorkspace(workspace.path)
   await until(
     () => !collabManager.debugSnapshot().some(slot => slot.workspacePath === canonicalPath)
@@ -98,7 +100,7 @@ describe('collab HTTP integration', () => {
       JSON.stringify({
         type: 'join',
         version: 1,
-        profile: { id: 'anna', name: 'Anna', color: 'blue' }
+        profile: { type: 'user', id: 'anna', name: 'Anna', color: 'blue' }
       })
     )
     try {
@@ -175,9 +177,10 @@ describe('collab HTTP integration', () => {
   })
 
   test.each(['existing', 'missing-directory', 'missing-symlink'])(
-    'removing a workspace closes joined sockets and stops its worker (%s)',
+    'deleting a workspace closes joined sockets and stops its worker (%s)',
     async state => {
       useCloudConfig()
+      spyOn(remote, 'clearWorkspaceAccess').mockResolvedValue({ success: true })
       if (state === 'missing-symlink') {
         workspace.path = join(fixtureRoot, 'workspace-link')
         await symlink(directory, workspace.path, 'dir')
@@ -208,7 +211,7 @@ describe('collab HTTP integration', () => {
           JSON.stringify({
             type: 'join',
             version: 1,
-            profile: { id: 'anna', name: 'Anna', color: 'blue' }
+            profile: { type: 'user', id: 'anna', name: 'Anna', color: 'blue' }
           })
         )
         await until(() => messages.some(message => message.type === 'welcome'))
@@ -234,7 +237,7 @@ describe('collab HTTP integration', () => {
     }
   )
 
-  test('removing a missing workspace without a presence room succeeds', async () => {
+  test('deleting a missing workspace without a presence room succeeds', async () => {
     await rm(directory, { recursive: true })
     expect(
       (await api.request(`/api/workspaces/${workspace.id}`, { method: 'DELETE' })).status
@@ -265,7 +268,7 @@ describe('collab HTTP integration', () => {
       JSON.stringify({
         type: 'join',
         version: 1,
-        profile: { id: 'anna', name: 'Anna', color: 'blue' }
+        profile: { type: 'user', id: 'anna', name: 'Anna', color: 'blue' }
       })
     )
     await until(() => messages.some(message => message.type === 'welcome'))

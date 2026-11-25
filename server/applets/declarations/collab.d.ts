@@ -3,7 +3,7 @@ declare module 'moi/collab' {
   import type { ReactElement, ReactNode } from 'react'
   import type { JsonValue } from 'moi'
 
-  export type UserColor =
+  export type ProfileColor =
     | 'pink'
     | 'orange'
     | 'amber'
@@ -12,27 +12,30 @@ declare module 'moi/collab' {
     | 'cyan'
     | 'blue'
     | 'violet'
-  export type UserProfile = {
+  export type Profile = {
     id: string
-    color: UserColor
+    type: 'user' | 'agent'
+    // Person who owns this agent, when supplied by the cloud.
+    ownerId?: string
+    color: ProfileColor
     name?: string
     email?: string
     avatar?: string
   }
   export type ConnectionStatus = 'active' | 'away'
-  export type UserStatus = ConnectionStatus | 'offline'
-  export type WorkspaceUser = UserProfile & { status: UserStatus }
+  export type MemberStatus = ConnectionStatus | 'offline'
+  export type MemberProfile = Profile & { status: MemberStatus }
   export type UsePeersOptions = { scope?: 'page' | 'workspace'; status?: ConnectionStatus }
-  export type UseWorkspaceUsersOptions = { status?: UserStatus }
+  export type UseWorkspaceMembersOptions = { status?: MemberStatus }
 
-  // Peers are connected users, deduplicated across tabs, excluding your own user.
-  export function useMe(): WorkspaceUser | undefined
-  export function useUser(id: string): WorkspaceUser | undefined
-  export function usePeers(options?: UsePeersOptions): WorkspaceUser[]
-  // Full workspace directory, including your own user and offline users.
-  export function useWorkspaceUsers(options?: UseWorkspaceUsersOptions): WorkspaceUser[]
+  // Peers are other connected members, counted once across tabs.
+  export function useMe(): MemberProfile | undefined
+  export function useMember(id: string): MemberProfile | undefined
+  export function usePeers(options?: UsePeersOptions): MemberProfile[]
+  // Full workspace directory, including yourself and offline members.
+  export function useWorkspaceMembers(options?: UseWorkspaceMembersOptions): MemberProfile[]
 
-  export type PresenceValue<T> = { connectionId: string; userId: string; value: T }
+  export type PresenceValue<T> = { connectionId: string; identityId: string; value: T }
   // Reading never registers or publishes presence. Values belong to connections.
   export function usePresence<T extends JsonValue>(channel: string): PresenceValue<T>[]
   // Publishes the current value reactively, releasing it on hide or unmount.
@@ -62,27 +65,27 @@ declare module 'moi/collab' {
   // Adds a namespace and a local gutter animation group; no DOM or publication.
   export type PresenceGroupProps = { id: string; children: ReactNode }
   export function PresenceGroup(props: PresenceGroupProps): ReactElement
-  export type UserAvatarProps = {
+  export type ProfileAvatarProps = {
     id: string
     size?: 'xs' | 'sm' | 'default' | 'lg'
     // Show a status dot when active. Defaults to false.
     showStatusBadge?: boolean
     className?: string
   }
-  export function UserAvatar(props: UserAvatarProps): ReactElement
-  export type UserProps = Pick<UserAvatarProps, 'id' | 'showStatusBadge' | 'className'> & {
+  export function ProfileAvatar(props: ProfileAvatarProps): ReactElement
+  export type ProfileProps = Pick<ProfileAvatarProps, 'id' | 'showStatusBadge' | 'className'> & {
     size?: 'xs' | 'sm' | 'default'
-    // Show a "(You)" label beside the current user's name. Defaults to false.
+    // Show a "(You)" label beside the current member’s name. Defaults to false.
     showYouLabel?: boolean
     // Secondary text alongside or below the name.
     description?: ReactNode
   }
-  export function User(props: UserProps): ReactElement
-  export type UserAvatarGroupProps = {
+  export function Profile(props: ProfileProps): ReactElement
+  export type ProfileAvatarGroupProps = {
     ids: readonly string[]
     max?: number
-    size?: UserAvatarProps['size']
+    size?: ProfileAvatarProps['size']
     className?: string
   }
-  export function UserAvatarGroup(props: UserAvatarGroupProps): ReactElement
+  export function ProfileAvatarGroup(props: ProfileAvatarGroupProps): ReactElement
 }

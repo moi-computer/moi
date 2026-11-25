@@ -1,9 +1,12 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
-import { wsUrl } from '@/client/lib/ws-url'
+import { workspaceKeys } from '@/client/api/workspace-keys'
+import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { AppContext, type AppContextValue } from '@/client/runtime/app-context'
-import { AppEventsClient } from '@/client/runtime/app-events'
+import { appEvents } from '@/client/runtime/app-events'
+
+const appContext: AppContextValue = { events: appEvents }
 
 type AppProviderProps = {
   children: ReactNode
@@ -12,28 +15,30 @@ type AppProviderProps = {
 // App-wide events outlive workspace routes.
 export function AppProvider({ children }: AppProviderProps) {
   const queryClient = useQueryClient()
-  const [value] = useState<AppContextValue>(() => ({
-    events: new AppEventsClient(wsUrl('/api/events'))
-  }))
 
   useEffect(() => {
-    const unsubscribe = value.events.subscribe(event => {
+    const unsubscribe = appEvents.subscribe(async event => {
       if (event.type === 'app:connected') {
-        for (const queryKey of [
-          ['workspaces'],
-          ['workspaces', 'state'],
-          ['workspaces', 'env'],
-          ['app-settings']
-        ])
+        for (const queryKey of [['workspaces', 'state'], ['workspaces', 'env'], ['app-settings']])
           void queryClient.invalidateQueries({ queryKey, exact: queryKey.length === 1 })
       }
+      if (
+        event.type === 'app:connected' ||
+        event.type === 'workspace-config:changed' ||
+        (event.type === 'workspaces-list:changed' && event.origin !== BROWSER_TAB_ID)
+      ) {
+        const list = { queryKey: workspaceKeys.all, exact: true }
+        // Invalidation alone reuses a pending first request, which can predate revocation.
+        await queryClient.cancelQueries(list)
+        void queryClient.invalidateQueries(list)
+      }
     })
-    value.events.connect()
+    appEvents.connect()
     return () => {
       unsubscribe()
-      value.events.close()
+      appEvents.close()
     }
-  }, [value, queryClient])
+  }, [queryClient])
 
-  return <AppContext value={value}>{children}</AppContext>
+  return <AppContext value={appContext}>{children}</AppContext>
 }

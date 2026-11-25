@@ -1,26 +1,31 @@
-import type { UserProps as UserContainerProps } from 'moi/collab'
+import type { ProfileProps as ProfileContainerProps } from 'moi/collab'
 import type { ReactNode } from 'react'
-import type { UserProfile } from '@/lib/collab/types'
+import type { Profile as ProfileData } from '@/lib/collab/types'
 import { cn } from '@/client/lib/cn'
-import { UserAvatar } from './user-avatar'
-import { userDisplayName } from '@/client/lib/user-display-name'
-import { useMe, useUser } from '../presence/hooks'
+import { ProfileAvatar } from './profile-avatar'
+import { profileDisplayName } from '@/client/lib/profile-display-name'
+import { useMe, useMember } from '../presence/hooks'
 
-export function UserContainer({ id, showStatusBadge, showYouLabel, ...props }: UserContainerProps) {
-  const user = useUser(id)
+export function ProfileContainer({
+  id,
+  showStatusBadge,
+  showYouLabel,
+  ...props
+}: ProfileContainerProps) {
+  const profile = useMember(id)
   const me = useMe()
   return (
-    <User
+    <Profile
       {...props}
-      profile={user}
-      active={showStatusBadge && user?.status === 'active'}
-      showYouLabel={showYouLabel && user !== undefined && user.id === me?.id}
+      profile={profile}
+      active={showStatusBadge && profile?.status === 'active'}
+      showYouLabel={showYouLabel && profile !== undefined && profile.id === me?.id}
     />
   )
 }
 
-export type UserProps = {
-  profile?: UserProfile
+export type ProfileProps = {
+  profile?: ProfileData
   size?: 'xs' | 'sm' | 'default'
   active?: boolean
   showYouLabel?: boolean
@@ -28,24 +33,24 @@ export type UserProps = {
   className?: string
 }
 
-export function User({
-  profile: user,
+export function Profile({
+  profile,
   size = 'default',
   active,
   showYouLabel,
   description,
   className
-}: UserProps) {
-  const name = user ? userDisplayName(user) : 'Unknown user'
+}: ProfileProps) {
+  const name = profile ? profileDisplayName(profile) : 'Unknown member'
 
   return (
     <span className={cn('flex min-w-0 items-center gap-2', className)}>
-      <UserAvatar profile={user} size={size} active={active} />
+      <ProfileAvatar profile={profile} size={size} active={active} />
       <span
         className={cn('flex min-w-0 flex-1 text-sm', size === 'xs' ? 'items-baseline' : 'flex-col')}
       >
         <span className="flex min-w-0 items-baseline gap-1">
-          <span className={cn('truncate', !user && 'text-muted-foreground')}>{name}</span>
+          <span className={cn('truncate', !profile && 'text-muted-foreground')}>{name}</span>
           {showYouLabel && <span className="shrink-0 text-muted-foreground">(You)</span>}
         </span>
         {description && (

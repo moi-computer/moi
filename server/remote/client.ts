@@ -81,8 +81,8 @@ const remoteSchema = z.object({
 const configSchema = z.object({ remote: remoteSchema.optional() })
 type RemoteConfig = { url: string; clientId: string; managed: boolean }
 export type Profile = z.infer<typeof profileSchema>
-export type SharedWorkspace = { id: string; owner: z.infer<typeof humanProfileSchema> }
-export type RemoteStatus = { me: Profile; workspaces: SharedWorkspace[] }
+export type RemoteWorkspace = { id: string; owner: z.infer<typeof humanProfileSchema> }
+export type RemoteStatus = { me: Profile; workspaces: RemoteWorkspace[] }
 const CLOUD_URL = 'https://moi.computer/cloud'
 const LEGACY_ORIGIN = 'https://run.moi.computer'
 
@@ -183,7 +183,7 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
       value = await Bun.file(authFile).json()
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT')
-        throw new CloudSignInRequired('Sign in with moi remote login to see shared workspaces')
+        throw new CloudSignInRequired('Sign in with moi remote login to see remote workspaces')
       throw new Error('Could not read remote credentials — run moi remote login')
     }
     const parsed = credentialsSchema.safeParse(value)
@@ -666,11 +666,16 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
     )
   }
 
-  /** Read accepted shared workspaces using this machine's configured cloud login.
+  const done = z.object({ success: z.literal(true) })
+  async function clearWorkspaceAccess(workspaceId: string) {
+    return request(cloudRoutes.workspace.path(workspaceId), undefined, done, 'DELETE')
+  }
+
+  /** Read accepted remote workspaces using this machine's configured cloud login.
    * Refreshes credentials automatically; requires no browser or running Moi server.
    */
-  async function fetchSharedWorkspaces(): Promise<SharedWorkspace[]> {
-    return (await request(cloudRoutes.sharedWorkspaces.path(), undefined, workspacesSchema))
+  async function fetchRemoteWorkspaces(): Promise<RemoteWorkspace[]> {
+    return (await request(cloudRoutes.remoteWorkspaces.path(), undefined, workspacesSchema))
       .workspaces
   }
 
@@ -690,11 +695,11 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
   }
 
   async function remoteStatus(): Promise<RemoteStatus> {
-    const [me, shared] = await Promise.all([
+    const [me, { workspaces }] = await Promise.all([
       request(cloudRoutes.me.path(), undefined, profileSchema),
-      request(cloudRoutes.sharedWorkspaces.path(), undefined, workspacesSchema)
+      request(cloudRoutes.remoteWorkspaces.path(), undefined, workspacesSchema)
     ])
-    return { me, workspaces: shared.workspaces }
+    return { me, workspaces }
   }
 
   return {
@@ -704,13 +709,14 @@ export function createRemoteClient(directory: string, broker?: RemoteBroker) {
     send,
     login,
     logout,
-    fetchSharedWorkspaces,
+    fetchRemoteWorkspaces,
     remoteRequest,
     remoteStatus,
     invitations,
     accept,
     renameAgent,
-    leave
+    leave,
+    clearWorkspaceAccess
   }
 }
 
@@ -723,11 +729,12 @@ export const {
   cloudUrl,
   login,
   logout,
-  fetchSharedWorkspaces,
+  fetchRemoteWorkspaces,
   remoteRequest,
   remoteStatus,
   invitations,
   accept,
   renameAgent,
-  leave
+  leave,
+  clearWorkspaceAccess
 } = createRemoteClient(DATA_DIR, ownsDataDir ? undefined : controlBroker)

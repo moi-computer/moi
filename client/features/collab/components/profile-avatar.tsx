@@ -1,56 +1,55 @@
-import type { UserAvatarProps as UserAvatarContainerProps } from 'moi/collab'
-import type { UserProfile } from '@/lib/collab/types'
+import type { ProfileAvatarProps as ProfileAvatarContainerProps } from 'moi/collab'
+import type { Profile } from '@/lib/collab/types'
 import { IconRobotFace, IconUser } from '@tabler/icons-react'
 import { Blobatar } from '@blobatar/react'
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/ui-components/avatar'
 import { cn } from '@/client/lib/cn'
-import { userDisplayName } from '@/client/lib/user-display-name'
-import { isAgentProfileId } from '@/lib/ids'
-import { useUser } from '../presence/hooks'
+import { profileDisplayName } from '@/client/lib/profile-display-name'
+import { useMember } from '../presence/hooks'
 
-export function UserAvatarContainer({
+export function ProfileAvatarContainer({
   id,
   size,
   showStatusBadge,
   className
-}: UserAvatarContainerProps) {
-  const user = useUser(id)
+}: ProfileAvatarContainerProps) {
+  const profile = useMember(id)
   return (
-    <UserAvatar
-      profile={user}
+    <ProfileAvatar
+      profile={profile}
       size={size}
-      active={showStatusBadge && user?.status === 'active'}
+      active={showStatusBadge && profile?.status === 'active'}
       className={className}
     />
   )
 }
 
-export type UserAvatarProps = {
-  profile?: UserProfile
+export type ProfileAvatarProps = {
+  profile?: Profile
   size?: 'xs' | 'sm' | 'default' | 'lg'
   className?: string
   active?: boolean
 }
 
-export function UserAvatar({
-  profile: user,
+export function ProfileAvatar({
+  profile,
   size = 'default',
   className,
   active
-}: UserAvatarProps) {
-  const agent = user && isAgentProfileId(user.id)
-  const name = user ? userDisplayName(user) : 'Unknown user'
+}: ProfileAvatarProps) {
+  const agent = profile?.type === 'agent'
+  const name = profile ? profileDisplayName(profile) : 'Unknown member'
 
   return (
     <Avatar size={size} aria-label={name} className={cn('after:border-0', className)}>
-      {user?.avatar && <AvatarImage src={user.avatar} alt="" />}
+      {profile?.avatar && <AvatarImage src={profile.avatar} alt="" />}
       <AvatarFallback className={agent ? 'bg-muted' : undefined}>
         {agent ? (
           <IconRobotFace className="text-foreground" size={size === 'xs' ? 12 : 16} stroke={1.75} />
-        ) : user ? (
+        ) : profile ? (
           <Blobatar
             className="scale-150"
-            name={user.id}
+            name={profile.id}
             animate="hover"
             background="circle"
             palette={{

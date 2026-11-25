@@ -98,6 +98,8 @@ window.moi.workspaceMembers.setAll([{ id: address, members, invitations }])
 window.moi.workspaceMembers.set(address, { members, invitations })
 window.moi.workspaceMembers.remove(address)
 window.moi.workspaceMembers.clear()
+
+window.moi.remoteWorkspaces.sync() // Relay a remote workspace membership change to this machine
 ```
 
 A workspace is named by its address: `workspaceId` on the account's own machine, and `ownerId:workspaceId` for a workspace someone shared with the account.
@@ -110,11 +112,11 @@ The page starts in this order:
 
 The cloud inserts its module just before `#moi-start`. It also loads `/cloud/bridge.js` for later updates; that download does not hold up rendering. There is no temporary global payload or readiness polling. If either setter is unavailable, initialization does nothing.
 
-`setAll()` replaces the full sharing collection, which is the only source of member lists: the account's own workspaces and every workspace shared with it. An own workspace omitted from it has no invited members; the machine owner still has access. A shared workspace omitted from it is no longer accessible, and its list becomes empty. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
+`setAll()` replaces the full sharing collection, which is the only source of member lists: the account's own workspaces and every workspace shared with it. An own workspace omitted from it has no invited members; the machine owner still has access. A remote workspace omitted from it is no longer accessible, and its list becomes empty. `set()` replaces the complete member list for one workspace. `remove()` forgets one workspace's list; `clear()` forgets all of them. These methods update what the frontend knows; they do not change access on the server.
 
 When sharing records are removed, existing member lists receive the owner-only replacement immediately. If ownership has not been established, the replacement is empty. This keeps mounted views and live presence in sync.
 
-People and agents use the same basic profile: ID, type, name, and avatar. People can also have an email. Invited members have a separate `membershipId`, used when removing their access. The owner has no membership record.
+People and agents use the same basic profile: ID, type, name, and avatar. People can also have an email. An agent can carry an optional `ownerId` identifying the person who owns the agent. Collaboration hooks preserve the cloud identity ID and its `user` or `agent` type. Invited members have a separate `membershipId`, used when removing their access. The owner has no membership record.
 
 Revision helpers, `identity.getRevision()` and `workspaceMembers.getRevision()`, help the cloud avoid replacing new data with an old response.
 
@@ -124,7 +126,7 @@ Components read the data through hooks:
 
 ```tsx
 const me = useIdentity()
-const { members, invitations, isPending } = useWorkspaceMembers(workspaceId)
+const { members, invitations, isPending } = useWorkspaceMembership(workspaceId)
 ```
 
 They use the shared mutation hook for actions:
@@ -136,20 +138,14 @@ action.mutate({ type: 'remove', membershipId })
 action.mutate({ type: 'revoke', invitationId })
 ```
 
-`useWorkspaceMembers` reads what the cloud last published and is pending until the first `setAll()`. Actions call the cloud URLs above. Moi shows pending changes immediately and undoes them if the request fails. A confirmed change is written into the store at once, and the cloud's next snapshot replaces it. Switching accounts clears the previous account's data. The cloud checks permission for every action.
+`useWorkspaceMembership` reads what the cloud last published and is pending until the first `setAll()`. Actions call the cloud URLs above. Moi shows pending changes immediately and undoes them if the request fails. A confirmed change is written into the store at once, and the cloud's next snapshot replaces it. Switching accounts clears the previous account's data. The cloud checks permission for every action.
 
 ### Collaboration
 
-The collaboration engine combines this workspace's members with live connections. Members supply names and avatars; connections supply online status, the current page, and cursor or focus activity. A connection cannot add someone to the member list. `useMe()` reads the current identity; `useWorkspaceUsers()` and `usePeers()` are scoped to the active workspace.
+The collaboration engine combines this workspace's members with live connections. Members supply names and avatars; connections supply online status, the current page, and cursor or focus activity. A connection cannot add someone to the member list. `useMe()` reads the current identity; `useWorkspaceMembers()` and `usePeers()` are scoped to the active workspace.
 
 Cloud collaboration waits until the current identity appears in the workspace's members. Removing that member clears their visible presence and closes this tab's connection. The cloud authenticates access to the owner's machine. Signed identity forwarding to Moi is deferred; frontend membership data is not an access token.
 
 Cloud deployments enable presence and sharing automatically. Cloud workspace setup and skill updates install the collaboration guide and applet types. Local deployments keep a local profile and leave presence disconnected.
 
 The code lives in [identity](../client/features/identity/store.ts), [the frontend API](../client/features/identity/host-api.ts), and [workspace member hooks](../client/features/collab/members/hooks.ts). The [workspace sharing menu](../client/features/collab/sharing/workspace-sharing-menu.tsx) manages invitations and members. [Profile settings](../client/features/app-settings/profile-settings.tsx) manages the user's name and avatar.
-
-## Test collaboration locally
-
-Run `bun run dev:collab` from the Moi checkout. Open the **Anna** and **Boris** URLs printed in the terminal in two tabs or browsers. Both open the same temporary workspace. Each URL keeps its identity on reload. Close one tab to test how its user appears offline.
-
-The command runs a separate Moi server on ports 13338 and 13060 and prints the workspace folder for applet development. It uses the normal workspace APIs and presence WebSocket. The two profiles and their membership are fixtures. Sign-in, invitations, and membership changes require Moi Cloud. Restarting the command creates a fresh workspace.

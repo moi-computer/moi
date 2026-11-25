@@ -21,7 +21,7 @@ import type {
 
 export type { WorkspaceLayoutResponse } from '@/lib/types'
 
-// One info query per API address, shared by discovery and the workspace loader.
+// The workspace list and loader share one info query per API address.
 export function workspaceInfoOptions(apiBase: string) {
   const address = decodeURIComponent(apiBase.slice('/api/workspaces/'.length))
   return {

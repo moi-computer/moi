@@ -1,9 +1,9 @@
-import type { UserColor } from 'moi/collab'
+import type { ProfileColor } from 'moi/collab'
 
-export type { UserColor } from 'moi/collab'
+export type { ProfileColor } from 'moi/collab'
 
-// The eight Tailwind palette names available for users. Their shades live in CSS.
-export const USER_COLORS = [
+// The eight Tailwind palette names available for profiles. Their shades live in CSS.
+export const PROFILE_COLORS = [
   'pink',
   'orange',
   'amber',
@@ -12,19 +12,19 @@ export const USER_COLORS = [
   'cyan',
   'blue',
   'violet'
-] as const satisfies readonly UserColor[]
+] as const satisfies readonly ProfileColor[]
 
-export function isUserColor(value: unknown): value is UserColor {
-  return typeof value === 'string' && (USER_COLORS as readonly string[]).includes(value)
+export function isProfileColor(value: unknown): value is ProfileColor {
+  return typeof value === 'string' && (PROFILE_COLORS as readonly string[]).includes(value)
 }
 
-// A random-looking but stable pick (FNV-1a), so a user id gets the same color
+// A random-looking but stable pick (FNV-1a), so an identity ID gets the same color
 // on the server and in every browser.
-export function colorForId(id: string): UserColor {
+export function colorForId(id: string): ProfileColor {
   let hash = 0x811c9dc5
   for (let index = 0; index < id.length; index++) {
     hash ^= id.charCodeAt(index)
     hash = Math.imul(hash, 0x01000193)
   }
-  return USER_COLORS[(hash >>> 0) % USER_COLORS.length] ?? USER_COLORS[0]
+  return PROFILE_COLORS[(hash >>> 0) % PROFILE_COLORS.length] ?? PROFILE_COLORS[0]
 }

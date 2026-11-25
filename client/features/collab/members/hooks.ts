@@ -35,7 +35,7 @@ export function applyPendingMembership(
   return { members, invitations }
 }
 // Member lists are published by the cloud host; this only reads what it last sent.
-export function useWorkspaceMembers(workspaceId: string | undefined) {
+export function useWorkspaceMembership(workspaceId: string | undefined) {
   // The owner-only list is built from the identity, so follow it too.
   useIdentity()
   const mutationKey = ['workspace-members-action', getAccountGeneration(), workspaceId]

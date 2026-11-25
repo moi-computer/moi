@@ -1,6 +1,6 @@
-import type { UserProfile } from '@/lib/collab/types'
+import type { Profile } from '@/lib/collab/types'
 
 // Presentation only: keep the supplied profile unchanged in applet APIs.
-export function userDisplayName(user: UserProfile): string {
+export function profileDisplayName(user: Profile): string {
   return user.name?.trim() || user.email?.trim() || user.id
 }

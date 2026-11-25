@@ -1,6 +1,6 @@
 import type { Connection } from '../lib/collab/types'
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, cp, symlink } from 'node:fs/promises'
+import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test'
+import { mkdtemp, mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -12,6 +12,7 @@ import {
 describe('owner startup', () => {
   let root: string
   let origin: string
+  let proxyOrigin: string
   let child: Bun.Subprocess
   let visitor: ReturnType<typeof Bun.serve>
   const remoteConfig = {
@@ -34,7 +35,19 @@ describe('owner startup', () => {
     await Bun.write(join(root, 'owner-board/.moi/count.json'), '7')
     await Bun.write(join(root, 'owner-board/.moi/launch-tasks.json'), '[{"done":true}]')
     await Bun.write(join(root, 'visitor/.moi/.workspace.json'), JSON.stringify(remoteConfig))
-    visitor = Bun.serve({ port: 0, fetch: () => Response.json([]) })
+    visitor = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const path = new URL(req.url).pathname
+        if (path === '/cloud/api/auth/get-session') {
+          const id = req.headers.get('cookie')
+          return Response.json(id ? { user: { id, isAnonymous: false } } : null)
+        }
+        if (path === '/api/workspaces' || path === '/api/workspaces/order')
+          return Response.json([{ id: 'existing', name: 'Existing workspace' }])
+        return Response.json([])
+      }
+    })
     const spawned = Bun.spawn([process.execPath, 'scripts/mock-remote-workspace.ts'], {
       cwd: join(import.meta.dir, '..'),
       env: {
@@ -42,7 +55,8 @@ describe('owner startup', () => {
         MOCK_OWNER_DATA_DIR: root,
         MOCK_VISITOR_ORIGIN: visitor.url.origin,
         MOCK_OWNER_PORT: '0',
-        MOCK_PROXY_PORT: '0'
+        MOCK_PROXY_PORT: '0',
+        MOCK_BATIOK_ORIGIN: visitor.url.origin
       },
       stdout: 'pipe',
       stderr: 'inherit'
@@ -51,10 +65,11 @@ describe('owner startup', () => {
     let output = ''
     const reader = spawned.stdout.getReader()
     try {
-      while (!origin) {
+      while (!origin || !proxyOrigin) {
         const chunk = await reader.read()
         if (chunk.done) throw new Error(`Mock exited: ${output}`)
         output += new TextDecoder().decode(chunk.value)
+        proxyOrigin = /Open Moi at (http:\/\/localhost:\d+)/.exec(output)?.[1] ?? ''
         origin = /Mock owner: (http:\/\/[^/]+)/.exec(output)?.[1] ?? ''
       }
     } finally {
@@ -66,6 +81,23 @@ describe('owner startup', () => {
     child?.kill('SIGTERM')
     if (child) await child.exited
     if (root) await rm(root, { recursive: true, force: true })
+  })
+  test('default startup includes an owned workspace you can delete and restore', async () => {
+    const request = (path: string, method = 'GET', cookie = 'visitor') =>
+      fetch(proxyOrigin + path, { method, headers: { cookie } })
+    const list = '/api/workspaces'
+    const [existing, workspace] = await (await request(list)).json()
+    expect(existing.id).toBe('existing')
+    expect(workspace.name).toBe('Test workspace')
+    const path = list + '/' + workspace.id
+    expect((await request(path, 'DELETE', 'other')).status).toBe(404)
+    expect((await request(path, 'DELETE', '')).status).toBe(401)
+    expect((await request(path, 'DELETE')).status).toBe(204)
+    expect(await (await request(list)).json()).toEqual([existing])
+    expect(await (await request(list + '/trash')).json()).toMatchObject([{ id: workspace.id }])
+    expect((await request(list + '/trash/' + workspace.id + '/restore', 'POST')).status).toBe(200)
+    expect(await (await request(list)).json()).toEqual([existing, workspace])
+    expect((await (await request(path + '?refresh=true')).json()).name).toBe('Test workspace')
   })
   test('owner provides two static launch widgets and a plan while preserving existing data', async () => {
     const layout = await (await fetch(origin + '/api/workspaces/owner-board')).json()
@@ -111,7 +143,7 @@ describe('owner startup', () => {
       if (message.type === 'welcome' || message.type === 'connections') {
         const active = message.connections
           .filter((connection: Connection) => connection.location?.status === 'active')
-          .map((connection: Connection) => connection.userId)
+          .map((connection: Connection) => connection.identityId)
         if (active.includes('alice')) peersActive.resolve()
       }
       if (message.type === 'workspace-config:changed') changed.resolve()
@@ -127,11 +159,11 @@ describe('owner startup', () => {
         JSON.stringify({
           type: 'join',
           version: 1,
-          profile: { id: 'visitor', name: 'Visitor', color: 'blue' }
+          profile: { type: 'user', id: 'visitor', name: 'Visitor', color: 'blue' }
         })
       )
       await peersActive.promise
-      expect(await agentActivity.promise).toEqual(['agent:launch-bot', 'agent:review-bot'])
+      expect(await agentActivity.promise).toEqual(['launch-bot', 'review-bot'])
       const state = await fetch(origin + '/api/workspaces/owner-board/state/tabs', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -162,12 +194,15 @@ const TestWebSocket = WebSocket as unknown as new (
   options: Bun.WebSocketOptions
 ) => WebSocket
 
-const cleanups: (() => void)[] = []
-afterEach(() => {
-  for (const cleanup of cleanups.splice(0).reverse()) cleanup()
+const cleanups: (() => unknown)[] = []
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
 
-async function setup() {
+async function setup(register?: (req: Request) => Promise<Response>) {
+  const referenceDir = await mkdtemp(join(tmpdir(), 'moi-proxy-reference-'))
+  cleanups.push(() => rm(referenceDir, { recursive: true, force: true }))
+  const referencePath = join(referenceDir, 'reference')
   const forwarded: string[] = []
   const batiok = Bun.serve({
     port: 0,
@@ -208,6 +243,7 @@ async function setup() {
           headers: { 'content-type': 'text/html' }
         })
       forwarded.push(path)
+      if (register && path === '/api/workspaces') return register(req)
       if (path === '/redirect')
         return new Response(null, {
           status: 302,
@@ -246,7 +282,7 @@ async function setup() {
     () => batiok.stop(true),
     () => owner.stop(true)
   )
-  const proxy = createMockRemoteProxy(batiok.url.origin, owner.url.origin)
+  const proxy = createMockRemoteProxy(batiok.url.origin, owner.url.origin, referencePath)
   await new Promise<void>(resolve => proxy.listen(0, '127.0.0.1', resolve))
   cleanups.push(() => {
     proxy.closeAllConnections()
@@ -261,7 +297,14 @@ async function setup() {
       headers: { cookie: 'session=visitor', ...init?.headers },
       redirect: 'manual'
     })
-  return { origin, request, forwarded, ownerRequests, batiokOrigin: batiok.url.origin }
+  return {
+    origin,
+    request,
+    forwarded,
+    ownerRequests,
+    referencePath,
+    batiokOrigin: batiok.url.origin
+  }
 }
 
 test('members can copy a fresh agent invite prompt for the mock workspace', async () => {
@@ -283,13 +326,30 @@ test('members can copy a fresh agent invite prompt for the mock workspace', asyn
   expect((await (await request(path, post)).json()).invitationUrl).not.toBe(link)
 })
 
-test('proxy supports invitation → accept → discovery and leaves registration on the visitor', async () => {
-  const { origin, request, forwarded } = await setup()
+test('visitor can accept, open and leave the mock workspace', async () => {
+  const { api } = await import('../server/api')
+  const { listWorkspaces, setRegistryPath, DEFAULT_REGISTRY_PATH } =
+    await import('../server/workspaces/registry')
+  const { codexHarness } = await import('../server/harness/codex')
+  const available = spyOn(codexHarness, 'availability').mockResolvedValue({ status: 'available' })
+  const { origin, request, forwarded, referencePath } = await setup(async req => {
+    if (req.method === 'POST') return api.fetch(req)
+    return Response.json(await listWorkspaces())
+  })
+  setRegistryPath(referencePath + '.registry.json')
+  cleanups.push(() => {
+    setRegistryPath(DEFAULT_REGISTRY_PATH)
+    available.mockRestore()
+  })
+  const remote = { user_id: 'alice', workspace_id: 'owner-board' }
+  const open = { method: 'POST', body: JSON.stringify({ remote, harness: 'codex' }) }
+  expect((await fetch(origin + '/api/workspaces', open)).status).toBe(401)
+  expect((await request('/api/workspaces', open)).status).toBe(404)
   expect((await fetch(origin + '/cloud/api/workspaces/invitations')).status).toBe(401)
   expect(
     (await (await request('/cloud/api/workspaces/invitations')).json()).invitations
   ).toHaveLength(1)
-  expect(await (await request('/cloud/api/workspaces/shared')).json()).toEqual({ workspaces: [] })
+  expect(await (await request('/cloud/api/workspaces/remote')).json()).toEqual({ workspaces: [] })
   expect(
     (
       await request('/cloud/api/invitations/mock-owner-invite/accept', {
@@ -301,15 +361,14 @@ test('proxy supports invitation → accept → discovery and leaves registration
   expect((await (await request('/cloud/api/workspaces/invitations')).json()).invitations).toEqual(
     []
   )
-  expect((await (await request('/cloud/api/workspaces/shared')).json()).workspaces[0].id).toBe(
+  expect((await (await request('/cloud/api/workspaces/remote')).json()).workspaces[0].id).toBe(
     'owner-board'
   )
-  const remote = { user_id: 'alice', workspace_id: 'owner-board' }
-  expect(
-    await (
-      await request('/api/workspaces', { method: 'POST', body: JSON.stringify({ remote }) })
-    ).json()
-  ).toEqual({ remote })
+  const registration = await request('/api/workspaces', open)
+  expect(registration.status).toBe(201)
+  const entry = await registration.json()
+  expect(entry).toMatchObject({ path: referencePath, remote, harness: 'codex' })
+  expect(await (await request('/api/workspaces')).json()).toMatchObject([{ id: entry.id }])
   expect(forwarded).toContain('/api/workspaces')
   const owner = await request(
     '/api/workspaces/alice:owner-board/rpc/counter/increment?revision=2',
@@ -329,6 +388,23 @@ test('proxy supports invitation → accept → discovery and leaves registration
   expect(redirect.status).toBe(302)
   expect(redirect.headers.get('location')).toBe('/cloud/login')
   expect(redirect.headers.get('set-cookie')).toContain('session=visitor')
+
+  const leavePath = `/api/workspaces/${entry.id}`
+  const leave = { method: 'DELETE' }
+  expect((await fetch(origin + leavePath, leave)).status).toBe(401)
+  expect((await request(leavePath, leave)).status).toBe(204)
+  expect(forwarded).not.toContain(leavePath)
+  expect(await (await request('/api/workspaces')).json()).toEqual([])
+  expect(await (await request('/cloud/api/workspaces/remote')).json()).toEqual({ workspaces: [] })
+  expect((await request('/api/workspaces/alice:owner-board')).status).toBe(404)
+  expect(await (await request('/cloud/api/workspaces/invitations')).json()).toEqual({
+    invitations: []
+  })
+  expect(
+    (await request('/cloud/api/invitations/mock-owner-invite/accept', { method: 'POST' })).status
+  ).toBe(404)
+  await request('/api/workspaces/other', leave)
+  expect(forwarded).toContain('/api/workspaces/other')
 })
 
 test('owner content and collaboration require accepted membership', async () => {
@@ -455,7 +531,7 @@ test('invitation acceptance reveals the share for that viewer and resets on rest
   expect(pending.invitations).toEqual([
     { id: 'mock-owner-invite', workspaceName: 'Product launch', inviter: { name: 'Alice' } }
   ])
-  expect(await (await cloud(request('workspaces/shared'))).json()).toEqual({ workspaces: [] })
+  expect(await (await cloud(request('workspaces/remote'))).json()).toEqual({ workspaces: [] })
   const accept = () => cloud(request('invitations/mock-owner-invite/accept', 'POST'))
   expect(await (await accept()).json()).toMatchObject({
     success: true,
@@ -463,12 +539,12 @@ test('invitation acceptance reveals the share for that viewer and resets on rest
   })
   await accept()
   expect(await (await cloud(request('workspaces/invitations'))).json()).toEqual({ invitations: [] })
-  expect(await (await cloud(request('workspaces/shared'))).json()).toEqual({
+  expect(await (await cloud(request('workspaces/remote'))).json()).toEqual({
     workspaces: [
       { id: 'owner-board', name: 'Product launch', owner: { id: 'alice', name: 'Alice' } }
     ]
   })
-  const sharing = request('workspaces/shared')
+  const sharing = request('workspaces/remote')
   const members = await (
     await cloud(new Request('http://localhost/mock/sharing/members', sharing))
   ).json()
@@ -476,14 +552,14 @@ test('invitation acceptance reveals the share for that viewer and resets on rest
     1
   )
   expect(
-    await (await cloud(request('workspaces/shared', 'GET', 'another-visitor'))).json()
+    await (await cloud(request('workspaces/remote', 'GET', 'another-visitor'))).json()
   ).toEqual({ workspaces: [] })
   expect(
     (await (await createMockRemoteInvitations()(request('workspaces/invitations'))).json())
       .invitations
   ).toHaveLength(1)
   expect(
-    (await cloud(new Request('http://localhost/mock/cloud/api/workspaces/shared'))).status
+    (await cloud(new Request('http://localhost/mock/cloud/api/workspaces/remote'))).status
   ).toBe(401)
 })
 
@@ -551,50 +627,17 @@ test('mock membership supports invites, revocation and removal while keeping the
   ])
 })
 
-test('startup reset unregisters only the mock and deletes only unmodified generated references', async () => {
+test('startup reset unregisters only the mock and preserves the visitor folder', async () => {
   const root = await mkdtemp(join(tmpdir(), 'moi-reset-test-'))
   const remote = { user_id: 'alice', workspace_id: 'owner-board' }
-  const hash = new Bun.CryptoHasher('sha256')
-    .update(JSON.stringify(['alice', 'owner-board']))
-    .digest('hex')
-    .slice(0, 12)
-  const name = `shared-owner-board-${hash}`
-  const paths = Object.fromEntries(
-    ['clean', 'extra', 'modified', 'linked', 'manual', 'owner', 'other'].map(id => [
-      id,
-      join(root, id, id === 'manual' ? 'my-project' : name)
-    ])
-  )
-  for (const path of Object.values(paths)) {
-    await mkdir(join(path, '.moi'), { recursive: true })
-    await Bun.write(join(path, '.moi/.workspace.json'), JSON.stringify({ version: 2, remote }))
-  }
-  await mkdir(join(paths.clean!, '.agents/skills'), { recursive: true })
-  await cp(join(import.meta.dir, '../skill'), join(paths.clean!, '.agents/skills/moi-workspace'), {
-    recursive: true
-  })
-  await mkdir(join(paths.clean!, '.claude/skills'), { recursive: true })
-  await symlink(
-    '../../.agents/skills/moi-workspace',
-    join(paths.clean!, '.claude/skills/moi-workspace')
-  )
-  await Bun.write(join(paths.extra!, 'notes.md'), 'Keep my notes')
-  await mkdir(join(paths.modified!, '.agents/skills/moi-workspace'), { recursive: true })
-  await Bun.write(
-    join(paths.modified!, '.agents/skills/moi-workspace/SKILL.md'),
-    'My custom instructions'
-  )
-  await symlink(paths.owner!, join(paths.linked!, 'owner-data'))
-  await Bun.write(
-    join(paths.owner!, '.moi/.workspace.json'),
-    '{"version":1,"name":"Product launch"}'
-  )
-  await Bun.write(join(paths.owner!, '.moi/launch-tasks.json'), '[{"done":true}]')
-  const entries = Object.entries(paths).map(([id, path]) => ({
-    id,
-    path,
-    remote: id === 'owner' ? undefined : id === 'other' ? { ...remote, user_id: 'bob' } : remote
-  }))
+  const path = join(root, 'visitor')
+  const config = Bun.file(join(path, '.moi/.workspace.json'))
+  await Bun.write(config, JSON.stringify({ version: 2, remote }))
+  const entries = [
+    { id: 'visitor', path, remote },
+    { id: 'owner', path: join(root, 'owner') },
+    { id: 'other', path: join(root, 'other'), remote: { ...remote, user_id: 'bob' } }
+  ]
   const registryPath = join(root, 'workspaces.json')
   await Bun.write(registryPath, JSON.stringify(entries))
   const visitor = Bun.serve({
@@ -610,16 +653,7 @@ test('startup reset unregisters only the mock and deletes only unmodified genera
       'owner',
       'other'
     ])
-    expect(await Bun.file(join(paths.clean!, '.moi/.workspace.json')).exists()).toBe(false)
-    expect(await Bun.file(join(paths.extra!, 'notes.md')).text()).toBe('Keep my notes')
-    expect(
-      await Bun.file(join(paths.modified!, '.agents/skills/moi-workspace/SKILL.md')).text()
-    ).toBe('My custom instructions')
-    expect(await Bun.file(join(paths.manual!, '.moi/.workspace.json')).exists()).toBe(true)
-    expect(await Bun.file(join(paths.linked!, '.moi/.workspace.json')).exists()).toBe(true)
-    expect(await Bun.file(join(paths.owner!, '.moi/launch-tasks.json')).json()).toEqual([
-      { done: true }
-    ])
+    expect(await config.json()).toEqual({ version: 2, remote })
     await resetMockRegistration(visitor.url.origin, registryPath)
     expect(await Bun.file(registryPath).json()).toHaveLength(2)
   } finally {

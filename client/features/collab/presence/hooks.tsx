@@ -7,70 +7,82 @@ import {
   useSyncExternalStore
 } from 'react'
 import type { JsonValue } from 'moi'
-import type { UserProfile } from '@/lib/collab/types'
+import type { Profile } from '@/lib/collab/types'
 import type { PresenceValue } from 'moi/collab'
 
 import { useAppletPresence, useCollabEngine } from './provider'
-import { resolvePeers, resolveUser, userStatus } from './users'
-import type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from './users'
+import { resolvePeers, resolveMember, memberStatus } from './member-profiles'
+import type { MemberProfile, UsePeersOptions, UseWorkspaceMembersOptions } from './member-profiles'
 import { createPresencePublisher } from './presence-publisher'
 
-export type { WorkspaceUser, UsePeersOptions, UseWorkspaceUsersOptions } from './users'
+export type { MemberProfile, UsePeersOptions, UseWorkspaceMembersOptions } from './member-profiles'
 
-const EMPTY_USERS: readonly UserProfile[] = []
+const EMPTY_PROFILES: readonly Profile[] = []
 
 export function useConnectionState() {
   const engine = useCollabEngine()
-  return useSyncExternalStore(engine.subscribe, engine.getUsersSnapshot, engine.getUsersSnapshot)
+  return useSyncExternalStore(
+    engine.subscribe,
+    engine.getProfilesSnapshot,
+    engine.getProfilesSnapshot
+  )
 }
-function useUsersSource() {
+function useProfileSource() {
   const engine = useCollabEngine()
   const state = useConnectionState()
   const self = useSyncExternalStore(
-    engine.subscribeCurrentUser,
-    engine.getCurrentUser,
-    engine.getCurrentUser
+    engine.subscribeCurrentProfile,
+    engine.getCurrentProfile,
+    engine.getCurrentProfile
   )
   const directory = useSyncExternalStore(
     engine.subscribeDirectory,
     engine.getDirectory,
     engine.getDirectory
   )
-  // Membership supplies profiles, including users who are currently offline.
-  const users = directory ?? EMPTY_USERS
-  return { state, self, users, engine }
+  // Membership supplies profiles, including profiles who are currently offline.
+  const profiles = directory ?? EMPTY_PROFILES
+  return { state, self, profiles, engine }
 }
-export function useUser(id: string): WorkspaceUser | undefined {
-  const { state, users } = useUsersSource()
-  return useMemo(() => resolveUser({ ...state, users }, id), [state, users, id])
+export function useMember(id: string): MemberProfile | undefined {
+  const { state, profiles } = useProfileSource()
+  return useMemo(() => resolveMember({ ...state, profiles }, id), [state, profiles, id])
 }
-export function useUsers(ids: readonly string[]): (WorkspaceUser | undefined)[] {
-  const { state, users } = useUsersSource()
-  return ids.map(id => resolveUser({ ...state, users }, id))
+export function useMembers(ids: readonly string[]): (MemberProfile | undefined)[] {
+  const { state, profiles } = useProfileSource()
+  return ids.map(id => resolveMember({ ...state, profiles }, id))
 }
-export function useWorkspaceUsers({ status }: UseWorkspaceUsersOptions = {}): WorkspaceUser[] {
-  const { state, users } = useUsersSource()
+export function useWorkspaceMembers({ status }: UseWorkspaceMembersOptions = {}): MemberProfile[] {
+  const { state, profiles } = useProfileSource()
   return useMemo(
     () =>
-      users
-        .map(user => resolveUser({ ...state, users }, user.id)!)
+      profiles
+        .map(user => resolveMember({ ...state, profiles }, user.id)!)
         .filter(user => !status || user.status === status),
-    [state, users, status]
+    [state, profiles, status]
   )
 }
-export function useMe(): WorkspaceUser | undefined {
-  const { state, self } = useUsersSource()
-  return useMemo(
-    () => (self ? { ...self, status: userStatus(state.connections, self.id) } : undefined),
-    [state, self]
-  )
+export function useMe(): MemberProfile | undefined {
+  const { state, self, profiles } = useProfileSource()
+  return useMemo(() => {
+    if (!self) return undefined
+    const ownerId =
+      self.type === 'agent'
+        ? (profiles.find(user => user.id === self.id)?.ownerId ?? self.ownerId)
+        : undefined
+    return {
+      ...self,
+      ...(ownerId && { ownerId }),
+      status: memberStatus(state.connections, self.id)
+    }
+  }, [state, self, profiles])
 }
-export function usePeers(options: UsePeersOptions = {}): WorkspaceUser[] {
-  const { state, self, users, engine } = useUsersSource()
+export function usePeers(options: UsePeersOptions = {}): MemberProfile[] {
+  const { state, self, profiles, engine } = useProfileSource()
   const { scope, status } = options
   return useMemo(
-    () => resolvePeers({ ...state, users }, self?.id, engine.getLocation(), { scope, status }),
-    [state, self, users, engine, scope, status]
+    () => resolvePeers({ ...state, profiles }, self?.id, engine.getLocation(), { scope, status }),
+    [state, self, profiles, engine, scope, status]
   )
 }
 export const presenceChannels = {
@@ -85,7 +97,7 @@ export function usePresence<T extends JsonValue>(channel: string): PresenceValue
   return usePresenceChannel<T>(presenceChannels.custom(channel))
 }
 export function usePresenceChannel<T extends JsonValue>(channel: string): PresenceValue<T>[] {
-  const { users, engine } = useUsersSource()
+  const { profiles, engine } = useProfileSource()
   const presence = useAppletPresence()
   const appletId = presence?.appletId ?? ''
   const snapshot = useCallback(
@@ -95,15 +107,15 @@ export function usePresenceChannel<T extends JsonValue>(channel: string): Presen
   const entries = useSyncExternalStore(engine.subscribe, snapshot, snapshot)
   return useMemo(() => {
     if (!presence?.active) return []
-    const known = new Set(users.map(user => user.id))
+    const known = new Set(profiles.map(user => user.id))
     return entries
-      .filter(entry => known.has(entry.userId))
+      .filter(entry => known.has(entry.identityId))
       .map(entry => ({
         connectionId: entry.connectionId,
-        userId: entry.userId,
+        identityId: entry.identityId,
         value: entry.value as T
       }))
-  }, [entries, users, presence])
+  }, [entries, profiles, presence])
 }
 
 // Internal imperative publisher for pointer/focus events. Ownership is per mount.

@@ -25,14 +25,14 @@ export function useTargetPresence(target: string, present?: boolean) {
   useLayoutEffect(() => {
     publish(present ?? ownsFocus(document.activeElement, root.current))
   }, [target, present, publish])
-  const users = new Map<string, { id: string; connectionId: string }>()
+  const peers = new Map<string, { id: string; connectionId: string }>()
   for (const entry of others) {
-    if (entry.value === true && !users.has(entry.userId)) {
-      users.set(entry.userId, { id: entry.userId, connectionId: entry.connectionId })
+    if (entry.value === true && !peers.has(entry.identityId)) {
+      peers.set(entry.identityId, { id: entry.identityId, connectionId: entry.connectionId })
     }
   }
   return {
-    users: [...users.values()],
+    peers: [...peers.values()],
     props: {
       ref: root,
       'data-collab-target': target,

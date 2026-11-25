@@ -4,10 +4,17 @@ import { allowedCloudRequest, cloudRoutes } from './routes'
 const workspace = { user_id: 'owner', workspace_id: 'board' }
 
 test('every path a route builds is allowed for each of its methods', () => {
-  const { files, scratchpadAsset, acceptInvitation, ...rest } = cloudRoutes
+  const {
+    files,
+    scratchpadAsset,
+    acceptInvitation,
+    workspace: ownedWorkspace,
+    ...rest
+  } = cloudRoutes
   const built = [
     [files, files.path(workspace, 'assets/my photo (1).png')],
     [scratchpadAsset, scratchpadAsset.path(workspace, 'image 1.png')],
+    [ownedWorkspace, ownedWorkspace.path('board')],
     [acceptInvitation, acceptInvitation.path('inv_1')],
     ...Object.values(rest).map(route => [route, route.path(workspace)] as const)
   ] as const

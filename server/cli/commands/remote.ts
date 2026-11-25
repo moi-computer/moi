@@ -13,7 +13,7 @@ import {
   logout as signOut,
   CloudSignInRequired,
   remoteStatus,
-  fetchSharedWorkspaces,
+  fetchRemoteWorkspaces,
   invitations as listInvitations,
   accept as acceptInvitation,
   renameAgent,
@@ -152,20 +152,20 @@ const invitations = defineCommand({
   }
 })
 const workspaces = defineCommand({
-  meta: { name: 'workspaces', description: 'List shared workspaces and pending invitations' },
+  meta: { name: 'workspaces', description: 'List remote workspaces and pending invitations' },
   args: { json: jsonArg },
   async run({ args }) {
     await reportErrors(async () => {
-      const [available, pending] = await Promise.all([fetchSharedWorkspaces(), listInvitations()])
+      const [available, pending] = await Promise.all([fetchRemoteWorkspaces(), listInvitations()])
       if (args.json) {
         console.log(JSON.stringify({ workspaces: available, invitations: pending }, null, 2))
         return
       }
-      console.log('\n' + pc.bold('Available shared workspaces') + '\n')
+      console.log('\n' + pc.bold('Available remote workspaces') + '\n')
       if (available.length) {
         console.log(
           columns(
-            ['Workspace', 'Shared by', 'Remote ID'].map(label => pc.dim(label)),
+            ['Workspace', 'Owner', 'Workspace address'].map(label => pc.dim(label)),
             available.map(workspace => [
               text(workspace.id),
               text(workspace.owner.email),
@@ -174,9 +174,11 @@ const workspaces = defineCommand({
           )
         )
         console.log(
-          '\n' + pc.dim('To link from a new folder: ') + pc.cyan('moi init --remote <remote-id>')
+          '\n' +
+            pc.dim('To link from a new folder: ') +
+            pc.cyan('moi init --remote <ownerId>:<workspaceId>')
         )
-      } else console.log('  No shared workspaces yet')
+      } else console.log('  No remote workspaces yet')
       console.log('\n' + pc.bold('Pending invitations') + '\n')
       if (pending.length) {
         console.log(
@@ -218,7 +220,7 @@ const accept = defineCommand({
   }
 })
 const leave = defineCommand({
-  meta: { name: 'leave', description: 'Leave a shared workspace; keep local files' },
+  meta: { name: 'leave', description: 'Leave a remote workspace' },
   args: {
     workspace: {
       type: 'positional',
@@ -238,7 +240,7 @@ const leave = defineCommand({
           'No remote workspace here — run from a linked workspace folder or provide ownerId:workspaceId'
         )
       const result = await leaveWorkspace(target.user_id, target.workspace_id)
-      console.log(args.json ? JSON.stringify(result) : 'Left the workspace; local files kept')
+      console.log(args.json ? JSON.stringify(result) : 'Left the workspace')
     })
   }
 })
@@ -294,7 +296,7 @@ export const remote = defineCommand({
             pc.bold(text(linked.workspace_id)) +
             (workspace ? ' by ' + text(workspace.owner.email) : '')
         )
-        console.log('Remote ID: ' + text(`${linked.user_id}:${linked.workspace_id}`))
+        console.log('Workspace address: ' + text(`${linked.user_id}:${linked.workspace_id}`))
         console.log(
           '\n' +
             keyValue([
