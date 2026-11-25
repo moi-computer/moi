@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/client/components/ui/button'
 import { Dialog, DialogClose } from '@/client/components/ui/dialog'
 import { workspaceDisplayName } from '@/client/features/workspace/workspace-presentation'
-import type { DiscoveredWorkspace, HarnessType } from '@/lib/types'
+import type { WorkspaceSuggestion, HarnessType } from '@/lib/types'
 
 import { WorkspaceAgentSelector } from './workspace-agent-selector'
 import { useHarnessStatuses } from '@/client/features/harness/api'
@@ -16,7 +16,7 @@ type AddWorkspaceDialogProps = {
   onSubmit: (harness: HarnessType) => void
   onClose: () => void
 } & (
-  | { workspace: DiscoveredWorkspace; workspaceName?: never }
+  | { workspace: WorkspaceSuggestion; workspaceName?: never }
   | { workspace?: never; workspaceName: string }
 )
 

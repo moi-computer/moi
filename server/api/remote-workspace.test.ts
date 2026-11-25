@@ -194,7 +194,6 @@ test('remote bundle RPC reads and writes owner data; assets and validators retai
 test('remote reference serves no shared content and keeps personal state local', async () => {
   for (const path of ['/widgets', '/views', '/scratchpad', '/config'])
     expect([path, (await api.request(local + path)).status]).toEqual([path, 404])
-  expect((await api.request(local, { method: 'DELETE' })).status).toBe(403)
   // Chat state, the agent and what it runs with are the visitor's own and never leave this Moi.
   for (const path of ['/state', '/env', '/skills'])
     expect([path, (await api.request(local + path)).status]).toEqual([path, 200])

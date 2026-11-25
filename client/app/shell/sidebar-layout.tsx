@@ -1,7 +1,6 @@
 import { type ReactNode } from 'react'
 
 import { IconPlus, IconSandbox, IconSmartHome } from '@tabler/icons-react'
-import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
 import { homePath, useAppConfig } from '@/client/api/app-config'
@@ -10,13 +9,10 @@ import {
   useWorkspaceMetadata,
   useWorkspaces
 } from '@/client/features/home/api'
-import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import {
   UpdateButton as UpdateButtonComponent,
   useUpdateControl
 } from '@/client/features/update/update-control'
-import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useClientEvent } from '@/client/runtime/use-client-events'
 import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
 import { useAccount } from '@/client/features/account/account-provider'
 import { AccountMenu } from '@/client/features/account/account-menu'
@@ -54,20 +50,6 @@ type SidebarLayoutProps = {
 export function SidebarLayout({ children, showWorkspaces = true }: SidebarLayoutProps) {
   const { data: entries } = useWorkspaces()
   const workspaces = useWorkspaceMetadata(entries ?? [])
-
-  // Identity, theme, and registry changes can all alter a workspace's sidebar
-  // presentation. Refetch the list so the sidebar reflects them live. Exact:
-  // `workspaceKeys.all` is the
-  // prefix of every workspace query — a prefix invalidation would refetch
-  // transcripts, widgets, and MCP probes in every connected client.
-  const qc = useQueryClient()
-  useClientEvent(e => {
-    if (e.type === 'workspace-config:changed' || e.type === 'workspaces-list:changed') {
-      // Shared config saves update the layout cache; the sidebar list still needs a refetch.
-      if (e.type !== 'workspace-config:changed' && e.origin === BROWSER_TAB_ID) return
-      qc.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
-    }
-  })
 
   return (
     <div className="flex h-dvh bg-muted transition-colors duration-100 ease-out motion-reduce:transition-none">

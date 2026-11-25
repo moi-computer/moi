@@ -39,7 +39,10 @@ export async function changeWorkspaceHarness(ws: WorkspaceEntry, next: HarnessTy
       !['claude-code', 'codex'].includes(next)
     )
       throw new HarnessTransitionError('This workspace’s agent cannot be changed')
-    if (next === previousHarness) return current
+    if (next === previousHarness) {
+      // A synced reference has no saved choice until the member picks an agent.
+      return current.remote && !current.harness ? updateWorkspaceHarness(ws.id, next) : current
+    }
     if (harness.activeSessions().some(session => session.workspaceId === ws.id))
       throw new HarnessTransitionError('Wait for the agent to finish before changing it')
     const before = await updateWorkspaceState(current, state => {

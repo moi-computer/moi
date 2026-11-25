@@ -50,13 +50,11 @@ test('creating a workspace rejects an unknown harness', async () => {
   expect(await response.text()).toBe('Unknown workspace type')
 })
 
-test('creating a workspace rejects a provider that only supports discovery', async () => {
+test('creating a workspace rejects an import-only provider', async () => {
   const response = await createWorkspace('openclaw')
 
   expect(response.status).toBe(400)
-  expect(await response.text()).toBe(
-    'Workspaces of this type arrive through discovery, not creation'
-  )
+  expect(await response.text()).toBe('Add this type of workspace from Suggestions')
 })
 
 test('rejects creation if the executable disappeared after setup', async () => {

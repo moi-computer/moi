@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react'
 
 import type { AppEventsClient } from './app-events'
 
-// App-wide state that lives exactly as long as the app: created by
+// App-wide state that lives exactly as long as the app: connected by
 // `AppProvider` (app/app-provider.tsx) when the app mounts and shut down when
 // it unmounts. Put things here that must survive route switches but not the
 // app itself.

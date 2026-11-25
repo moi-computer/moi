@@ -21,5 +21,8 @@ alwaysApply: true
 - Use thread only when matching terminology from an external provider or SDK.
 - Apply the same boundary to code names and filenames. Session metadata uses names such as `sessionTitle`, `generateSessionTitle`, and `session-title.ts`. Use `chatTitle` and `chat-title.ts` only for client or UI label formatting.
 - Translate provider-native thread terminology to session terminology at the adapter boundary. Keep thread naming only in native wire types, RPC methods, and provider-facing variables.
-- Name actions precisely, such as `Remove workspace` or `Start new chat`.
+- Name actions precisely, such as `Start new chat`.
+- Use **local workspace** and **remote workspace** from the current user’s perspective. A workspace stays local to its owner after they share it. Members who access it on the owner’s machine see it as remote. Use **shared workspace** when describing collaboration from either side, and **remote workspace reference** for the pointer in a member’s local folder.
+- Use **Delete workspace** for a workspace you own, **Leave workspace** for one you joined, and **Remove** to end another person’s or agent’s access. In code and docs, **unregister** means dropping the local registry entry while keeping the folder.
+- “trash” is a popular concept, so write it in lowercase.
 - Avoid generic confirmations, hype, “please,” and “successfully.”

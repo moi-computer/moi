@@ -8,7 +8,9 @@ import { Button } from '@/client/components/ui/button'
 import { cloudRequest } from '@/client/features/account/api'
 import type { HarnessType } from '@/lib/types'
 import { AddWorkspaceDialog } from '@/client/features/workspace/add/add-workspace-dialog'
-import { addSharedWorkspace, checkSharedWorkspaceAccess } from '@/client/features/workspace/add/api'
+import { openRemoteWorkspace } from '@/client/features/workspace/add/api'
+
+import { WorkspaceListRow, WorkspaceListSection } from './workspace-list-section'
 
 type WorkspaceInvitation = {
   id: string
@@ -48,9 +50,7 @@ export function WorkspaceInvitations() {
       const { remote } = (await response.json()) as { remote: unknown }
       const target = parseRemoteWorkspaceTarget(remote)
       void client.invalidateQueries({ queryKey: invitationsKey })
-      void client.invalidateQueries({ queryKey: ['shared-workspaces'] })
-      await checkSharedWorkspaceAccess(client, target)
-      return addSharedWorkspace(client, target, harness)
+      return openRemoteWorkspace(client, target, harness)
     },
     onSuccess: entry => {
       setChoice(undefined)
@@ -62,27 +62,21 @@ export function WorkspaceInvitations() {
   return (
     <>
       {invitations.length > 0 && (
-        <section className="mb-8">
-          <h2 className="mb-4 text-sm font-medium">Invitations</h2>
-          <ul className="border-t border-border">
-            {invitations.map(invitation => (
-              <li
-                key={invitation.id}
-                className="flex items-center gap-2 border-b border-border px-1 py-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{invitation.workspaceName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Invited by {invitation.inviter.name}
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setChoice(invitation)}>
-                  Add
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <WorkspaceListSection title="Invitations">
+          {invitations.map(invitation => (
+            <WorkspaceListRow key={invitation.id}>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{invitation.workspaceName}</p>
+                <p className="text-xs text-muted-foreground">
+                  Invited by {invitation.inviter.name}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setChoice(invitation)}>
+                Add
+              </Button>
+            </WorkspaceListRow>
+          ))}
+        </WorkspaceListSection>
       )}
       {choice && (
         <AddWorkspaceDialog

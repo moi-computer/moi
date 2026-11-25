@@ -94,7 +94,7 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
         if (request.method === 'PATCH') name = JSON.parse(raw).name
         return Response.json({ id: agentId, type: 'agent', name, client: 'town-assistant' })
       }
-      if (path.endsWith('/workspaces/shared'))
+      if (path.endsWith('/workspaces/remote'))
         return Response.json({
           workspaces: [...members].map(id => ({
             id,
@@ -209,7 +209,7 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
     expect((await cli(['accept', 'second'])).stdout).toContain(
       'moi init ./workspace-folder --remote owner:two'
     )
-    expect(await client.fetchSharedWorkspaces()).toHaveLength(2)
+    expect(await client.fetchRemoteWorkspaces()).toHaveLength(2)
     expect((await cli(['init', folder, '--remote', 'owner:two', '--json'], 1)).stderr).toContain(
       'different workspace configuration'
     )
@@ -226,12 +226,12 @@ test('agent lifecycle uses real signatures, preserves keys on ambiguous acceptan
       'Unknown option --path'
     )
     expect((await cli(['leave', ''], 1)).stderr).toContain('ownerId:workspaceId')
-    expect(await client.fetchSharedWorkspaces()).toHaveLength(2)
+    expect(await client.fetchRemoteWorkspaces()).toHaveLength(2)
     await cli(['leave', '--json'], 0, folder)
-    expect(await client.fetchSharedWorkspaces()).toHaveLength(1)
+    expect(await client.fetchRemoteWorkspaces()).toHaveLength(1)
     expect(await configFile.text()).toBe(originalConfig)
     await cli(['leave', 'owner:two', '--json'])
-    expect(await client.fetchSharedWorkspaces()).toEqual([])
+    expect(await client.fetchRemoteWorkspaces()).toEqual([])
     expect((await cli(['logout'], 1)).stderr).toContain('--yes')
     expect(active).toBe(true)
     await cli(['logout', '--yes'])

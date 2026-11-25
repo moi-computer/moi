@@ -28,7 +28,6 @@ export function AgentsSettings() {
               />
               {agent.membershipId && (
                 <MembershipMenu
-                  removeLabel="Remove from workspace"
                   workspaceId={workspaceId}
                   action={{ type: 'remove', membershipId: agent.membershipId }}
                 />

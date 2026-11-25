@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path'
 import { provisionWorkspace } from '../workspaces/init'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './update'
 import { bundledSkillDirectory } from './template'
-import { installWorkspaceSkills } from './workspace'
+import { installWorkspaceSkills, removeWorkspaceSkill } from './workspace'
 
 const roots: string[] = []
 
@@ -21,6 +21,27 @@ async function fixture() {
 
 afterEach(async () => {
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
+})
+
+test('cleanup removes an older Claude skill folder and keeps neighboring skills', async () => {
+  const { claude } = await fixture()
+  const personal = Bun.file(join(dirname(claude), 'personal', 'SKILL.md'))
+  await Bun.write(join(claude, 'SKILL.md'), 'older Moi skill')
+  await Bun.write(personal, 'my skill')
+
+  await removeWorkspaceSkill(dirname(claude))
+  await expect(lstat(claude)).rejects.toMatchObject({ code: 'ENOENT' })
+  expect(await personal.text()).toBe('my skill')
+})
+
+test('removing a dangling Claude skill link leaves its parent directory', async () => {
+  const { claude } = await fixture()
+  await mkdir(dirname(claude), { recursive: true })
+  await symlink('missing', claude, 'dir')
+
+  await removeWorkspaceSkill(dirname(claude))
+  await expect(lstat(claude)).rejects.toMatchObject({ code: 'ENOENT' })
+  expect((await lstat(dirname(claude))).isDirectory()).toBe(true)
 })
 
 test('concurrent provisioning and updates share one lock through workspace aliases', async () => {

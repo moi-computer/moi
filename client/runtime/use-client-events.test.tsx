@@ -3,15 +3,16 @@ import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-ut
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { queryClient } from '@/client/api/query-client'
 import type { ClientEvent } from '@/lib/events'
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, expect, mock, test } from 'bun:test'
 import { act, useState, type ReactNode } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query'
 import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 
 import { AppProvider as EventsProvider } from '@/client/app/app-provider'
 
 import { useClientEvent, useWorkspaceEvent } from './use-client-events'
+import { installIdentityHostApi, type IdentityHostApi } from '@/client/features/identity/host-api'
 import { AppEventsClient } from './app-events'
 
 type AppProviderProps = { children: ReactNode }
@@ -146,6 +147,60 @@ test('components outside the app open no socket', async () => {
   await act(async () => root.render(<HomeShell />))
   expect(document.body.textContent).toContain('home')
   expect(FakeWebSocket.instances.length).toBe(0)
+})
+
+test('a Cloud membership change reaches the machine socket even before it opens', async () => {
+  const { root } = installDom()
+  installIdentityHostApi()
+  const { remoteWorkspaces } = (window as Window & { moi?: IdentityHostApi }).moi!
+  remoteWorkspaces.sync()
+  remoteWorkspaces.sync()
+  await act(async () =>
+    root.render(
+      <AppProvider>
+        <HomeShell />
+      </AppProvider>
+    )
+  )
+  const [machine] = FakeWebSocket.instances
+  const relayed = () =>
+    machine!.sent.filter(frame => JSON.parse(frame).type === 'remote-workspaces:updated')
+  machine!.open()
+  expect(relayed()).toHaveLength(1)
+  remoteWorkspaces.sync()
+  expect(relayed()).toHaveLength(2)
+})
+
+test('revocation during the first workspace list request discards the stale response', async () => {
+  const { root } = installDom()
+  const client = new QueryClient()
+  await act(async () =>
+    root.render(
+      <QueryClientProvider client={client}>
+        <EventsProvider>{null}</EventsProvider>
+      </QueryClientProvider>
+    )
+  )
+  const machine = FakeWebSocket.instances[0]!
+  machine.open()
+
+  const stale = Promise.withResolvers<string[]>()
+  const fetchList = mock(async (): Promise<string[]> => []).mockImplementationOnce(
+    () => stale.promise
+  )
+  const list = new QueryObserver(client, { queryKey: workspaceKeys.all, queryFn: fetchList })
+  const settled = Promise.withResolvers<string[]>()
+  const unsubscribe = list.subscribe(result => {
+    if (result.isSuccess) settled.resolve(result.data)
+  })
+  try {
+    machine.onmessage?.({ data: JSON.stringify({ type: 'workspaces-list:changed' }) })
+    stale.resolve(['revoked-workspace'])
+    expect(await settled.promise).toEqual([])
+  } finally {
+    unsubscribe()
+    client.clear()
+  }
 })
 
 test('a dropped socket reopens on its own and delivers events again', async () => {

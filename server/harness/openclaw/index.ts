@@ -1,6 +1,6 @@
 // OpenClaw as a Harness. Thin wiring over this folder's modules — see
 // ../types.ts for the contract and ../README.md for the architecture.
-import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
+import type { HarnessWorkspaceSuggestion, Harness } from '../types'
 import { OPENCLAW_WIRE_SCOPE, getOpenClawGatewayStatus } from './gateway'
 import { toSessionInfo, toStreamEvents } from './adapter'
 import { cronRunsToStreamEvents, openClawCronJobIdFromKey } from './cron-view'
@@ -35,7 +35,7 @@ export const openclawHarness: Harness = {
 
   sendMessage: async input => {
     if (!input.agentId) {
-      throw new Error('OpenClaw workspace has no agentId — re-add it via discovery')
+      throw new Error('OpenClaw workspace has no agentId — add it again from Suggestions')
     }
     return sendOpenClawMessage({ ...input, agentId: input.agentId })
   },
@@ -87,12 +87,12 @@ export const openclawHarness: Harness = {
   },
   listModels: () => getOpenClawModels(),
 
-  discoverWorkspaces: async registeredPaths => {
+  listWorkspaceSuggestions: async registeredPaths => {
     const agents = await discoverOpenClawAgents()
     return agents
       .filter(a => !registeredPaths.has(a.path))
       .map(
-        (a): DiscoveredWorkspaceCandidate => ({
+        (a): HarnessWorkspaceSuggestion => ({
           path: a.path,
           harness: 'openclaw'
         })

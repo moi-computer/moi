@@ -103,10 +103,3 @@ export function useUpdateWorkspaceIcon(workspaceId: string) {
     }
   })
 }
-
-export function removeWorkspaceFromCache(
-  workspaces: WorkspaceEntry[] | undefined,
-  workspaceId: string
-) {
-  return (workspaces ?? []).filter(workspace => workspace.id !== workspaceId)
-}

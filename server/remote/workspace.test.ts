@@ -9,7 +9,7 @@ import { setRegistryPath, DEFAULT_REGISTRY_PATH, listWorkspaces } from '../works
 test('remote initialization is repeatable and preserves workspace files', async () => {
   const root = await mkdtemp(join(tmpdir(), 'moi-link-')),
     folder = join(root, 'workspace')
-  const shares = spyOn(client, 'fetchSharedWorkspaces').mockResolvedValue([
+  const fetchWorkspaces = spyOn(client, 'fetchRemoteWorkspaces').mockResolvedValue([
     { id: 'board', owner: { id: 'owner', name: 'Owner', email: 'owner@example.com' } }
   ])
   setRegistryPath(join(root, 'registry.json'))
@@ -40,7 +40,7 @@ test('remote initialization is repeatable and preserves workspace files', async 
       initializeRemoteWorkspace(join(root, 'other'), { user_id: 'stranger', workspace_id: 'board' })
     ).rejects.toThrow('not shared')
   } finally {
-    shares.mockRestore()
+    fetchWorkspaces.mockRestore()
     setRegistryPath(DEFAULT_REGISTRY_PATH)
     await rm(root, { recursive: true, force: true })
   }
@@ -49,7 +49,7 @@ test('remote initialization is repeatable and preserves workspace files', async 
 test('remote initialization targets the requested folder even inside a registered parent', async () => {
   const root = await mkdtemp(join(tmpdir(), 'moi-link-parent-'))
   const folder = join(root, 'nested')
-  const shares = spyOn(client, 'fetchSharedWorkspaces').mockResolvedValue([
+  const fetchWorkspaces = spyOn(client, 'fetchRemoteWorkspaces').mockResolvedValue([
     { id: 'parent', owner: { id: 'owner', name: 'Owner', email: 'owner@example.com' } },
     { id: 'child', owner: { id: 'owner', name: 'Owner', email: 'owner@example.com' } }
   ])
@@ -77,7 +77,7 @@ test('remote initialization targets the requested folder even inside a registere
     ).rejects.toThrow('already initialized')
     expect(await Bun.file(join(root, 'another/.moi/.workspace.json')).exists()).toBe(false)
   } finally {
-    shares.mockRestore()
+    fetchWorkspaces.mockRestore()
     setRegistryPath(DEFAULT_REGISTRY_PATH)
     await rm(root, { recursive: true, force: true })
   }

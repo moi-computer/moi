@@ -542,9 +542,11 @@ export type WorkspaceEntry = {
   agentId?: string
   isDefault?: boolean
   lastRunAt?: string
+  // Set while the workspace is in trash. Only trash listings carry such entries.
+  trashedAt?: string
 }
 
-export type DiscoveredWorkspace = {
+export type WorkspaceSuggestion = {
   path: string
   displayPath?: string
   // Deduplicated in canonical provider order; empty for folders without agent history.

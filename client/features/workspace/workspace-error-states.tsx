@@ -6,53 +6,51 @@ import { IconFolderOff } from '@tabler/icons-react'
 
 import { harnessIcon } from '@/client/components/shared/workspace-icon'
 import { Button } from '@/client/components/ui/button'
-import { Spinner } from '@/client/components/ui/spinner'
-import { useRemoveWorkspace } from '@/client/features/home/api'
+import { useDeleteWorkspace } from '@/client/features/home/api'
 import type { HarnessAvailability, HarnessType } from '@/lib/types'
 
-type RecoveryRetryProps = {
+type RetryProps = {
   retrying: boolean
   onRetry: () => void
 }
 
-type WorkspaceCheckFailedStateProps = RecoveryRetryProps
+type HarnessCheckFailedStateProps = RetryProps
 
-export function WorkspaceCheckFailedState(props: WorkspaceCheckFailedStateProps) {
+export function HarnessCheckFailedState(props: HarnessCheckFailedStateProps) {
   return (
-    <RecoveryMessage title="Could not check your agent" {...props}>
+    <WorkspaceErrorMessage title="Could not check your agent" {...props}>
       Could not check this workspace’s agent. Try again.
-    </RecoveryMessage>
+    </WorkspaceErrorMessage>
   )
 }
 
-type WorkspaceMissingStateProps = {
+type WorkspaceFolderMissingStateProps = {
   workspaceId: string
 }
 
-export function WorkspaceMissingState({ workspaceId }: WorkspaceMissingStateProps) {
-  const [, navigate] = useLocation()
-  const remove = useRemoveWorkspace()
+export function WorkspaceFolderMissingState({ workspaceId }: WorkspaceFolderMissingStateProps) {
+  const deleteWorkspace = useDeleteWorkspace()
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
       <IconFolderOff size={56} stroke={0.5} className="text-muted-foreground" aria-hidden />
       <h1 className="font-medium">The workspace folder is missing</h1>
       <Button
         variant="secondary"
-        disabled={remove.isPending}
-        onClick={() => remove.mutate(workspaceId, { onSuccess: () => navigate(homePath()) })}
+        disabled={deleteWorkspace.isPending}
+        onClick={() => deleteWorkspace.mutate(workspaceId)}
       >
-        {remove.isPending ? 'Deleting workspace…' : 'Delete workspace'}
+        {deleteWorkspace.isPending ? 'Deleting workspace…' : 'Delete workspace'}
       </Button>
-      {remove.error && (
+      {deleteWorkspace.error && (
         <p role="alert" className="text-sm text-destructive">
-          {remove.error.message}
+          {deleteWorkspace.error.message}
         </p>
       )}
     </div>
   )
 }
 
-type HarnessUnavailableStateProps = RecoveryRetryProps & {
+type HarnessUnavailableStateProps = RetryProps & {
   harness: HarnessType
   availability: Exclude<HarnessAvailability, { status: 'available' }>
 }
@@ -64,7 +62,7 @@ export function HarnessUnavailableState({
 }: HarnessUnavailableStateProps) {
   const needsTerminalLogin = availability.status === 'login-required'
   return (
-    <RecoveryMessage
+    <WorkspaceErrorMessage
       title={needsTerminalLogin ? 'Connect your agent' : 'Your agent is unavailable'}
       harness={harness}
       {...retry}
@@ -77,50 +75,48 @@ export function HarnessUnavailableState({
           Complete sign-in in your agent’s terminal, then try again.
         </>
       )}
-    </RecoveryMessage>
+    </WorkspaceErrorMessage>
   )
 }
 
-export function WorkspaceLoadingState() {
-  return (
-    <div className="flex flex-1 items-center justify-center">
-      <Spinner className="size-6 text-muted-foreground" stroke={1.5} />
-    </div>
-  )
-}
-
-type WorkspaceOpenErrorProps = RecoveryRetryProps & { error: Error }
+type WorkspaceOpenErrorProps = RetryProps & { error: Error }
 
 export function WorkspaceOpenError({ error, retrying, onRetry }: WorkspaceOpenErrorProps) {
-  const [, navigate] = useLocation()
-  const missing = error instanceof HttpError && error.status === 404
+  if (error instanceof HttpError && error.status === 404) return <WorkspaceUnavailableState />
   return (
-    <RecoveryMessage
-      title={missing ? 'Workspace not found or you don’t have access' : 'Couldn’t open workspace'}
-      retrying={!missing && retrying}
-      onRetry={missing ? () => navigate(homePath()) : onRetry}
-      actionLabel={missing ? 'Back to home' : 'Try again'}
-    >
-      {missing ? undefined : error.message}
-    </RecoveryMessage>
+    <WorkspaceErrorMessage title="Couldn’t open workspace" retrying={retrying} onRetry={onRetry}>
+      {error.message}
+    </WorkspaceErrorMessage>
   )
 }
 
-type RecoveryMessageProps = RecoveryRetryProps & {
+export function WorkspaceUnavailableState() {
+  const [, navigate] = useLocation()
+  return (
+    <WorkspaceErrorMessage
+      title="Workspace not found or you don’t have access"
+      retrying={false}
+      onRetry={() => navigate(homePath())}
+      actionLabel="Back to home"
+    />
+  )
+}
+
+type WorkspaceErrorMessageProps = RetryProps & {
   title: string
   harness?: HarnessType
   children?: ReactNode
   actionLabel?: string
 }
 
-export function RecoveryMessage({
+export function WorkspaceErrorMessage({
   title,
   harness,
   children,
   retrying,
   onRetry,
   actionLabel = 'Try again'
-}: RecoveryMessageProps) {
+}: WorkspaceErrorMessageProps) {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="flex w-full max-w-md flex-col gap-6">

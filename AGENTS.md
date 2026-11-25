@@ -94,4 +94,4 @@ Claude Code stores sessions as `.jsonl` files under:
 Path encoding: each `/` (or `\` on Windows) in the working directory path is replaced with `-`.
 Example: `/Users/foo/my-project` → `-Users-foo-my-project`
 
-Potential use: auto-discover workspaces by listing `~/.claude/projects/` and decoding folder names back to paths.
+Potential use: suggest workspaces by listing `~/.claude/projects/` and decoding folder names back to paths.

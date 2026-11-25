@@ -57,11 +57,13 @@ export class ReconnectingSocket {
   }
 
   send(message: object) {
-    if (!this.isOpen) return
+    if (!this.socket || !this.isOpen) return false
     try {
-      this.socket?.send(JSON.stringify(message))
+      this.socket.send(JSON.stringify(message))
+      return true
     } catch {
-      this.socket?.close()
+      this.socket.close()
+      return false
     }
   }
 

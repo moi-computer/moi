@@ -195,7 +195,10 @@ function MemberRow({ user, isOwner, workspaceId, membershipId }: MemberRowProps)
       />
       {isOwner && <span className="mr-1.5 shrink-0 text-xs text-muted-foreground">Owner</span>}
       {membershipId && (
-        <MembershipMenu workspaceId={workspaceId} action={{ type: 'remove', membershipId }} />
+        <MembershipMenu
+          workspaceId={workspaceId}
+          action={user.self ? { type: 'leave' } : { type: 'remove', membershipId }}
+        />
       )}
     </li>
   )

@@ -2,6 +2,7 @@ import { useHarnessStatus, useRetryHarnessStatus } from '@/client/features/harne
 import { useCallback } from 'react'
 import { useAppConfig } from '@/client/api/app-config'
 
+import { WorkspaceLoadingState } from '../workspace-fallback-screen'
 import { useWorkspaceHarness } from '../api'
 import {
   useWorkspaceWelcome,
@@ -11,10 +12,9 @@ import {
 import { WorkspaceLoginState } from './workspace-login-state'
 import {
   HarnessUnavailableState,
-  WorkspaceCheckFailedState,
-  WorkspaceLoadingState,
-  WorkspaceMissingState
-} from './workspace-recovery-states'
+  HarnessCheckFailedState,
+  WorkspaceFolderMissingState
+} from '../workspace-error-states'
 
 export function useWorkspaceSetup(
   workspaceId: string,
@@ -48,10 +48,10 @@ export function useWorkspaceSetup(
     // Background network failures do not invalidate a known working workspace.
     if (isError && availability?.status === 'available') return undefined
     if (isError || !data || !availability) {
-      return <WorkspaceCheckFailedState retrying={isFetching} onRetry={retryStatus} />
+      return <HarnessCheckFailedState retrying={isFetching} onRetry={retryStatus} />
     }
     if (data.isFolderMissing) {
-      return <WorkspaceMissingState workspaceId={workspaceId} />
+      return <WorkspaceFolderMissingState workspaceId={workspaceId} />
     }
     const { harness } = data
     if (availability.status === 'available') return undefined
@@ -93,6 +93,6 @@ export function useWorkspaceSetup(
       (recovery ?? <WorkspaceLoadingState />)
     ),
     ready: ready && !welcoming,
-    setupRequired: welcoming || !!recovery
+    showPanel: welcoming || !!recovery
   }
 }

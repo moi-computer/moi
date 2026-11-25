@@ -100,7 +100,7 @@ test('menu stays visible for a single member even with multiple open tabs', () =
       profiles: [self],
       otherConnections: [connection(self, 'scratchpad')]
     })
-  ).toContain('aria-label="People in this workspace"')
+  ).toContain('aria-label="Members in this workspace"')
 })
 
 test('header shows only active profiles, reversed from the popup order', () => {
@@ -181,7 +181,7 @@ test('menu stays visible without a current user', () => {
       profiles: [active],
       otherConnections: [connection(active, 'overview')]
     })
-  ).toContain('aria-label="People in this workspace"')
+  ).toContain('aria-label="Members in this workspace"')
 })
 
 describe('workspace sharing', () => {
@@ -248,7 +248,7 @@ describe('workspace sharing', () => {
       )
     })
     await ui.settle()
-    await ui.click('People in this workspace')
+    await ui.click('Members in this workspace')
     expect(ui.calls.some(call => call.path.endsWith('/members'))).toBe(false)
     expect(ui.document.body.textContent).toContain('Alex')
     expect(ui.document.body.textContent).not.toContain('Offline')
@@ -271,7 +271,7 @@ describe('workspace sharing', () => {
     expect(ui.document.body.textContent).toContain('Alex')
     expect(ui.document.body.textContent).toContain('(You)')
     expect(ui.document.querySelector('[aria-label="Loading workspace members"]')).toBeNull()
-    expect(ui.document.querySelector('[aria-label="People in this workspace"]')).not.toBeNull()
+    expect(ui.document.querySelector('[aria-label="Members in this workspace"]')).not.toBeNull()
   })
 
   test('members stay loading until the host publishes its first snapshot', async () => {
@@ -286,7 +286,7 @@ describe('workspace sharing', () => {
     await ui.settle()
     const selfAvatar = () => ui.document.querySelector('[aria-label="Alex (You), open sharing"]')
     expect(selfAvatar()).toBeNull()
-    await ui.click('People in this workspace')
+    await ui.click('Members in this workspace')
     expect(ui.document.querySelector('[aria-label="Loading workspace members"]')).not.toBeNull()
     expect(ui.calls.some(call => call.path.endsWith('/members'))).toBe(false)
     await act(async () => setAllWorkspaceMembers([]))
@@ -361,7 +361,7 @@ describe('workspace sharing', () => {
     })
     expect(ui.document.querySelector('[aria-label="Self (You), open sharing"]')).not.toBeNull()
     expect(ui.document.querySelector('[aria-label="Active colleague"]')).toBeNull()
-    await ui.click('People in this workspace')
+    await ui.click('Members in this workspace')
     expect(ui.document.querySelector('form')).not.toBeNull()
     await act(async () => engine.setLocation({ page: 'overview', status: 'active' }))
     expect(ui.document.querySelector('[aria-label="Self (You), open sharing"]')).not.toBeNull()
@@ -380,7 +380,7 @@ describe('workspace sharing', () => {
         )
       })
       await ui.settle()
-      await ui.click('People in this workspace')
+      await ui.click('Members in this workspace')
       const input = ui.document.querySelector<HTMLInputElement>('[aria-label="Email"]')!
       await ui.type(input, 'Tony@Example.com')
       const submit = async () => {
@@ -465,7 +465,7 @@ describe('workspace sharing', () => {
               : []
         })
         await ui.settle()
-        await ui.click('People in this workspace')
+        await ui.click('Members in this workspace')
         const list = ui.document.querySelector('[aria-label="Who has access"]')!
         const rows = list.children.length
         const address = existing === 'member' ? 'alex@example.com' : 'tony@example.com'
@@ -512,7 +512,7 @@ describe('workspace sharing', () => {
           )
         })
         await ui.settle()
-        await ui.click('People in this workspace')
+        await ui.click('Members in this workspace')
         const fetch = globalThis.fetch
         spyOn(globalThis, 'fetch').mockImplementation(
           Object.assign(
@@ -582,7 +582,7 @@ describe('workspace sharing', () => {
       const snapshot = { members: [...data.members], invitations: [...data.invitations] }
       ui.setMembership(snapshot)
       await act(async () => setWorkspaceMembers('one', snapshot))
-      await ui.click('People in this workspace')
+      await ui.click('Members in this workspace')
       const list = ui.document.querySelector('[aria-label="Who has access"]')!
       expect(list.querySelectorAll('li')).toHaveLength(3)
       expect(list.textContent).toContain('Tony')

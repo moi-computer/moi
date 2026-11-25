@@ -3,7 +3,7 @@ import { QueryClient } from '@tanstack/react-query'
 
 import type { WorkspaceEntry } from '@/lib/types'
 
-import { addSharedWorkspace, upsertWorkspaceEntry } from '@/client/features/workspace/add/api'
+import { openRemoteWorkspace, upsertWorkspaceEntry } from '@/client/features/workspace/add/api'
 
 const existing: WorkspaceEntry = {
   id: 'one',
@@ -48,13 +48,16 @@ describe('upsertWorkspaceEntry', () => {
   })
 })
 
-test('registers a shared workspace with the visitor’s chosen agent', async () => {
+test('registers a remote workspace with the visitor’s chosen agent', async () => {
   const remote = { user_id: 'owner', workspace_id: 'board' }
   const entry: WorkspaceEntry = { ...existing, remote, harness: 'codex' }
-  const request = spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(entry))
+  const request = spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(Response.json({ isRemote: false }))
+    .mockResolvedValueOnce(Response.json(entry))
   try {
-    expect(await addSharedWorkspace(new QueryClient(), remote, 'codex')).toEqual(entry)
-    const [url, init] = request.mock.calls[0]
+    expect(await openRemoteWorkspace(new QueryClient(), remote, 'codex')).toEqual(entry)
+    expect(request.mock.calls[0][0]).toBe('/api/workspaces/owner:board')
+    const [url, init] = request.mock.calls[1]
     expect(url).toBe('/api/workspaces')
     expect(init?.method).toBe('POST')
     expect(JSON.parse(String(init?.body))).toEqual({ remote, harness: 'codex' })

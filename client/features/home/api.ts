@@ -1,3 +1,6 @@
+import { useLocation } from 'wouter'
+import { homePath } from '@/client/api/app-config'
+import { toast } from '@/client/components/ui/toast'
 import { workspaceApiBase, type RemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { workspaceInfoOptions } from '../workspace/api'
 import {
@@ -9,17 +12,14 @@ import {
 } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
-import { workspaceKeys } from '@/client/api/workspace-keys'
+import { trashedWorkspacesKey, workspaceKeys } from '@/client/api/workspace-keys'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
-import type { DiscoveredWorkspace, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
+import type { WorkspaceSuggestion, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
 
 export function useWorkspaces() {
-  return useQuery<WorkspaceEntry[]>({
+  return useQuery({
     queryKey: workspaceKeys.all,
-    queryFn: () => requestJson<WorkspaceEntry[]>('/api/workspaces'),
-    // Live events invalidate the list on every change. This only bounds how
-    // long a missed event (socket down) can leave it wrong; route switches
-    // within the window reuse the cache.
+    queryFn: ({ signal }) => requestJson<WorkspaceEntry[]>('/api/workspaces', { signal }),
     staleTime: 5 * 60_000
   })
 }
@@ -68,10 +68,10 @@ export function useWorkspacePreview(workspaceId: string) {
   return useQuery({ ...workspacePreviewsOptions, select: previews => previews[workspaceId] })
 }
 
-export function useDiscoveredWorkspaces() {
-  return useQuery<DiscoveredWorkspace[]>({
-    queryKey: workspaceKeys.discover,
-    queryFn: () => requestJson('/api/workspaces/discover')
+export function useWorkspaceSuggestions() {
+  return useQuery<WorkspaceSuggestion[]>({
+    queryKey: workspaceKeys.suggestions,
+    queryFn: () => requestJson('/api/workspaces/suggestions')
   })
 }
 
@@ -116,20 +116,56 @@ export function useReorderWorkspaces() {
   })
 }
 
-export function useRemoveWorkspace() {
+export function useDeleteWorkspace(action: 'delete' | 'leave' = 'delete') {
+  const [, navigate] = useLocation()
   const queryClient = useQueryClient()
   return useMutation<void, Error, string>({
     mutationFn: workspaceId =>
       requestVoid(
         `/api/workspaces/${workspaceId}`,
         { method: 'DELETE' },
-        'Failed to remove workspace'
+        `Failed to ${action} workspace`
       ),
     onSuccess: (_result, workspaceId) => {
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         (previous ?? []).filter(workspace => workspace.id !== workspaceId)
       )
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.discover })
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.suggestions })
+      if (action === 'delete') queryClient.invalidateQueries({ queryKey: trashedWorkspacesKey })
+      navigate(homePath())
+    },
+    onError: error => {
+      if (action === 'leave')
+        toast.add({ title: 'Couldn’t leave workspace', description: error.message, type: 'error' })
     }
+  })
+}
+
+export function useTrashedWorkspaces(enabled: boolean) {
+  return useQuery<WorkspaceEntry[]>({
+    queryKey: trashedWorkspacesKey,
+    enabled,
+    queryFn: () => requestJson('/api/workspaces/trash'),
+    staleTime: 60_000
+  })
+}
+
+export function useRestoreWorkspace() {
+  const queryClient = useQueryClient()
+  return useMutation<WorkspaceEntry, Error, string>({
+    mutationFn: workspaceId =>
+      requestJson(
+        `/api/workspaces/trash/${encodeURIComponent(workspaceId)}/restore`,
+        { method: 'POST' },
+        'Failed to restore workspace'
+      ),
+    onSuccess: (_entry, workspaceId) => {
+      queryClient.setQueryData<WorkspaceEntry[]>(trashedWorkspacesKey, previous =>
+        (previous ?? []).filter(workspace => workspace.id !== workspaceId)
+      )
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
+    },
+    // A workspace that can no longer be restored is about to leave trash.
+    onError: () => void queryClient.invalidateQueries({ queryKey: trashedWorkspacesKey })
   })
 }

@@ -1,3 +1,4 @@
+import { appEvents } from '@/client/runtime/app-events'
 import { setIdentity, getIdentityRevision } from './store'
 import {
   setWorkspaceMembers,
@@ -11,6 +12,7 @@ import type { WorkspaceMembers, WorkspaceMembersSnapshot } from '../collab/membe
 
 export type IdentityHostApi = {
   identity: { set: (identity: Identity | null) => void; getRevision: () => number }
+  remoteWorkspaces: { sync: () => void }
   workspaceMembers: {
     // Workspaces are named by address: `workspaceId`, or `ownerId:workspaceId` when shared.
     set: (address: string, data: WorkspaceMembers) => void
@@ -25,6 +27,7 @@ export function installIdentityHostApi() {
   const host = window as Window & { moi?: Partial<IdentityHostApi> & Record<string, unknown> }
   host.moi ??= {}
   host.moi.identity = { set: setIdentity, getRevision: getIdentityRevision }
+  host.moi.remoteWorkspaces = { sync: () => appEvents.syncRemoteWorkspaces() }
   host.moi.workspaceMembers = {
     set: setWorkspaceMembers,
     setAll: setAllWorkspaceMembers,

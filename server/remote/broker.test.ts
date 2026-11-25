@@ -65,7 +65,7 @@ beforeEach(async () => {
       })
       if (path === '/cloud/api/me')
         return Response.json({ id: 'u1', name: 'Owner', email: 'owner@example.com' })
-      if (path === '/cloud/api/workspaces/shared') return Response.json({ workspaces: [] })
+      if (path === '/cloud/api/workspaces/remote') return Response.json({ workspaces: [] })
       return new Response(body || 'file bytes', {
         headers: { 'content-type': request.headers.get('content-type') ?? 'text/plain' }
       })

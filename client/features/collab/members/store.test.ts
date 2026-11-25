@@ -116,7 +116,7 @@ test('optimistic pending actions are derived over the newest snapshot without mu
   expect(applyPendingMembership(pushed, [])).toEqual(pushed)
 })
 
-test('shared workspaces are listed under the owner address and lose access when omitted', () => {
+test('remote workspaces are listed under the owner address and lose access when omitted', () => {
   setIdentity(alex)
   const id = 'visitor-board'
   seedWorkspaceInfo(id, { user_id: 'host', workspace_id: 'board' })
