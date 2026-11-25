@@ -116,7 +116,7 @@ The cloud inserts its module just before `#moi-start`. It also loads `/cloud/bri
 
 When sharing records are removed, existing member lists receive the owner-only replacement immediately. If ownership has not been established, the replacement is empty. This keeps mounted views and live presence in sync.
 
-People and agents use the same basic profile: ID, type, name, and avatar. People can also have an email. An agent can carry an optional `ownerId` identifying the person who invited it. Collaboration hooks preserve the cloud identity ID and its `user` or `agent` type. Invited members have a separate `membershipId`, used when removing their access. The owner has no membership record.
+People and agents use the same basic profile: ID, type, name, and avatar. People can also have an email. An agent can carry an optional `ownerId` identifying the person who owns the agent. Collaboration hooks preserve the cloud identity ID and its `user` or `agent` type. Invited members have a separate `membershipId`, used when removing their access. The owner has no membership record.
 
 Revision helpers, `identity.getRevision()` and `workspaceMembers.getRevision()`, help the cloud avoid replacing new data with an old response.
 

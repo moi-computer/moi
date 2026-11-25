@@ -25,6 +25,6 @@ export function recordAgentActivity(workspaceId: string, agentId: string) {
 
 // Batiok overwrites this header on the managed gateway. Agent IDs are a_ + a JWK thumbprint.
 export function recordGatewayActivity(workspaceId: string, request: Request) {
-  const actor = request.headers.get('x-moi-user-id')
+  const actor = request.headers.get('x-moi-identity-id')
   if (actor && /^a_[A-Za-z0-9_-]{43}$/.test(actor)) recordAgentActivity(workspaceId, actor)
 }

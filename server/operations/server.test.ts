@@ -34,7 +34,8 @@ test('binary upload, download, HEAD, overwrite and empty files', async () => {
 })
 test('workspace reads renew only the requesting agent’s one-minute activity window', async () => {
   const agentId = 'a_' + 'x'.repeat(43)
-  const read = (id: string) => request('files/activity.txt', { headers: { 'x-moi-user-id': id } })
+  const read = (id: string) =>
+    request('files/activity.txt', { headers: { 'x-moi-identity-id': id } })
   await Bun.write(join(root, 'activity.txt'), 'test')
   jest.useFakeTimers()
   try {
@@ -168,7 +169,7 @@ test('explicit cancellation stops only the matching caller and prevents a late s
   const id = crypto.randomUUID()
   const start = await request('exec', {
     method: 'POST',
-    headers: { 'x-moi-user-id': 'agent-a' },
+    headers: { 'x-moi-identity-id': 'agent-a' },
     body: JSON.stringify({
       id,
       command: 'printf ready; sleep 0.1; printf alive; sleep 1; touch cancel-should-not-exist'
@@ -178,13 +179,13 @@ test('explicit cancellation stops only the matching caller and prevents a late s
   await reader.read()
   await request('exec', {
     method: 'POST',
-    headers: { 'x-moi-user-id': 'agent-b' },
+    headers: { 'x-moi-identity-id': 'agent-b' },
     body: JSON.stringify({ cancel: id })
   })
   expect(new TextDecoder().decode((await reader.read()).value)).toContain('alive')
   await request('exec', {
     method: 'POST',
-    headers: { 'x-moi-user-id': 'agent-a' },
+    headers: { 'x-moi-identity-id': 'agent-a' },
     body: JSON.stringify({ cancel: id })
   })
   while (!(await reader.read()).done) {
@@ -196,7 +197,7 @@ test('explicit cancellation stops only the matching caller and prevents a late s
     (
       await request('exec', {
         method: 'POST',
-        headers: { 'x-moi-user-id': 'agent-a' },
+        headers: { 'x-moi-identity-id': 'agent-a' },
         body: JSON.stringify({ id, command: 'true' })
       })
     ).status

@@ -6,7 +6,7 @@ Use `moi/collab` in views and widgets to display workspace members and share cur
 
 A workspace member is a person or agent with access. Moi manages profiles and workspace membership. Store only identity IDs in fields such as `authorId` or `assigneeIds`, then resolve the current profile for display. Keep applet-specific roles and preferences in applet storage, keyed by identity ID.
 
-All four hooks below return member profiles with the original identity ID. Presence entries use that same ID in `identityId`. A `MemberProfile`’s `type` is `'user'` for a person and `'agent'` for an agent. For agents, the cloud supplies `ownerId` when the inviter is known. A member’s `status` tracks tab visibility. A visible tab on another workspace page still counts as active, even while the person is idle.
+All four hooks below return member profiles with the original identity ID. Presence entries use that same ID in `identityId`. A `MemberProfile`’s `type` is `'user'` for a person and `'agent'` for an agent. For agents, `ownerId` identifies the person who owns the agent when the cloud supplies that information. A member’s `status` tracks tab visibility. A visible tab on another workspace page still counts as active, even while the person is idle.
 
 - `active` means at least one tab is visible in this workspace.
 - `away` means connected with no visible tab in this workspace.
