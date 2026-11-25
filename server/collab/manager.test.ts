@@ -82,7 +82,7 @@ async function connect(url: string, id: string) {
   socket.onmessage = event => messages.push(JSON.parse(String(event.data)) as CollabServerMessage)
   const send = (message: CollabClientMessage) => socket.send(JSON.stringify(message))
   await until(() => socket.readyState === WebSocket.OPEN)
-  send({ type: 'join', version: 1, profile: { type: 'human', id, name: id, color: 'blue' } })
+  send({ type: 'join', version: 1, profile: { type: 'user', id, name: id, color: 'blue' } })
   await until(() => messages.some(message => message.type === 'welcome'))
   return { socket, messages, send }
 }
@@ -126,13 +126,13 @@ function joinLocal(runtime: CollabManager, socket: ClientSocket, id = 'anna') {
     JSON.stringify({
       type: 'join',
       version: 1,
-      profile: { type: 'human', id, name: id, color: 'blue' }
+      profile: { type: 'user', id, name: id, color: 'blue' }
     })
   )
 }
 
 describe('collab process and socket integration', () => {
-  test('simultaneous connections share one worker and workspaces isolate presence and users', async () => {
+  test('simultaneous connections share one worker and workspaces isolate presence and profiles', async () => {
     const runtime = manager()
     const first = directory()
     const second = directory()
@@ -142,14 +142,16 @@ describe('collab process and socket integration', () => {
     expect(runtime.debugSnapshot()).toHaveLength(1)
     expect(
       latestConnections(a.messages)
-        .users.map(user => user.id)
+        .profiles.map(user => user.id)
         .sort()
     ).toEqual(['anna', 'boris'])
     const c = await connect(serve(runtime, second), 'carla')
-    expect(latestConnections(c.messages).connections.map(user => user.userId)).toEqual(['carla'])
+    expect(latestConnections(c.messages).connections.map(user => user.identityId)).toEqual([
+      'carla'
+    ])
     expect(
       latestConnections(b.messages)
-        .users.map(user => user.id)
+        .profiles.map(user => user.id)
         .sort()
     ).toEqual(['anna', 'boris'])
     expect(runtime.debugSnapshot()).toHaveLength(2)
@@ -172,14 +174,14 @@ describe('collab process and socket integration', () => {
     })
     await until(() =>
       latestConnections(b.messages).connections.some(
-        item => item.userId === 'anna' && item.presence.length === 1
+        item => item.identityId === 'anna' && item.presence.length === 1
       )
     )
     a.send({ type: 'location', location: { page: 'views/board', status: 'away' } })
     await until(() =>
       latestConnections(b.messages).connections.some(
         item =>
-          item.userId === 'anna' &&
+          item.identityId === 'anna' &&
           item.location?.page === 'views/board' &&
           item.location.status === 'away'
       )
@@ -187,7 +189,7 @@ describe('collab process and socket integration', () => {
     expect(runtime.debugSnapshot()[0]?.connections).toBe(2)
     a.socket.close()
     await until(() => latestConnections(b.messages).connections.length === 1)
-    expect(latestConnections(b.messages).users.map(user => user.id)).toEqual(['boris'])
+    expect(latestConnections(b.messages).profiles.map(user => user.id)).toEqual(['boris'])
     expect(runtime.debugSnapshot()[0]?.connections).toBe(1)
   })
 
@@ -212,7 +214,7 @@ describe('collab process and socket integration', () => {
     await Bun.sleep(300)
     const replacement = await connect(url, 'boris')
     expect(runtime.debugSnapshot()[0]?.generation).not.toBe(previous.generation)
-    expect(latestConnections(replacement.messages).users.map(user => user.id)).toEqual(['boris'])
+    expect(latestConnections(replacement.messages).profiles.map(user => user.id)).toEqual(['boris'])
     expect(latestConnections(replacement.messages).connections[0]?.presence).toEqual([])
   })
 
@@ -233,7 +235,7 @@ describe('collab process and socket integration', () => {
       JSON.stringify({
         type: 'join',
         version: 0,
-        profile: { type: 'human', id: 'invalid', name: 'Invalid', color: 'blue' }
+        profile: { type: 'user', id: 'invalid', name: 'Invalid', color: 'blue' }
       }),
       JSON.stringify({
         type: 'mutate',
@@ -251,7 +253,7 @@ describe('collab process and socket integration', () => {
         .filter(item => item.type === 'error')
         .every(item => item.code === 'invalid_message')
     ).toBe(true)
-    expect(latestConnections(client.messages).connections.map(item => item.userId)).toEqual([
+    expect(latestConnections(client.messages).connections.map(item => item.identityId)).toEqual([
       'anna'
     ])
     client.send({ type: 'ping' })
@@ -265,8 +267,8 @@ describe('collab process and socket integration', () => {
     const b = await connect(url, 'boris')
     a.socket.send('x'.repeat(COLLAB_MAX_MESSAGE_BYTES + 1))
     await until(() => a.socket.readyState === WebSocket.CLOSED)
-    await until(() => latestConnections(b.messages).users.length === 1)
-    expect(latestConnections(b.messages).users[0]?.id).toBe('boris')
+    await until(() => latestConnections(b.messages).profiles.length === 1)
+    expect(latestConnections(b.messages).profiles[0]?.id).toBe('boris')
   })
 
   test('a missed departure snapshot forces reconnect even when the buffer drains before ping', async () => {
@@ -279,7 +281,7 @@ describe('collab process and socket integration', () => {
     await until(() => client.messages.some(item => item.type === 'welcome'))
     runtime.open(peer.socket, workspace)
     joinLocal(runtime, peer.socket, 'boris')
-    await until(() => latestConnections(client.messages).users.length === 2)
+    await until(() => latestConnections(client.messages).profiles.length === 2)
     const count = client.messages.length
     client.buffered = 1024 * 1024 + 1
     runtime.close(peer.socket)
@@ -295,14 +297,14 @@ describe('collab process and socket integration', () => {
     runtime.open(replacement.socket, workspace)
     joinLocal(runtime, replacement.socket)
     await until(() => replacement.messages.some(message => message.type === 'welcome'))
-    expect(latestConnections(replacement.messages).users.map(user => user.id)).toEqual(['anna'])
+    expect(latestConnections(replacement.messages).profiles.map(user => user.id)).toEqual(['anna'])
   })
 
   test('a proxy-verified socket joins only with its verified id and keeps its verified profile', async () => {
     const runtime = manager()
     const workspace = directory()
     const verified = {
-      type: 'human',
+      type: 'user',
       id: 'cf-user-1',
       color: 'blue',
       email: 'alex@example.com'
@@ -320,7 +322,7 @@ describe('collab process and socket integration', () => {
     runtime.open(peer.socket, workspace)
     joinLocal(runtime, peer.socket, 'carla')
     await until(() => peer.messages.some(item => item.type === 'welcome'))
-    expect(latestConnections(peer.messages).users).toEqual([verified, expect.anything()])
+    expect(latestConnections(peer.messages).profiles).toEqual([verified, expect.anything()])
   })
 
   test('heartbeats keep active sockets live and silent connections time out', async () => {
@@ -332,8 +334,8 @@ describe('collab process and socket integration', () => {
     try {
       await until(() => silent.socket.readyState === WebSocket.CLOSED, 6500)
       expect(active.socket.readyState).toBe(WebSocket.OPEN)
-      await until(() => latestConnections(active.messages).users.length === 1)
-      expect(latestConnections(active.messages).users[0]?.id).toBe('anna')
+      await until(() => latestConnections(active.messages).profiles.length === 1)
+      expect(latestConnections(active.messages).profiles[0]?.id).toBe('anna')
     } finally {
       clearInterval(heartbeat)
     }
@@ -411,7 +413,7 @@ describe('collab process and socket integration', () => {
         return message.length;
       }, close() {} };
       runtime.open(socket, ${JSON.stringify(root)});
-      runtime.message(socket, JSON.stringify({ type: 'join', version: 1, profile: { type: 'human', id: 'test', name: 'Test', color: 'blue' } }));
+      runtime.message(socket, JSON.stringify({ type: 'join', version: 1, profile: { type: 'user', id: 'test', name: 'Test', color: 'blue' } }));
     `
     )
     const parent = Bun.spawn([process.execPath, parentPath], { stdout: 'pipe', stderr: 'inherit' })

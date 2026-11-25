@@ -56,7 +56,7 @@ if (target.startsWith('ui/')) {
   await loadAppConfig()
   // client/index.tsx makes a random local user on first run; a fixed one keeps
   // the captures the same.
-  setLocalUser({ type: 'human', id: 'local-mole', name: 'Mole', color: 'blue' })
+  setLocalUser({ type: 'user', id: 'local-mole', name: 'Mole', color: 'blue' })
   const { hook } = memoryLocation({ path: target || '/' })
   createRoot(root).render(
     <QueryClientProvider client={queryClient}>

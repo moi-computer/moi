@@ -63,9 +63,9 @@ test('missing collaboration bridge returns empty hook values and warns once', as
     for (const bridge of [undefined, null, {}, { collab: undefined }]) {
       api.__attachBridge(bridge)
       expect(api.useMe()).toBeUndefined()
-      expect(api.useUser('alice')).toBeUndefined()
+      expect(api.useMember('alice')).toBeUndefined()
       expect(api.usePeers()).toEqual([])
-      expect(api.useWorkspaceUsers()).toEqual([])
+      expect(api.useWorkspaceMembers()).toEqual([])
       expect(api.usePresence('editing')).toEqual([])
       expect(api.usePublishPresence('editing', true)).toBeUndefined()
     }
@@ -82,9 +82,9 @@ test('every collaboration component renders nothing without its bridge, includin
   try {
     const children = <span>Applet child content</span>
     const components = {
-      User: <api.User id="alice" />,
-      UserAvatar: <api.UserAvatar id="alice" />,
-      UserAvatarGroup: <api.UserAvatarGroup ids={['alice']} />,
+      Profile: <api.Profile id="alice" />,
+      ProfileAvatar: <api.ProfileAvatar id="alice" />,
+      ProfileAvatarGroup: <api.ProfileAvatarGroup ids={['alice']} />,
       Cursors: <api.Cursors>{children}</api.Cursors>,
       PresenceFrame: <api.PresenceFrame id="task:1">{children}</api.PresenceFrame>,
       PresenceAvatars: <api.PresenceAvatars id="task:1">{children}</api.PresenceAvatars>,
@@ -101,19 +101,21 @@ test('every collaboration component renders nothing without its bridge, includin
 test('the bridge delegates when attached and falls back again when disposed', async () => {
   const api = await loadModule()
   const warning = spyOn(console, 'warn').mockImplementation(() => {})
-  const user: CollabApi.WorkspaceUser = {
-    type: 'human',
+  const user: CollabApi.MemberProfile = {
+    type: 'user',
     id: 'alice',
     name: 'Alice',
     color: 'blue',
     status: 'active'
   }
   const host = {
-    useUser: mock((_id: string) => user),
-    useWorkspaceUsers: mock((_options?: CollabApi.UseWorkspaceUsersOptions) => [user]),
+    useMember: mock((_id: string) => user),
+    useWorkspaceMembers: mock((_options?: CollabApi.UseWorkspaceMembersOptions) => [user]),
     usePublishPresence: mock((_channel: string, _value: unknown) => {}),
-    User: mock(() => createElement('span', null, 'Alice')),
-    UserAvatar: mock((_props: CollabApi.UserAvatarProps) => createElement('span', null, 'Avatar'))
+    Profile: mock(() => createElement('span', null, 'Alice')),
+    ProfileAvatar: mock((_props: CollabApi.ProfileAvatarProps) =>
+      createElement('span', null, 'Avatar')
+    )
   }
   let alive = true
   try {
@@ -122,38 +124,38 @@ test('the bridge delegates when attached and falls back again when disposed', as
         return alive ? host : undefined
       }
     })
-    expect(api.useUser('alice')).toBe(user)
-    expect(api.useWorkspaceUsers({ status: 'active' })).toEqual([user])
-    expect(host.useWorkspaceUsers.mock.calls).toEqual([[{ status: 'active' }]])
-    expect(host.useUser.mock.calls).toEqual([['alice']])
+    expect(api.useMember('alice')).toBe(user)
+    expect(api.useWorkspaceMembers({ status: 'active' })).toEqual([user])
+    expect(host.useWorkspaceMembers.mock.calls).toEqual([[{ status: 'active' }]])
+    expect(host.useMember.mock.calls).toEqual([['alice']])
     api.usePublishPresence('editing', { field: 'title' })
     expect(host.usePublishPresence.mock.calls).toEqual([['editing', { field: 'title' }]])
-    expect(renderToStaticMarkup(createElement(api.User, { id: 'alice' }))).toBe(
+    expect(renderToStaticMarkup(createElement(api.Profile, { id: 'alice' }))).toBe(
       '<span>Alice</span>'
     )
-    expect(renderToStaticMarkup(createElement(api.UserAvatar, { id: 'alice', size: 'sm' }))).toBe(
-      '<span>Avatar</span>'
-    )
-    expect(host.UserAvatar.mock.calls[0]?.[0]).toEqual({
+    expect(
+      renderToStaticMarkup(createElement(api.ProfileAvatar, { id: 'alice', size: 'sm' }))
+    ).toBe('<span>Avatar</span>')
+    expect(host.ProfileAvatar.mock.calls[0]?.[0]).toEqual({
       id: 'alice',
       size: 'sm'
     })
     expect(warning).not.toHaveBeenCalled()
 
     alive = false
-    expect(api.useUser('alice')).toBeUndefined()
-    expect(api.useWorkspaceUsers()).toEqual([])
+    expect(api.useMember('alice')).toBeUndefined()
+    expect(api.useWorkspaceMembers()).toEqual([])
     api.usePublishPresence('editing', false)
-    expect(renderToStaticMarkup(createElement(api.User, { id: 'alice' }))).toBe('')
+    expect(renderToStaticMarkup(createElement(api.Profile, { id: 'alice' }))).toBe('')
     expect(host.usePublishPresence).toHaveBeenCalledTimes(1)
-    expect(host.useWorkspaceUsers).toHaveBeenCalledTimes(1)
-    expect(renderToStaticMarkup(createElement(api.UserAvatar, { id: 'alice' }))).toBe('')
-    expect(host.UserAvatar).toHaveBeenCalledTimes(1)
-    expect(host.User).toHaveBeenCalledTimes(1)
+    expect(host.useWorkspaceMembers).toHaveBeenCalledTimes(1)
+    expect(renderToStaticMarkup(createElement(api.ProfileAvatar, { id: 'alice' }))).toBe('')
+    expect(host.ProfileAvatar).toHaveBeenCalledTimes(1)
+    expect(host.Profile).toHaveBeenCalledTimes(1)
     expect(warning).toHaveBeenCalledTimes(1)
 
     alive = true
-    expect(api.useUser('alice')).toBe(user)
+    expect(api.useMember('alice')).toBe(user)
   } finally {
     warning.mockRestore()
   }

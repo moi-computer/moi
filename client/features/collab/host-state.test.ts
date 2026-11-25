@@ -2,15 +2,15 @@ import * as identityStore from '../identity/store'
 import { colorForId } from '@/lib/collab/colors'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 
-import type { UserProfile } from '@/lib/collab/types'
+import type { Profile } from '@/lib/collab/types'
 
 import type * as HostStateModule from './host-state'
 
 const PROFILE_KEY = 'moi:local-profile'
-const alice = { type: 'human', id: 'alice', name: 'Alice', color: 'emerald' } satisfies UserProfile
-const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } satisfies UserProfile
+const alice = { type: 'user', id: 'alice', name: 'Alice', color: 'emerald' } satisfies Profile
+const bob = { type: 'user', id: 'bob', name: 'Bob', color: 'blue' } satisfies Profile
 const carol = {
-  type: 'human',
+  type: 'user',
   id: 'cf-carol',
   color: 'emerald',
   email: 'carol@example.com'
@@ -34,7 +34,7 @@ afterEach(() => {
 type Host = { moi?: Record<string, unknown> }
 type SetupOptions = {
   // A local profile saved by an earlier session.
-  profile?: UserProfile
+  profile?: Profile
   beforeInstall?: (state: typeof HostStateModule) => void
   initializeSaved?: boolean
   host?: Host
@@ -66,7 +66,7 @@ async function setup({
   return {
     ...collab,
     saved,
-    publishIdentity: (profile: UserProfile | undefined) => {
+    publishIdentity: (profile: Profile | undefined) => {
       restoreIdentity()
       identityStore.setIdentity(
         profile
@@ -87,21 +87,21 @@ async function setup({
 test('a saved local profile restores after confirmed local initialization', async () => {
   const savedProfile = { ...alice, id: 'local-saved' }
   const collab = await setup({ profile: savedProfile })
-  expect(collab.getCurrentUser()).toEqual(savedProfile)
-  expect(collab.getCurrentUserSource()).toBe('local')
+  expect(collab.getCurrentProfile()).toEqual(savedProfile)
+  expect(collab.getCurrentProfileSource()).toBe('local')
   expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(savedProfile)
 })
 
 test('saved local users stay inactive until local mode is confirmed and the proxy check succeeds', async () => {
   const collab = await setup({ profile: alice, initializeSaved: false })
-  expect(collab.getCurrentUser()).toBeUndefined()
+  expect(collab.getCurrentProfile()).toBeUndefined()
   collab.initializeLocalUser(false, {})
   collab.initializeLocalUser(true, undefined)
-  expect(collab.getCurrentUser()).toBeUndefined()
+  expect(collab.getCurrentProfile()).toBeUndefined()
   expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(alice)
   collab.initializeLocalUser(true, {})
-  expect(collab.getCurrentUser()).toEqual(alice)
-  expect(collab.getCurrentUserSource()).toBe('local')
+  expect(collab.getCurrentProfile()).toEqual(alice)
+  expect(collab.getCurrentProfileSource()).toBe('local')
 })
 
 test.each([accessed, { provider: 'cloudflare-access' } as const])(
@@ -111,8 +111,8 @@ test.each([accessed, { provider: 'cloudflare-access' } as const])(
     collab.setProxyUserState(proxyUser)
     collab.initializeLocalUser(true, proxyUser)
     collab.initializeLocalUser(true, {})
-    expect(collab.getCurrentUser()).toEqual('profile' in proxyUser ? carol : undefined)
-    expect(collab.getCurrentUserSource()).toBe('cloudflare-access')
+    expect(collab.getCurrentProfile()).toEqual('profile' in proxyUser ? carol : undefined)
+    expect(collab.getCurrentProfileSource()).toBe('cloudflare-access')
     expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(alice)
   }
 )
@@ -121,7 +121,7 @@ test('invalid or unavailable local storage still allows a confirmed local user',
   const collab = await setup()
   collab.saved.set(PROFILE_KEY, 'invalid json')
   collab.initializeLocalUser(true, {})
-  expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(collab.getCurrentUser())
+  expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(collab.getCurrentProfile())
   const inaccessible = await setup()
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
@@ -135,8 +135,8 @@ test('invalid or unavailable local storage still allows a confirmed local user',
     }
   })
   inaccessible.initializeLocalUser(true, {})
-  expect(inaccessible.getCurrentUserSource()).toBe('local')
-  expect(inaccessible.getCurrentUser()).toBeDefined()
+  expect(inaccessible.getCurrentProfileSource()).toBe('local')
+  expect(inaccessible.getCurrentProfile()).toBeDefined()
 })
 
 // The host script runs after moi's bundle but before startup finishes, so its
@@ -144,9 +144,9 @@ test('invalid or unavailable local storage still allows a confirmed local user',
 test('storage changes synchronize local profiles without writing back or replacing external users', async () => {
   const collab = await setup({ profile: alice })
   let notices = 0
-  collab.subscribeCurrentUserStore(() => notices++)
+  collab.subscribeCurrentProfileStore(() => notices++)
   collab.receiveLocalProfile({ key: PROFILE_KEY, newValue: JSON.stringify(bob) })
-  expect(collab.getCurrentUser()).toEqual(bob)
+  expect(collab.getCurrentProfile()).toEqual(bob)
   expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(alice)
   expect(notices).toBe(1)
   collab.receiveLocalProfile({ key: PROFILE_KEY, newValue: 'bad' })
@@ -154,7 +154,7 @@ test('storage changes synchronize local profiles without writing back or replaci
   expect(notices).toBe(1)
   collab.publishIdentity(alice)
   collab.receiveLocalProfile({ key: PROFILE_KEY, newValue: JSON.stringify(bob) })
-  expect(collab.getCurrentUser()).toEqual({ ...alice, color: colorForId(alice.id) })
+  expect(collab.getCurrentProfile()).toEqual({ ...alice, color: colorForId(alice.id) })
 })
 
 test('storage subscription updates the profile and stops after cleanup', async () => {
@@ -166,45 +166,45 @@ test('storage subscription updates the profile and stops after cleanup', async (
   }
   const collab = await setup({ profile: alice, host })
   const unsubscribe = collab.subscribeLocalProfileStorage()
-  const notify = (profile: UserProfile) => {
+  const notify = (profile: Profile) => {
     const event = new Event('storage')
     Object.assign(event, { key: PROFILE_KEY, newValue: JSON.stringify(profile) })
     events.dispatchEvent(event)
   }
   notify(bob)
-  expect(collab.getCurrentUser()).toEqual(bob)
+  expect(collab.getCurrentProfile()).toEqual(bob)
   unsubscribe()
   notify(alice)
-  expect(collab.getCurrentUser()).toEqual(bob)
+  expect(collab.getCurrentProfile()).toEqual(bob)
 })
 
 test('cloud identity publishes without a global member list or callback', async () => {
   const collab = await setup({ profile: alice })
   let notices = 0
-  collab.subscribeCurrentUserStore(() => notices++)
+  collab.subscribeCurrentProfileStore(() => notices++)
   collab.publishIdentity(bob)
-  expect(collab.getCurrentUser()).toEqual({ ...bob, color: colorForId(bob.id) })
-  expect(collab.getCurrentUserSource()).toBe('external')
-  const profile = collab.getCurrentUser()
-  expect(collab.getCurrentUser()).toBe(profile)
+  expect(collab.getCurrentProfile()).toEqual({ ...bob, color: colorForId(bob.id) })
+  expect(collab.getCurrentProfileSource()).toBe('external')
+  const profile = collab.getCurrentProfile()
+  expect(collab.getCurrentProfile()).toBe(profile)
   collab.publishIdentity({ ...bob })
-  expect(collab.getCurrentUser()).toBe(profile)
+  expect(collab.getCurrentProfile()).toBe(profile)
   expect(notices).toBe(1)
   collab.setProxyUserState(accessed)
-  expect(collab.getCurrentUser()).toEqual({ ...bob, color: colorForId(bob.id) })
+  expect(collab.getCurrentProfile()).toEqual({ ...bob, color: colorForId(bob.id) })
   collab.publishIdentity(undefined)
   collab.setLocalUser(alice)
-  expect(collab.getCurrentUser()).toBeUndefined()
+  expect(collab.getCurrentProfile()).toBeUndefined()
 })
 
 test('agent identity and anonymous sign-in derive presence without restoring a local profile', async () => {
   const collab = await setup({ profile: alice })
   restoreIdentity()
   identityStore.setIdentity({ id: 'helper', type: 'agent', name: 'Helper' })
-  expect(collab.getCurrentUser()).toMatchObject({ id: 'helper', type: 'agent', name: 'Helper' })
+  expect(collab.getCurrentProfile()).toMatchObject({ id: 'helper', type: 'agent', name: 'Helper' })
   identityStore.setIdentity({ id: 'guest', type: 'user', name: '', email: '', isAnonymous: true })
-  expect(collab.getCurrentUser()).toBeUndefined()
-  expect(collab.getCurrentUserSource()).toBe('external')
+  expect(collab.getCurrentProfile()).toBeUndefined()
+  expect(collab.getCurrentProfileSource()).toBe('external')
   collab.initializeLocalUser(true, {})
-  expect(collab.getCurrentUser()).toBeUndefined()
+  expect(collab.getCurrentProfile()).toBeUndefined()
 })

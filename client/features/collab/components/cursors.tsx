@@ -1,5 +1,5 @@
 import type { CursorsProps as CursorsContainerProps } from 'moi/collab'
-import type { UserProfile } from '@/lib/collab/types'
+import type { Profile } from '@/lib/collab/types'
 import type { JsonValue } from 'moi'
 import { useLayoutEffect, useRef } from 'react'
 import type { PointerEvent, ReactNode, Ref, RefObject } from 'react'
@@ -12,9 +12,9 @@ import {
   presenceChannels,
   usePresenceChannel,
   usePresencePublisher,
-  useUsers
+  useMembers
 } from '../presence/hooks'
-import { userDisplayName } from '@/client/lib/user-display-name'
+import { profileDisplayName } from '@/client/lib/profile-display-name'
 import { hasPresence } from './presence-helpers'
 
 export type PointerPosition = {
@@ -46,12 +46,12 @@ export function CursorsContainer({ id = 'default', ...props }: CursorsContainerP
   const cursors = usePresenceChannel<JsonValue>(channel)
   const publish = usePresencePublisher<JsonValue>(channel, null, hasPresence)
   const byConnection = new Map<string, { id: string; point: PointerPosition }>()
-  for (const { connectionId, userId, value } of cursors) {
+  for (const { connectionId, identityId, value } of cursors) {
     const point = pointerPosition(value)
-    if (point) byConnection.set(connectionId, { id: userId, point })
+    if (point) byConnection.set(connectionId, { id: identityId, point })
   }
   const entries = [...byConnection]
-  const profiles = useUsers(entries.map(([, cursor]) => cursor.id))
+  const profiles = useMembers(entries.map(([, cursor]) => cursor.id))
   return (
     <Cursors
       {...props}
@@ -70,7 +70,7 @@ export type CursorsProps = {
   id?: string
   children: ReactNode
   className?: string
-  cursors: readonly { connectionId: string; point: PointerPosition; profile?: UserProfile }[]
+  cursors: readonly { connectionId: string; point: PointerPosition; profile?: Profile }[]
   onPositionChange?: (point: PointerPosition | null) => void
 }
 
@@ -155,7 +155,7 @@ export function Cursors({
 type RemoteCursorProps = {
   root: RefObject<HTMLDivElement | null>
   point: PointerPosition
-  profile?: UserProfile
+  profile?: Profile
 }
 // Semantic anchors follow their own data through scrolling and reordering.
 // A cursor on a different record's modal has no matching anchor and stays hidden.
@@ -213,7 +213,7 @@ function RemoteCursor({ root, point, profile }: RemoteCursorProps) {
 }
 
 type CursorProps = {
-  profile?: UserProfile
+  profile?: Profile
   ref?: Ref<HTMLSpanElement>
 }
 function Cursor({ profile: user, ref }: CursorProps) {
@@ -233,7 +233,7 @@ function Cursor({ profile: user, ref }: CursorProps) {
           className="-translate-x-0.5 -translate-y-0.5 fill-collab stroke-white drop-shadow-xs"
         />
         <Badge className="absolute top-3.5 left-3.5 bg-collab text-collab-foreground">
-          <span className="truncate">{user ? userDisplayName(user) : 'Someone'}</span>
+          <span className="truncate">{user ? profileDisplayName(user) : 'Someone'}</span>
         </Badge>
       </span>
     </span>

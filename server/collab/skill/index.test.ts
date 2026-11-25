@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type * as CollabApi from 'moi/collab'
 import type { AppletCollabApi } from '@/client/features/collab/applet-api'
-import type { USER_COLORS } from '@/lib/collab/colors'
+import type { PROFILE_COLORS } from '@/lib/collab/colors'
 import type { HarnessType } from '@/lib/types'
 import { resetAppConfig } from '../../app-config'
 import { updateWorkspaceSkills } from '../../skills/update'
@@ -14,7 +14,7 @@ import { collabSkillReferencePath } from './index'
 // This assignment is checked by tsc without importing React into the server.
 const declarationsMatch: AppletCollabApi extends typeof CollabApi ? true : false = true
 // `satisfies` checks palette entries; this checks that none are missing.
-const paletteDeclarationsMatch: CollabApi.UserColor extends (typeof USER_COLORS)[number]
+const paletteDeclarationsMatch: CollabApi.ProfileColor extends (typeof PROFILE_COLORS)[number]
   ? true
   : false = true
 

@@ -1,63 +1,43 @@
 # Collab
 
-Moi workspaces can be shared with multiple users. Use `moi/collab` in views and widgets to
-show users and share cursors, focus, selections, and custom presence. Moi supplies identity,
-workspace membership, and the connection. Import the API directly; no provider or socket
-setup is needed.
+Use `moi/collab` in views and widgets to display workspace members and share cursors, focus, selections, and custom presence. Import the API directly. Moi provides the workspace directory, React context, and socket connection. See `.moi/collab.d.ts` for the full API.
 
-See `.moi/collab.d.ts` for the full types and props.
+## Members
 
-## Users
+A workspace member is a person or agent with access. Moi manages profiles and workspace membership. Store only identity IDs in fields such as `authorId` or `assigneeIds`, then resolve the current profile for display. Keep applet-specific roles and preferences in applet storage, keyed by identity ID.
 
-Store **only** user IDs in application records, such as `authorId` or `assigneeIds`. Resolve their
-current profiles through hooks or components. Keep applet-specific roles and preferences
-separately, keyed by user ID. The host owns profile updates and workspace membership.
+All four hooks below return member profiles with the original identity ID. Presence entries use that same ID in `identityId`. A `MemberProfile`’s `type` is `'user'` for a person and `'agent'` for an agent. For agents, the cloud supplies `ownerId` when the inviter is known. A member’s `status` tracks tab visibility. A visible tab on another workspace page still counts as active, even while the person is idle.
 
-All four user hooks return profiles with the original identity ID and a `type` of
-`'human'` or `'agent'`. Group assignees by `type`. An agent’s optional `ownerId` is the
-human ID supplied by the cloud for the person who invited it. When omitted, the inviter
-is unknown. Presence entries identify their publisher by the same ID in `userId`.
-
-User results include a `status`:
-
-- `active`: at least one connected browser tab is visible in this workspace.
-- `away`: connected, with no visible tab in this workspace.
-- `offline`: no connection in this workspace.
-
-This tracks tab visibility, not idle time. A user on another page can still be active.
+- `active` means at least one tab is visible in this workspace.
+- `away` means connected with no visible tab in this workspace.
+- `offline` means there are no live connections in this workspace.
 
 ### Hooks
 
-#### `useMe` and `useUser`
+Use `useMe()` for the current identity's profile. Use `useMember(id)` to look up an author or assignee by identity ID, even while the member is offline. Both return `undefined` when the profile is unavailable.
 
-Use `useMe()` when an action needs the current user's identity, such as assigning a task
-to yourself. Use `useUser(id)` to resolve a stored author or assignee, including an offline
-member. Both return `undefined` when the profile cannot be resolved. Handle that before
-reading profile fields.
+Use `useWorkspaceMembers()` for a directory or assignee picker. It includes yourself and offline members. Filter by status with the hook's `status` option, or by identity type in your applet:
 
-#### `useWorkspaceUsers` and `usePeers`
+```tsx
+const agents = useWorkspaceMembers().filter(member => member.type === 'agent')
+```
 
-Use `useWorkspaceUsers()` for assignee pickers and member lists. It includes your own user
-and offline members. Filter with `status: 'active'`, `'away'`, or `'offline'`.
-
-Use `usePeers()` to find other connected users on the current page. It excludes your own
-user and combines multiple browser tabs into one user. Set `scope: 'workspace'` to include
-other pages; its status filter accepts `'active'` or `'away'`.
+Use `usePeers()` for other connected members on the current page. Each identity appears once across tabs. Set `scope: 'workspace'` to include other pages. The peer filter accepts `status: 'active'` or `status: 'away'`.
 
 ### Components
 
-#### `User` and `UserAvatar`
+#### `Profile` and `ProfileAvatar`
 
-`User` shows an avatar and name, with optional secondary `description` text. `UserAvatar` shows
-only the avatar. Pass a user ID; both handle missing names and unknown users.
+`Profile` shows an avatar and name, with optional secondary `description` text. `ProfileAvatar` shows
+only the avatar. Pass an identity ID; both handle missing names and unknown members.
 
-`User` and `UserAvatar` hide the status badge by default; pass `showStatusBadge` to show it
-for active users.
+`Profile` and `ProfileAvatar` hide the status badge by default; pass `showStatusBadge` to show it
+for active members.
 
-#### `UserAvatarGroup`
+#### `ProfileAvatarGroup`
 
-Show several users together. IDs are deduplicated; `max` limits the visible avatars and
-remaining users appear as an overflow count.
+Show several members together. IDs are deduplicated; `max` limits the visible avatars and
+remaining members appear as an overflow count.
 
 ## Presence
 
@@ -66,7 +46,7 @@ or custom state. It is removed when its publishing component unmounts, the apple
 inactive, or the browser tab is hidden.
 
 Save durable application content through your applet's `.server.ts` functions and storage.
-Presence does not persist it. With live presence disabled, user lookups remain available
+Presence does not persist it. With live presence disabled, member lookups remain available
 and applet content still renders.
 
 Presence is scoped to the current page and applet. Matching IDs or channels in another
@@ -87,12 +67,12 @@ an active tool, or a drag preview. Publish near the interaction and read the cha
 that information is useful in the applet. `usePublishPresence(channel, value)` publishes a
 value and replaces it when it changes. Values must be JSON and no larger than 4 KiB.
 
-`usePresence<T>(channel)` reads other connections' `{ connectionId, userId, value }` entries.
-Reading never publishes presence. One user can have multiple entries, including another tab
-of your own user. Resolve each `userId` with `User` or `useUser`.
+`usePresence<T>(channel)` reads other connections' `{ connectionId, identityId, value }` entries.
+Reading never publishes presence. One member can have multiple entries, including another tab
+of your own identity. Resolve each `identityId` with `Profile` or `useMember`.
 
 ```tsx
-import { usePresence, usePublishPresence, User } from 'moi/collab'
+import { usePresence, usePublishPresence, Profile } from 'moi/collab'
 
 type TaskPresenceProps = { taskId: string }
 
@@ -106,7 +86,7 @@ function TaskEditors({ taskId }: TaskPresenceProps) {
   const editors = usePresence<{ taskId: string }>('editing')
   return editors
     .filter(entry => entry.value.taskId === taskId)
-    .map(entry => <User key={entry.connectionId} id={entry.userId} />)
+    .map(entry => <Profile key={entry.connectionId} id={entry.identityId} />)
 }
 ```
 
@@ -134,12 +114,12 @@ import { Cursors } from 'moi/collab'
 
 #### `PresenceFrame` and `PresenceAvatars`
 
-Both components show other participants at a target and support the same automatic and
+Both components show other members at a target and support the same automatic and
 controlled modes below. Choose the appearance that fits the target's shape and how much
 attention the activity needs.
 
 Use `PresenceFrame` for a compact target whose boundaries should stand out, such as a form
-field, a small group of controls, or a selected card. It draws an outline and shows user
+field, a small group of controls, or a selected card. It draws an outline and shows member
 names above it. A frame around a very wide or tall block can dominate the screen; keep the
 target to the specific field or block being worked on.
 
@@ -148,14 +128,14 @@ row, compact field, or low-height block. It reserves a left gutter for avatars a
 well with wide rows because it marks one spot along the edge. For tall content, split it
 into meaningful targets so the avatar stays close to the activity.
 
-Both components accept `align` to position their user indicators. For `PresenceFrame`,
+Both components accept `align` to position their presence indicators. For `PresenceFrame`,
 it aligns the name badge above the frame: `"start"` (left) or `"end"` (right, default).
 For `PresenceAvatars`, it aligns avatars vertically in the left gutter: `"start"` (top),
 `"center"` (default), or `"end"` (bottom).
 
 Use the same `id` across clients for the same activity. Give separate activities distinct IDs.
 Each component publishes your own presence and displays other connections, including another
-tab of your own user. Multiple connections for one user display once at each target.
+tab of your own identity. Multiple connections for one member display once at each target.
 
 ##### Automatic focus
 
@@ -183,7 +163,7 @@ import { Textarea } from '../ui/textarea'
 
 Pass `present` when application state determines presence, such as selecting an item or editing
 a record. `true` publishes your presence; `false` clears it. Focus tracking is disabled, and
-other participants still appear when your own value is false.
+other members still appear when your own value is false.
 
 ```tsx
 <>
@@ -253,7 +233,7 @@ animation scope, so avatars glide between targets within that group. Separate ro
 will not animate movement across rows. Without a group, avatars animate their appearance
 at each target. Movement respects the user's reduced-motion preference.
 
-Controlled avatars do not glide between targets: a user can be present at several at once.
+Controlled avatars do not glide between targets: a member can be present at several at once.
 `PresenceFrame` does not share movement between targets.
 
 Group IDs apply to `PresenceFrame` and `PresenceAvatars`. Cursor area IDs and custom

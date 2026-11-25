@@ -8,19 +8,19 @@ import type { Icon as TabIcon } from '@tabler/icons-react'
 import type { WorkspaceTabId } from '@/lib/types'
 import { tabFromPath } from '@/lib/workspace-tabs'
 import { cn } from '@/client/lib/cn'
-import { userDisplayName } from '@/client/lib/user-display-name'
+import { profileDisplayName } from '@/client/lib/profile-display-name'
 import {
   Tooltip,
   TooltipProvider,
   TooltipTrigger,
   TooltipContent
 } from '@/client/components/ui/tooltip'
-import { UserAvatar } from '../components/user-avatar'
+import { ProfileAvatar } from '../components/profile-avatar'
 import { AvatarGroupCount } from '@/ui-components/avatar'
-import { useWorkspaceMembers } from '../members/hooks'
+import { useWorkspaceMembership } from '../members/hooks'
 import { pageFromPath } from '../presence/provider'
-import { useConnectionState, useWorkspaceUsers, useMe } from '../presence/hooks'
-import { summarizeWorkspaceUsers, type WorkspaceUserInfo } from '../presence/users'
+import { useConnectionState, useWorkspaceMembers, useMe } from '../presence/hooks'
+import { summarizeMemberPresence, type MemberPresence } from '../presence/member-profiles'
 import { WorkspaceMembers } from './workspace-members'
 import { AgentInvite } from './agent-invite'
 
@@ -38,31 +38,33 @@ export function WorkspaceSharingMenu({
   onOpenTab
 }: WorkspaceSharingMenuProps) {
   const state = useConnectionState()
-  const workspaceUsers = useWorkspaceUsers()
-  const currentUser = useMe()
+  const memberProfiles = useWorkspaceMembers()
+  const currentProfile = useMe()
   const router = useRouter()
   const page = pageFromPath(usePathname(router), workspaceId, router.base)
-  const membership = useWorkspaceMembers(workspaceId)
+  const membership = useWorkspaceMembership(workspaceId)
   const memberIds = membership.members && new Set(membership.members.map(member => member.id))
   const members = memberIds
-    ? workspaceUsers.filter(user => user.id === currentUser?.id || memberIds.has(user.id))
-    : workspaceUsers
-  const users = summarizeWorkspaceUsers(state.connections, {
-    currentUser,
-    users:
-      membership.isSuccess && currentUser && !members.some(user => user.id === currentUser.id)
-        ? [currentUser, ...members]
+    ? memberProfiles.filter(member => member.id === currentProfile?.id || memberIds.has(member.id))
+    : memberProfiles
+  const memberPresence = summarizeMemberPresence(state.connections, {
+    currentProfile,
+    profiles:
+      membership.isSuccess &&
+      currentProfile &&
+      !members.some(member => member.id === currentProfile.id)
+        ? [currentProfile, ...members]
         : members,
     page
   })
-  const agents = users.filter(
-    user =>
-      user.profile.type === 'agent' &&
-      (state.activeAgentIds.includes(user.profile.id) || user.status === 'active')
+  const agents = memberPresence.filter(
+    member =>
+      member.profile.type === 'agent' &&
+      (state.activeAgentIds.includes(member.profile.id) || member.status === 'active')
   )
-  const people = users.filter(user => user.profile.type !== 'agent')
-  const headerUsers = people.filter(
-    user => user.status === 'active' || (user.self && memberIds?.has(user.profile.id))
+  const users = memberPresence.filter(member => member.profile.type === 'user')
+  const headerUsers = users.filter(
+    member => member.status === 'active' || (member.self && memberIds?.has(member.profile.id))
   )
   const [open, setOpen] = useState(false)
   const [hoveredGroup, setHoveredGroup] = useState<'users' | 'agents' | null>(null)
@@ -79,8 +81,8 @@ export function WorkspaceSharingMenu({
           onPointerLeave={() => setHoveredGroup(null)}
         >
           <PresenceStack
-            users={agents}
-            label="Recently active agents"
+            profiles={agents}
+            label="Active agents"
             hovered={hoveredGroup === 'agents'}
           >
             {agent => <AgentAvatar agent={agent} describeTab={describeTab} />}
@@ -115,7 +117,7 @@ export function WorkspaceSharingMenu({
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label="Users in this workspace"
+                aria-label="Members in this workspace"
                 className="absolute inset-0 h-full w-full justify-end gap-0.5 rounded-full pr-1 pl-1 group-hover/sharing:bg-accent data-popup-open:bg-accent"
               />
             }
@@ -124,13 +126,13 @@ export function WorkspaceSharingMenu({
           </PopoverTrigger>
           <div className="pointer-events-none flex h-7 items-center gap-0.5 px-1">
             <PresenceStack
-              users={headerUsers}
-              label="Active users"
+              profiles={headerUsers}
+              label="Active people"
               hovered={hoveredGroup === 'users'}
             >
-              {user => (
+              {member => (
                 <MemberAvatar
-                  user={user}
+                  member={member}
                   page={page}
                   describeTab={describeTab}
                   onToggleSharing={() => setOpen(value => !value)}
@@ -149,7 +151,7 @@ export function WorkspaceSharingMenu({
           align="end"
           className="w-96 max-w-[calc(100vw-2rem)] gap-2 bg-transparent p-0 shadow-none"
         >
-          <WorkspaceMembers workspaceId={workspaceId} users={people} membership={membership} />
+          <WorkspaceMembers workspaceId={workspaceId} profiles={users} membership={membership} />
           <AgentInvite workspaceId={workspaceId} workspaceName={workspaceName} />
         </PopoverContent>
       </Popover>
@@ -158,16 +160,16 @@ export function WorkspaceSharingMenu({
 }
 
 type PresenceStackProps = {
-  users: WorkspaceUserInfo[]
+  profiles: MemberPresence[]
   label: string
   hovered: boolean
-  children: (user: WorkspaceUserInfo) => ReactNode
+  children: (member: MemberPresence) => ReactNode
 }
 
-function PresenceStack({ users, label, hovered, children }: PresenceStackProps) {
+function PresenceStack({ profiles, label, hovered, children }: PresenceStackProps) {
   const [focused, setFocused] = useState(false)
   const expanded = hovered || focused
-  const overflow = Math.max(0, users.length - 4)
+  const overflow = Math.max(0, profiles.length - 4)
   const slotClass = cn(
     'relative grid size-5 shrink-0 items-center justify-items-start rounded-full not-last:me-(--presence-gap)',
     'not-last:mask-[radial-gradient(circle_at_calc(100%_+_var(--presence-gap)_+_var(--avatar-radius))_50%,transparent_calc(var(--avatar-radius)_+_2px),black_calc(var(--avatar-radius)_+_2.5px))]',
@@ -191,9 +193,9 @@ function PresenceStack({ users, label, hovered, children }: PresenceStackProps) 
           <AvatarGroupCount size="xs">+{overflow}</AvatarGroupCount>
         </div>
       )}
-      {users.toReversed().map((user, index) => (
-        <div key={user.profile.id} inert={!expanded && index < overflow} className={slotClass}>
-          <TooltipProvider delay={300}>{children(user)}</TooltipProvider>
+      {profiles.toReversed().map((member, index) => (
+        <div key={member.profile.id} inert={!expanded && index < overflow} className={slotClass}>
+          <TooltipProvider delay={300}>{children(member)}</TooltipProvider>
         </div>
       ))}
     </div>
@@ -201,7 +203,7 @@ function PresenceStack({ users, label, hovered, children }: PresenceStackProps) 
 }
 
 type AgentAvatarProps = {
-  agent: WorkspaceUserInfo
+  agent: MemberPresence
   describeTab: WorkspaceSharingMenuProps['describeTab']
 }
 
@@ -212,10 +214,10 @@ function AgentAvatar({ agent, describeTab }: AgentAvatarProps) {
   return (
     <Tooltip disableHoverablePopup>
       <TooltipTrigger render={<span tabIndex={0} className="rounded-full" />}>
-        <UserAvatar profile={agent.profile} size="xs" />
+        <ProfileAvatar profile={agent.profile} size="xs" />
       </TooltipTrigger>
       <TooltipContent className="flex-col gap-1 text-center">
-        <div>{userDisplayName(agent.profile)}</div>
+        <div>{profileDisplayName(agent.profile)}</div>
         {agent.status === 'active' ? (
           <TabSubtitle info={info} />
         ) : (
@@ -227,15 +229,21 @@ function AgentAvatar({ agent, describeTab }: AgentAvatarProps) {
 }
 
 type MemberAvatarProps = Pick<WorkspaceSharingMenuProps, 'describeTab' | 'onOpenTab'> & {
-  user: WorkspaceUserInfo
+  member: MemberPresence
   page: string
   onToggleSharing: () => void
 }
 
-function MemberAvatar({ user, page, describeTab, onOpenTab, onToggleSharing }: MemberAvatarProps) {
-  const tab = user.page ? tabFromPath(user.page) : null
+function MemberAvatar({
+  member,
+  page,
+  describeTab,
+  onOpenTab,
+  onToggleSharing
+}: MemberAvatarProps) {
+  const tab = member.page ? tabFromPath(member.page) : null
   const info = tab ? describeTab(tab) : null
-  const name = userDisplayName(user.profile)
+  const name = profileDisplayName(member.profile)
   return (
     <Tooltip disableHoverablePopup>
       <TooltipTrigger
@@ -246,9 +254,9 @@ function MemberAvatar({ user, page, describeTab, onOpenTab, onToggleSharing }: M
             data-slot="avatar"
             data-size="xs"
             className="pointer-events-auto relative size-5 rounded-full p-0"
-            aria-label={user.self ? `${name} (You), open sharing` : name}
+            aria-label={member.self ? `${name} (You), open sharing` : name}
             onClick={() => {
-              if (user.self) onToggleSharing()
+              if (member.self) onToggleSharing()
               else if (tab && info && tab !== page) {
                 onOpenTab(tab)
               }
@@ -256,12 +264,12 @@ function MemberAvatar({ user, page, describeTab, onOpenTab, onToggleSharing }: M
           />
         }
       >
-        <UserAvatar profile={user.profile} size="xs" />
+        <ProfileAvatar profile={member.profile} size="xs" />
       </TooltipTrigger>
       <TooltipContent className="flex-col gap-1 text-center">
         <div>
           {name}
-          {user.self ? ' (You)' : ''}
+          {member.self ? ' (You)' : ''}
         </div>
         <TabSubtitle info={info} />
       </TooltipContent>

@@ -11,18 +11,18 @@ import { useIdentity } from '../../identity/use-identity'
 import { identityKey } from '../../identity/types'
 import { getAccountGeneration } from '../../identity/store'
 import { MembershipMenu } from './membership-menu'
-import { User } from '../components/user'
-import { type useWorkspaceMembers, useMembershipAction } from '../members/hooks'
+import { Profile } from '../components/profile'
+import { type useWorkspaceMembership, useMembershipAction } from '../members/hooks'
 import type { WorkspaceMember, WorkspaceInvitation } from '../members/types'
-import type { WorkspaceUserInfo } from '../presence/users'
+import type { MemberPresence } from '../presence/member-profiles'
 
 export type WorkspaceMembersProps = {
   workspaceId: string
-  users: WorkspaceUserInfo[]
-  membership: ReturnType<typeof useWorkspaceMembers>
+  profiles: MemberPresence[]
+  membership: ReturnType<typeof useWorkspaceMembership>
 }
 
-export function WorkspaceMembers({ workspaceId, users, membership }: WorkspaceMembersProps) {
+export function WorkspaceMembers({ workspaceId, profiles, membership }: WorkspaceMembersProps) {
   const identity = useIdentity()
   const membersById =
     membership.members && new Map(membership.members.map(member => [member.id, member]))
@@ -39,7 +39,7 @@ export function WorkspaceMembers({ workspaceId, users, membership }: WorkspaceMe
       <MembersList
         className="-mx-2 -my-1 mt-3"
         workspaceId={workspaceId}
-        users={users}
+        profiles={profiles}
         membersById={membersById}
         ownerId={membership.members?.[0]?.id}
         invitations={membership.invitations ?? []}
@@ -144,7 +144,7 @@ type MembersListProps = {
   ownerId?: string
   membersById?: Map<string, WorkspaceMember>
   invitations: WorkspaceInvitation[]
-  users: WorkspaceUserInfo[]
+  profiles: MemberPresence[]
 }
 
 function MembersList({
@@ -153,14 +153,14 @@ function MembersList({
   membersById,
   ownerId,
   invitations,
-  users
+  profiles
 }: MembersListProps) {
   return (
     <ul
       aria-label="Who has access"
       className={cn('flex max-h-80 scroll-fade flex-col gap-0.5 overflow-y-auto', className)}
     >
-      {users.map(user => (
+      {profiles.map(user => (
         <MemberRow
           key={user.profile.id}
           user={user}
@@ -177,7 +177,7 @@ function MembersList({
 }
 
 type MemberRowProps = {
-  user: WorkspaceUserInfo
+  user: MemberPresence
   isOwner: boolean
   workspaceId: string
   membershipId?: string
@@ -186,7 +186,7 @@ type MemberRowProps = {
 function MemberRow({ user, isOwner, workspaceId, membershipId }: MemberRowProps) {
   return (
     <li className="flex min-w-0 items-center gap-2 px-2 py-1">
-      <User
+      <Profile
         profile={user.profile}
         className="flex-1"
         size="sm"
@@ -205,11 +205,11 @@ type InvitationRowProps = { workspaceId: string; invitation: WorkspaceInvitation
 function InvitationRow({ workspaceId, invitation }: InvitationRowProps) {
   return (
     <li className="flex min-w-0 items-center gap-2 px-2 py-1">
-      <User
+      <Profile
         className="flex-1 text-muted-foreground **:data-[slot=avatar]:opacity-30"
         size="sm"
         profile={{
-          type: 'human',
+          type: 'user',
           id: invitation.id,
           email: invitation.email,
           color: colorForId(invitation.email)

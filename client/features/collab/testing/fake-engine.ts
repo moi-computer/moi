@@ -1,15 +1,15 @@
-import type { UserProfile, Connection, PresenceRegistration } from '@/lib/collab/types'
+import type { Profile, Connection, PresenceRegistration } from '@/lib/collab/types'
 import { COLLAB_PROTOCOL_VERSION } from '@/lib/collab/protocol'
 import type { CollabEngineApi } from '../presence/client'
-import { normalizeUserProfile } from '../host-state'
+import { normalizeProfile } from '../host-state'
 import { CollabStore } from '../presence/store'
 
-function normalizeUsers(users: readonly UserProfile[]): readonly UserProfile[] {
-  if (!Array.isArray(users)) throw new Error('Users must be an array.')
+function normalizeProfiles(profiles: readonly Profile[]): readonly Profile[] {
+  if (!Array.isArray(profiles)) throw new Error('Profiles must be an array.')
   const ids = new Set<string>()
-  const snapshot = users.map(user => {
-    const normalized = normalizeUserProfile(user)
-    if (ids.has(normalized.id)) throw new Error('Users must have unique ids.')
+  const snapshot = profiles.map(user => {
+    const normalized = normalizeProfile(user)
+    if (ids.has(normalized.id)) throw new Error('Profiles must have unique ids.')
     ids.add(normalized.id)
     return normalized
   })
@@ -17,42 +17,42 @@ function normalizeUsers(users: readonly UserProfile[]): readonly UserProfile[] {
 }
 
 export type FakeEngineOptions = {
-  self: UserProfile | undefined
+  self: Profile | undefined
   page?: string
   otherConnections?: Connection[]
-  // Full fixture directory, including users who are offline.
-  users?: readonly UserProfile[]
+  // Full fixture directory, including offline members.
+  profiles?: readonly Profile[]
 }
 export type FakeEngine = CollabEngineApi & {
   setOtherConnections: (otherConnections: Connection[]) => void
-  setUsers: (users: readonly UserProfile[] | undefined) => void
+  setProfiles: (profiles: readonly Profile[] | undefined) => void
 }
 
 export function createFakeEngine({
   self,
   page = 'preview',
   otherConnections = [],
-  users
+  profiles: initialProfiles
 }: FakeEngineOptions): FakeEngine {
   const store = new CollabStore()
   const presence = new Map<string, PresenceRegistration>()
   const userListeners = new Set<() => void>()
-  let directory = users === undefined ? undefined : normalizeUsers(users)
+  let directory = initialProfiles === undefined ? undefined : normalizeProfiles(initialProfiles)
   let profiles = directory ?? (self ? [self] : [])
   let currentOtherConnections = otherConnections
   let location: Connection['location'] = { page, status: 'active' }
   const connections = (): Connection[] => [
     ...(self
-      ? [{ connectionId: 'local', userId: self.id, location, presence: [...presence.values()] }]
+      ? [{ connectionId: 'local', identityId: self.id, location, presence: [...presence.values()] }]
       : []),
     ...currentOtherConnections
   ]
-  const liveUsers = () => {
-    const connected = new Set(connections().map(connection => connection.userId))
+  const liveProfiles = () => {
+    const connected = new Set(connections().map(connection => connection.identityId))
     return profiles.filter(user => connected.has(user.id))
   }
   const announce = () =>
-    store.receive({ type: 'connections', connections: connections(), users: liveUsers() })
+    store.receive({ type: 'connections', connections: connections(), profiles: liveProfiles() })
   store.setSender(message => {
     switch (message.type) {
       case 'location':
@@ -79,18 +79,18 @@ export function createFakeEngine({
     version: COLLAB_PROTOCOL_VERSION,
     connectionId: 'local',
     connections: connections(),
-    users: liveUsers()
+    profiles: liveProfiles()
   })
   return {
     workspaceId: 'preview',
     enabled: true,
     start: () => () => {},
     getSnapshot: store.getSnapshot,
-    getUsersSnapshot: store.getUsersSnapshot,
+    getProfilesSnapshot: store.getProfilesSnapshot,
     getPresenceSnapshot: store.getPresenceSnapshot,
     subscribe: store.subscribe,
-    getCurrentUser: () => self,
-    subscribeCurrentUser: () => () => {},
+    getCurrentProfile: () => self,
+    subscribeCurrentProfile: () => () => {},
     getDirectory: () => directory,
     subscribeDirectory: listener => {
       userListeners.add(listener)
@@ -110,8 +110,8 @@ export function createFakeEngine({
       currentOtherConnections = next
       announce()
     },
-    setUsers: next => {
-      directory = next === undefined ? undefined : normalizeUsers(next)
+    setProfiles: next => {
+      directory = next === undefined ? undefined : normalizeProfiles(next)
       if (directory) profiles = directory
       userListeners.forEach(listener => listener())
       announce()

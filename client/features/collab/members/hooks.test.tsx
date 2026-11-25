@@ -2,7 +2,7 @@ import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-ut
 import { afterEach, expect, test } from 'bun:test'
 import { act } from 'react'
 import { cleanupAccount, mountAccount } from '../../account/account-test-utils'
-import { useMembershipAction, useWorkspaceMembers } from './hooks'
+import { useMembershipAction, useWorkspaceMembership } from './hooks'
 import {
   clearWorkspaceMembers,
   removeWorkspaceMembers,
@@ -27,7 +27,7 @@ const tony = {
 } as const
 afterEach(cleanupAccount)
 function Probe() {
-  const snapshot = useWorkspaceMembers('one')
+  const snapshot = useWorkspaceMembership('one')
   const invite = useMembershipAction('one')
   return (
     <>
@@ -109,7 +109,7 @@ for (const name of ['Weekly Review', '', '   ']) {
 }
 
 function RemoteMembersProbe() {
-  const members = useWorkspaceMembers('visitor-board')
+  const members = useWorkspaceMembership('visitor-board')
   return <pre data-members>{JSON.stringify(members.data)}</pre>
 }
 

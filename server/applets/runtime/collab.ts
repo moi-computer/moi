@@ -3,15 +3,15 @@ import { createElement } from 'react'
 import type { JsonValue } from 'moi'
 import type {
   CursorsProps,
-  UserAvatarGroupProps,
+  ProfileAvatarGroupProps,
   PresenceFrameProps,
   PresenceGroupProps,
   PresenceAvatarsProps,
   PresenceValue,
-  UserProps,
-  UserAvatarProps,
+  ProfileProps,
+  ProfileAvatarProps,
   UsePeersOptions,
-  UseWorkspaceUsersOptions
+  UseWorkspaceMembersOptions
 } from 'moi/collab'
 import type { AppletCollabApi } from '../../../client/features/collab/applet-api'
 
@@ -25,17 +25,17 @@ function empty(): never[] {
 const nothing = () => null
 const fallback = {
   useMe: () => undefined,
-  useUser: () => undefined,
+  useMember: () => undefined,
   usePeers: empty,
-  useWorkspaceUsers: empty,
+  useWorkspaceMembers: empty,
   usePresence<T extends JsonValue>(_channel: string): PresenceValue<T>[] {
     return []
   },
   usePublishPresence() {},
   Cursors: nothing,
-  User: nothing,
-  UserAvatar: nothing,
-  UserAvatarGroup: nothing,
+  Profile: nothing,
+  ProfileAvatar: nothing,
+  ProfileAvatarGroup: nothing,
   PresenceFrame: nothing,
   PresenceGroup: nothing,
   PresenceAvatars: nothing
@@ -59,11 +59,11 @@ export function useMe() {
 export function usePeers(options?: UsePeersOptions) {
   return api().usePeers(options)
 }
-export function useUser(id: string) {
-  return api().useUser(id)
+export function useMember(id: string) {
+  return api().useMember(id)
 }
-export function useWorkspaceUsers(options?: UseWorkspaceUsersOptions) {
-  return api().useWorkspaceUsers(options)
+export function useWorkspaceMembers(options?: UseWorkspaceMembersOptions) {
+  return api().useWorkspaceMembers(options)
 }
 export function usePresence<T extends JsonValue>(channel: string) {
   return api().usePresence<T>(channel)
@@ -74,14 +74,14 @@ export function usePublishPresence<T extends JsonValue>(channel: string, value: 
 export function Cursors(props: CursorsProps) {
   return createElement(api().Cursors, props)
 }
-export function User(props: UserProps) {
-  return createElement(api().User, props)
+export function Profile(props: ProfileProps) {
+  return createElement(api().Profile, props)
 }
-export function UserAvatar(props: UserAvatarProps) {
-  return createElement(api().UserAvatar, props)
+export function ProfileAvatar(props: ProfileAvatarProps) {
+  return createElement(api().ProfileAvatar, props)
 }
-export function UserAvatarGroup(props: UserAvatarGroupProps) {
-  return createElement(api().UserAvatarGroup, props)
+export function ProfileAvatarGroup(props: ProfileAvatarGroupProps) {
+  return createElement(api().ProfileAvatarGroup, props)
 }
 export function PresenceFrame(props: PresenceFrameProps) {
   return createElement(api().PresenceFrame, props)

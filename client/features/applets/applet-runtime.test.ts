@@ -377,7 +377,7 @@ describe('disposal', () => {
     const api = view.bridge.collab
 
     expect(typeof api?.usePeers).toBe('function')
-    expect(typeof api?.useWorkspaceUsers).toBe('function')
+    expect(typeof api?.useWorkspaceMembers).toBe('function')
     expect(widget.bridge.collab).toBe(api)
 
     view.dispose()

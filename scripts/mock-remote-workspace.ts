@@ -731,7 +731,7 @@ export default function LaunchPlan() {
       JSON.stringify({
         type: 'join',
         version: COLLAB_PROTOCOL_VERSION,
-        profile: { type: 'human', id: alice.id, name: alice.name, color: colorForId(alice.id) },
+        profile: { type: 'user', id: alice.id, name: alice.name, color: colorForId(alice.id) },
         location: { page: 'overview', status: 'active' }
       })
     )

@@ -7,16 +7,16 @@ import type {
   CollabClientMessage,
   CollabServerMessage,
   Connection,
-  UserProfile
+  Profile
 } from '@/lib/collab/types'
 
 type Emit = (connectionId: string, message: CollabServerMessage) => void
 type Client = {
-  profile: UserProfile
+  profile: Profile
   connection: Connection
 }
 
-function cleanProfile(profile: UserProfile): UserProfile {
+function cleanProfile(profile: Profile): Profile {
   return {
     id: profile.id,
     type: profile.type,
@@ -36,13 +36,13 @@ export class CollabService {
   constructor(private emit: Emit) {}
 
   private snapshot() {
-    const users = new Map<string, UserProfile>()
+    const profiles = new Map<string, Profile>()
     const connections: Connection[] = []
     for (const { profile, connection } of this.clients.values()) {
-      users.set(profile.id, profile)
+      profiles.set(profile.id, profile)
       connections.push(connection)
     }
-    return { connections, users: [...users.values()] }
+    return { connections, profiles: [...profiles.values()] }
   }
 
   private publishConnections() {
@@ -70,7 +70,7 @@ export class CollabService {
         profile,
         connection: {
           connectionId,
-          userId: profile.id,
+          identityId: profile.id,
           location: message.location ?? null,
           presence: []
         }
@@ -90,7 +90,8 @@ export class CollabService {
     const { connection } = client
     switch (message.type) {
       case 'profile': {
-        if (message.profile.id !== connection.userId) throw new Error('Reconnect to change user ID')
+        if (message.profile.id !== connection.identityId)
+          throw new Error('Reconnect to change user ID')
         const profile = cleanProfile(message.profile)
         for (const other of this.clients.values()) {
           if (other.profile.id === profile.id) other.profile = profile

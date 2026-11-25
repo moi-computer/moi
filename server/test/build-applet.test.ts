@@ -544,7 +544,7 @@ describe('moi resolveUrl module', () => {
 
   test('collaboration and attachments share the extracted applet runtime bridge', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-collab.tsx'), undefined, 'view')
-    expect(result.js).toContain('function useWorkspaceUsers')
+    expect(result.js).toContain('function useWorkspaceMembers')
     expect(result.js).toContain('function addChatAttachment')
     expect(result.js.match(/function __attachBridge\(/g)).toHaveLength(1)
     expect(result.js.match(/function __getBridge\(/g)).toHaveLength(1)

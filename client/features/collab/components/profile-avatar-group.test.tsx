@@ -1,27 +1,27 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, test } from 'bun:test'
-import { UserAvatarGroup, UserAvatarGroupContainer } from './user-avatar-group'
+import { ProfileAvatarGroup, ProfileAvatarGroupContainer } from './profile-avatar-group'
 import { createRoom, renderCollab } from '../testing/component-fixtures'
 
-test('avatar groups deduplicate user IDs and count the remaining users in overflow', () => {
+test('avatar groups deduplicate user IDs and count the remaining profiles in overflow', () => {
   const html = renderCollab(
     createRoom(),
-    <UserAvatarGroupContainer ids={['peer', 'peer', 'me', 'missing']} max={1} />
+    <ProfileAvatarGroupContainer ids={['peer', 'peer', 'me', 'missing']} max={1} />
   )
-  expect(html).toContain('aria-label="3 users"')
+  expect(html).toContain('aria-label="3 profiles"')
   expect(html.match(/aria-label="Ada"/g)).toHaveLength(1)
   expect(html).toContain('+2')
-  expect(html).not.toContain('Unknown user')
+  expect(html).not.toContain('Unknown member')
 })
 
 test('avatar groups render supplied profiles and overflow without a collaboration provider', () => {
   const html = renderToStaticMarkup(
-    <UserAvatarGroup
-      users={[{ type: 'human', id: 'ada', name: 'Ada', color: 'cyan' }, undefined]}
+    <ProfileAvatarGroup
+      profiles={[{ type: 'user', id: 'ada', name: 'Ada', color: 'cyan' }, undefined]}
       max={1}
     />
   )
   expect(html).toContain('aria-label="Ada"')
-  expect(html).toContain('aria-label="2 users"')
+  expect(html).toContain('aria-label="2 profiles"')
   expect(html).toContain('+1')
 })

@@ -9,27 +9,27 @@ import {
   usePeers,
   usePresence,
   usePublishPresence,
-  useUser,
-  useUsers,
-  useWorkspaceUsers
+  useMember,
+  useMembers,
+  useWorkspaceMembers
 } from './hooks'
 import { AppletPresenceProvider, CollabContext, pageFromPath } from './provider'
-import type { WorkspaceUser } from './hooks'
+import type { MemberProfile } from './hooks'
 
-const alice = { type: 'human', id: 'alice', name: 'Alice', color: 'emerald' } as const
-const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } as const
+const alice = { type: 'user', id: 'alice', name: 'Alice', color: 'emerald' } as const
+const bob = { type: 'user', id: 'bob', name: 'Bob', color: 'blue' } as const
 
 test.each(['offline member', 'empty', 'missing'] as const)(
-  '%s directory stays authoritative over connected users and self',
+  '%s directory stays authoritative over connected profiles and self',
   kind => {
-    const offline = { type: 'human', id: 'offline', name: 'Offline user', color: 'blue' } as const
+    const offline = { type: 'user', id: 'offline', name: 'Offline user', color: 'blue' } as const
     const room = createFakeEngine({
       self: alice,
-      users: [alice, bob],
+      profiles: [alice, bob],
       otherConnections: [
         {
           connectionId: 'b',
-          userId: 'bob',
+          identityId: 'bob',
           location: { page: 'preview', status: 'active' },
           presence: []
         }
@@ -44,8 +44,8 @@ test.each(['offline member', 'empty', 'missing'] as const)(
     function Members() {
       return encodeURIComponent(
         JSON.stringify({
-          users: useWorkspaceUsers(),
-          connectedUser: useUser('bob'),
+          profiles: useWorkspaceMembers(),
+          connectedUser: useMember('bob'),
           peers: usePeers()
         })
       )
@@ -60,7 +60,7 @@ test.each(['offline member', 'empty', 'missing'] as const)(
       )
     )
     expect(snapshot).toEqual({
-      users: kind === 'offline member' ? [{ ...offline, status: 'offline' }] : [],
+      profiles: kind === 'offline member' ? [{ ...offline, status: 'offline' }] : [],
       peers: []
     })
   }
@@ -83,23 +83,23 @@ function Observer() {
       {JSON.stringify({
         me: useMe(),
         peers: usePeers(),
-        users: useWorkspaceUsers(),
-        user: useUser('bob'),
+        profiles: useWorkspaceMembers(),
+        user: useMember('bob'),
         presence: usePresence('editing')
       })}
     </output>
   )
 }
 
-test('observers resolve users and read presence without creating a publisher', () => {
+test('observers resolve profiles and read presence without creating a publisher', () => {
   const room = createFakeEngine({
     self: alice,
     page: 'board',
-    users: [alice, bob],
+    profiles: [alice, bob],
     otherConnections: [
       {
         connectionId: 'b',
-        userId: 'bob',
+        identityId: 'bob',
         location: { page: 'board', status: 'active' },
         presence: [
           {
@@ -137,11 +137,11 @@ test('observers resolve users and read presence without creating a publisher', (
 function Disabled() {
   usePublishPresence('editing', 'title')
   expect(useMe()).toBeUndefined()
-  expect(useUser('missing')).toBeUndefined()
-  expect(useUsers(['missing'])).toEqual([undefined])
+  expect(useMember('missing')).toBeUndefined()
+  expect(useMembers(['missing'])).toEqual([undefined])
   return <Observer />
 }
-test('hooks are safe without a backend or applet and resolve missing users to undefined', () => {
+test('hooks are safe without a backend or applet and resolve missing profiles to undefined', () => {
   setIdentity(null)
   const html = renderToStaticMarkup(<Disabled />)
   expect(html).toContain('[]')
@@ -152,13 +152,13 @@ test('identity does not provide a global member directory', () => {
   try {
     function Global() {
       return encodeURIComponent(
-        JSON.stringify({ me: useMe(), user: useUser('bob'), users: useWorkspaceUsers() })
+        JSON.stringify({ me: useMe(), user: useMember('bob'), profiles: useWorkspaceMembers() })
       )
     }
     // No workspace means no directory; the current identity is still available.
     expect(JSON.parse(decodeURIComponent(renderToStaticMarkup(<Global />)))).toEqual({
       me: { ...alice, color: colorForId(alice.id), status: 'offline' },
-      users: []
+      profiles: []
     })
   } finally {
     setIdentity(null)
@@ -173,15 +173,15 @@ test('user hooks preserve missing names for self, peers, and offline members', (
     id: 'bob',
     color: 'blue'
   } as const
-  const offline = { type: 'human', id: 'offline', color: 'blue' } as const
+  const offline = { type: 'user', id: 'offline', color: 'blue' } as const
   const room = createFakeEngine({
     self,
     page: 'board',
-    users: [{ ...self, ownerId: 'inviter' }, peer, offline],
+    profiles: [{ ...self, ownerId: 'inviter' }, peer, offline],
     otherConnections: [
       {
         connectionId: 'b',
-        userId: peer.id,
+        identityId: peer.id,
         location: { page: 'board', status: 'active' },
         presence: []
       }
@@ -191,9 +191,9 @@ test('user hooks preserve missing names for self, peers, and offline members', (
     return encodeURIComponent(
       JSON.stringify({
         me: useMe(),
-        user: useUser('bob'),
+        user: useMember('bob'),
         peers: usePeers(),
-        users: useWorkspaceUsers()
+        profiles: useWorkspaceMembers()
       })
     )
   }
@@ -205,12 +205,12 @@ test('user hooks preserve missing names for self, peers, and offline members', (
         </CollabContext>
       )
     )
-  ) as { me: WorkspaceUser; user: WorkspaceUser; peers: WorkspaceUser[]; users: WorkspaceUser[] }
+  ) as { me: MemberProfile; user: MemberProfile; peers: MemberProfile[]; profiles: MemberProfile[] }
   expect(snapshot).toEqual({
     me: { ...self, ownerId: 'inviter', status: 'active' },
     user: { ...peer, status: 'active' },
     peers: [{ ...peer, status: 'active' }],
-    users: [
+    profiles: [
       { ...self, ownerId: 'inviter', status: 'active' },
       { ...peer, status: 'active' },
       { ...offline, status: 'offline' }
@@ -218,32 +218,32 @@ test('user hooks preserve missing names for self, peers, and offline members', (
   })
 })
 
-test('workspace users include self and offline members with workspace-wide status filters', () => {
-  const carol = { type: 'human', id: 'carol', name: 'Carol', color: 'blue' } as const
-  const david = { type: 'human', id: 'david', name: 'David', color: 'emerald' } as const
+test('workspace profiles include self and offline members with workspace-wide status filters', () => {
+  const carol = { type: 'user', id: 'carol', name: 'Carol', color: 'blue' } as const
+  const david = { type: 'user', id: 'david', name: 'David', color: 'emerald' } as const
   const room = createFakeEngine({
     self: alice,
     page: 'board',
-    users: [alice, bob, carol, david],
+    profiles: [alice, bob, carol, david],
     otherConnections: [
       {
         connectionId: 'b1',
-        userId: 'bob',
+        identityId: 'bob',
         location: { page: 'other-page', status: 'active' },
         presence: []
       },
-      { connectionId: 'b2', userId: 'bob', location: null, presence: [] },
-      { connectionId: 'c', userId: 'carol', location: null, presence: [] }
+      { connectionId: 'b2', identityId: 'bob', location: null, presence: [] },
+      { connectionId: 'c', identityId: 'carol', location: null, presence: [] }
     ]
   })
   function Directory() {
     // Encode the readout so React's HTML escaping does not alter the JSON.
     return encodeURIComponent(
       JSON.stringify({
-        all: useWorkspaceUsers(),
-        active: useWorkspaceUsers({ status: 'active' }),
-        away: useWorkspaceUsers({ status: 'away' }),
-        offline: useWorkspaceUsers({ status: 'offline' })
+        all: useWorkspaceMembers(),
+        active: useWorkspaceMembers({ status: 'active' }),
+        away: useWorkspaceMembers({ status: 'away' }),
+        offline: useWorkspaceMembers({ status: 'offline' })
       })
     )
   }
@@ -256,7 +256,7 @@ test('workspace users include self and offline members with workspace-wide statu
           </CollabContext>
         )
       )
-    ) as Record<string, WorkspaceUser[]>
+    ) as Record<string, MemberProfile[]>
 
   const snapshot = render()
   expect(snapshot.all).toEqual([
@@ -273,7 +273,7 @@ test('workspace users include self and offline members with workspace-wide statu
   expect(snapshot.offline).toEqual([{ ...david, status: 'offline' }])
 
   // A host directory replacement removes even connected members and updates profiles.
-  room.setUsers([alice, { ...david, name: 'David updated' }])
+  room.setProfiles([alice, { ...david, name: 'David updated' }])
   const updated = render()
   expect(updated.all).toEqual([
     { ...alice, status: 'active' },
@@ -281,21 +281,21 @@ test('workspace users include self and offline members with workspace-wide statu
   ])
   expect(updated.away).toEqual([])
 
-  room.setUsers([])
+  room.setProfiles([])
   expect(render().all).toEqual([])
 })
 
 test('missing and empty directories hide members while preserving self', () => {
   const engine = createFakeEngine({
     self: alice,
-    users: [alice, bob],
-    otherConnections: [{ connectionId: 'b', userId: bob.id, location: null, presence: [] }]
+    profiles: [alice, bob],
+    otherConnections: [{ connectionId: 'b', identityId: bob.id, location: null, presence: [] }]
   })
-  engine.setUsers(undefined)
+  engine.setProfiles(undefined)
   function Directory() {
     const me = useMe()
     return encodeURIComponent(
-      JSON.stringify({ users: useWorkspaceUsers(), me, hasMe: me !== undefined })
+      JSON.stringify({ profiles: useWorkspaceMembers(), me, hasMe: me !== undefined })
     )
   }
   const render = () =>
@@ -309,7 +309,7 @@ test('missing and empty directories hide members while preserving self', () => {
       )
     )
   const populated = {
-    users: [
+    profiles: [
       { ...alice, status: 'active' },
       { ...bob, status: 'away' }
     ],
@@ -317,25 +317,25 @@ test('missing and empty directories hide members while preserving self', () => {
     hasMe: true
   }
   // Identity remains available even when workspace membership is unknown.
-  expect(render()).toEqual({ users: [], me: { ...alice, status: 'active' }, hasMe: true })
+  expect(render()).toEqual({ profiles: [], me: { ...alice, status: 'active' }, hasMe: true })
   // An empty host directory is authoritative, even over the viewer.
-  engine.setUsers([])
-  expect(render()).toEqual({ users: [], me: { ...alice, status: 'active' }, hasMe: true })
-  engine.setUsers([alice, bob])
+  engine.setProfiles([])
+  expect(render()).toEqual({ profiles: [], me: { ...alice, status: 'active' }, hasMe: true })
+  engine.setProfiles([alice, bob])
   expect(render()).toEqual(populated)
-  engine.setUsers(undefined)
-  expect(render()).toEqual({ users: [], me: { ...alice, status: 'active' }, hasMe: true })
+  engine.setProfiles(undefined)
+  expect(render()).toEqual({ profiles: [], me: { ...alice, status: 'active' }, hasMe: true })
 })
 
 test('away peers remain on the page while their focus presence is hidden', () => {
   const engine = createFakeEngine({
     self: alice,
     page: 'board',
-    users: [alice, bob],
+    profiles: [alice, bob],
     otherConnections: [
       {
         connectionId: 'b',
-        userId: bob.id,
+        identityId: bob.id,
         location: { page: 'board', status: 'away' },
         presence: [
           {

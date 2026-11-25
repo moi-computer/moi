@@ -235,12 +235,12 @@ test(
                 new MessageEvent('message', {
                   data: JSON.stringify({
                     type: 'welcome',
-                    version: 2,
+                    version: 1,
                     connectionId: 'self',
-                    users: [
+                    profiles: [
                       message.profile,
                       {
-                        type: 'human',
+                        type: 'user',
                         id: 'tony',
                         name: 'Tony',
                         email: 'tony@example.com',
@@ -250,19 +250,19 @@ test(
                     connections: [
                       ...['lee', 'sam', 'pat', 'cleo'].map(id => ({
                         connectionId: id,
-                        userId: id,
+                        identityId: id,
                         location: { page: 'overview', status: 'active' },
                         presence: []
                       })),
                       {
                         connectionId: 'self',
-                        userId: message.profile.id,
+                        identityId: message.profile.id,
                         location: { page: 'overview', status: 'active' },
                         presence: []
                       },
                       {
                         connectionId: 'tony',
-                        userId: 'tony',
+                        identityId: 'tony',
                         location: { page: 'scratchpad', status: 'active' },
                         presence: []
                       }
@@ -302,11 +302,11 @@ test(
     await expect(tooltip.getByText('Active now', { exact: true })).not.toBeVisible()
     await agents.getByLabel('Pip').click()
     await expect(page.getByRole('textbox', { name: 'Email', exact: true })).not.toBeVisible()
-    const users = page.getByRole('group', { name: 'Active users', exact: true })
-    await expect(users.getByText('+1')).toBeVisible()
-    await page.getByRole('button', { name: 'Users in this workspace' }).locator('svg').hover()
-    await expect(users.getByText('+1')).not.toBeVisible()
-    await expect(users.getByRole('button', { name: 'pat', exact: true })).toBeVisible()
+    const profiles = page.getByRole('group', { name: 'Active people', exact: true })
+    await expect(profiles.getByText('+1')).toBeVisible()
+    await page.getByRole('button', { name: 'People in this workspace' }).locator('svg').hover()
+    await expect(profiles.getByText('+1')).not.toBeVisible()
+    await expect(profiles.getByRole('button', { name: 'pat', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Tony', exact: true }).hover()
     await expect(
       page.locator('[data-slot="tooltip-content"]').getByText('Scratchpad', { exact: true })
@@ -420,7 +420,7 @@ test(
     await expect(page.getByPlaceholder('Do anything')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Create tab', exact: true })).toBeVisible()
     await expect(
-      page.getByRole('button', { name: 'Users in this workspace', exact: true })
+      page.getByRole('button', { name: 'People in this workspace', exact: true })
     ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Alex (You), open sharing' })).toBeVisible()

@@ -1,23 +1,27 @@
 import { useSyncExternalStore } from 'react'
 
-import { USER_COLORS } from '@/lib/collab/colors'
-import type { UserProfile } from '@/lib/collab/types'
-import { User } from '@/client/features/collab/components/user'
-import { UserAvatar } from '@/client/features/collab/components/user-avatar'
+import { PROFILE_COLORS } from '@/lib/collab/colors'
+import type { Profile as ProfileData } from '@/lib/collab/types'
+import { Profile } from '@/client/features/collab/components/profile'
+import { ProfileAvatar } from '@/client/features/collab/components/profile-avatar'
 import {
-  getCurrentUser,
-  getCurrentUserSource,
+  getCurrentProfile,
+  getCurrentProfileSource,
   setLocalUser,
-  subscribeCurrentUserStore
+  subscribeCurrentProfileStore
 } from '@/client/features/collab/host-state'
 
 export function LocalUserSettings() {
   const source = useSyncExternalStore(
-    subscribeCurrentUserStore,
-    getCurrentUserSource,
-    getCurrentUserSource
+    subscribeCurrentProfileStore,
+    getCurrentProfileSource,
+    getCurrentProfileSource
   )
-  const profile = useSyncExternalStore(subscribeCurrentUserStore, getCurrentUser, getCurrentUser)
+  const profile = useSyncExternalStore(
+    subscribeCurrentProfileStore,
+    getCurrentProfile,
+    getCurrentProfile
+  )
   if (source === 'external') return null
   if (source === 'cloudflare-access') return <AccessUser profile={profile} />
   if (profile) return <LocalUserEditor key={profile.id} profile={profile} />
@@ -33,7 +37,7 @@ export function LocalUserSettings() {
   )
 }
 
-type AccessUserProps = { profile: UserProfile | undefined }
+type AccessUserProps = { profile: ProfileData | undefined }
 
 // Behind Cloudflare Access the profile is inherited, so there is nothing to edit.
 // Access profiles carry no name, so the label is the email, as in workspaces.
@@ -50,12 +54,12 @@ function AccessUser({ profile }: AccessUserProps) {
             : 'This server uses Cloudflare Access, but this page wasn’t opened through it. Open Moi at its Cloudflare Access address to appear in workspaces.'}
         </p>
       </header>
-      {profile && <User profile={profile} />}
+      {profile && <Profile profile={profile} />}
     </section>
   )
 }
 
-type LocalUserEditorProps = { profile: UserProfile }
+type LocalUserEditorProps = { profile: ProfileData }
 
 function LocalUserEditor({ profile }: LocalUserEditorProps) {
   return (
@@ -76,7 +80,7 @@ function LocalUserEditor({ profile }: LocalUserEditorProps) {
             aria-label="Local user preview"
             className="size-16 shrink-0 overflow-hidden rounded-full"
           >
-            <UserAvatar profile={profile} className="data-[size=default]:size-full" />
+            <ProfileAvatar profile={profile} className="data-[size=default]:size-full" />
           </div>
           <div className="flex w-full max-w-sm min-w-0 flex-col gap-4">
             <div className="flex flex-col gap-1.5 text-sm">
@@ -86,7 +90,7 @@ function LocalUserEditor({ profile }: LocalUserEditorProps) {
                 aria-labelledby="collab-color-label"
                 className="flex flex-wrap gap-2"
               >
-                {USER_COLORS.map(color => (
+                {PROFILE_COLORS.map(color => (
                   <label key={color} data-collab-color={color} className="cursor-pointer">
                     <input
                       type="radio"
@@ -112,7 +116,7 @@ function LocalUserEditor({ profile }: LocalUserEditorProps) {
         </div>
         <p className="text-sm text-muted-foreground">
           Your user is saved in this browser and shared across tabs. The playground below uses its
-          own sample users.
+          own sample profiles.
         </p>
       </div>
     </section>

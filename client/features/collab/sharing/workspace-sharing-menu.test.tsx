@@ -4,42 +4,42 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { act } from 'react'
 import { toast } from '@/client/components/ui/toast'
 import { cleanupAccount, mountAccount } from '../../account/account-test-utils'
-import { useWorkspaceMembers } from '../members/hooks'
+import { useWorkspaceMembership } from '../members/hooks'
 import { setAllWorkspaceMembers, setWorkspaceMembers } from '../members/store'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { IconLayoutDashboard, IconScribble } from '@tabler/icons-react'
 import { Router } from 'wouter'
 
-import type { UserProfile, Connection } from '@/lib/collab/types'
+import type { Profile, Connection } from '@/lib/collab/types'
 
 import { seedWorkspaceInfo } from '../../workspace/workspace-test-utils'
 import { AgentInvite } from './agent-invite'
 import { WorkspaceSharingMenu } from './workspace-sharing-menu'
-import { summarizeWorkspaceUsers } from '../presence/users'
+import { summarizeMemberPresence } from '../presence/member-profiles'
 import { WorkspaceMembers } from './workspace-members'
 import { Popover } from '@/client/components/ui/popover'
 import { createFakeEngine } from '../testing/fake-engine'
 import type { FakeEngineOptions } from '../testing/fake-engine'
 import { CollabContext, CollabProvider } from '../presence/provider'
 
-const self = { type: 'human', id: 'self', name: 'Self', color: 'emerald' } as const
-const active = { type: 'human', id: 'active', name: 'Active colleague', color: 'blue' } as const
-const away = { type: 'human', id: 'away', name: 'Away colleague', color: 'blue' } as const
+const self = { type: 'user', id: 'self', name: 'Self', color: 'emerald' } as const
+const active = { type: 'user', id: 'active', name: 'Active colleague', color: 'blue' } as const
+const away = { type: 'user', id: 'away', name: 'Away colleague', color: 'blue' } as const
 const offline = Array.from(
   { length: 3 },
   (_, index) =>
     ({
-      type: 'human',
+      type: 'user',
       id: `offline-${index}`,
       name: `Offline colleague ${index}`,
       color: 'blue'
     }) as const
 )
 
-function connection(user: UserProfile, page: string | null): Connection {
+function connection(user: Profile, page: string | null): Connection {
   return {
     connectionId: user.id,
-    userId: user.id,
+    identityId: user.id,
     location: page === null ? null : { page, status: 'active' },
     presence: []
   }
@@ -67,14 +67,14 @@ function renderSharingMenu(options: FakeEngineOptions) {
 function renderMembersPanel(options: FakeEngineOptions) {
   const engine = createFakeEngine({ page: 'overview', ...options })
   function Panel() {
-    const membership = useWorkspaceMembers('test')
+    const membership = useWorkspaceMembership('test')
     return (
       <WorkspaceMembers
         workspaceId="test"
         membership={membership}
-        users={summarizeWorkspaceUsers(engine.getUsersSnapshot().connections, {
-          currentUser: options.self,
-          users: options.users ?? [],
+        profiles={summarizeMemberPresence(engine.getProfilesSnapshot().connections, {
+          currentProfile: options.self,
+          profiles: options.profiles ?? [],
           page: 'overview'
         })}
       />
@@ -97,16 +97,16 @@ test('menu stays visible for a single member even with multiple open tabs', () =
   expect(
     renderSharingMenu({
       self,
-      users: [self],
+      profiles: [self],
       otherConnections: [connection(self, 'scratchpad')]
     })
-  ).toContain('aria-label="Users in this workspace"')
+  ).toContain('aria-label="People in this workspace"')
 })
 
-test('header shows only active users, reversed from the popup order', () => {
+test('header shows only active profiles, reversed from the popup order', () => {
   const html = renderSharingMenu({
     self,
-    users: [...offline, active, self, away],
+    profiles: [...offline, active, self, away],
     otherConnections: [connection(active, 'overview'), connection(away, null)]
   })
   expect(html).toContain('aria-label="Active colleague"')
@@ -120,11 +120,11 @@ test('header shows only active users, reversed from the popup order', () => {
 test('header limits active avatars to four and puts the overflow on the left', () => {
   const peers = Array.from(
     { length: 5 },
-    (_, i) => ({ type: 'human', id: `p${i}`, name: `Peer ${i}`, color: 'blue' }) as const
+    (_, i) => ({ type: 'user', id: `p${i}`, name: `Peer ${i}`, color: 'blue' }) as const
   )
   const html = renderSharingMenu({
     self,
-    users: [...peers, self],
+    profiles: [...peers, self],
     otherConnections: peers.map(p => connection(p, 'overview'))
   })
   expect(html.indexOf('+2')).toBeGreaterThan(-1)
@@ -141,7 +141,7 @@ test('header limits active avatars to four and puts the overflow on the left', (
 test('popup puts self first, active members next, and preserves remaining member order', () => {
   const html = renderMembersPanel({
     self,
-    users: [offline[0], away, active, self],
+    profiles: [offline[0], away, active, self],
     otherConnections: [connection(active, 'scratchpad'), connection(away, null)]
   })
   const order = [self, active, offline[0], away]
@@ -158,16 +158,16 @@ test('popup puts self first, active members next, and preserves remaining member
 test('member rows show name and email, falling back to email for missing names', () => {
   const named = { ...active, email: 'active@example.com' }
   const unnamed = { ...away, name: '', email: 'away@example.com' }
-  const html = renderMembersPanel({ self, users: [self, named, unnamed] })
+  const html = renderMembersPanel({ self, profiles: [self, named, unnamed] })
   expect(html).toContain('>Active colleague<')
   expect(html).toContain('>active@example.com<')
   expect(html.match(/>away@example.com</g)).toHaveLength(2)
 })
 
-test('an authoritative empty directory does not leak live users into avatars', () => {
+test('an authoritative empty directory does not leak live profiles into avatars', () => {
   const html = renderSharingMenu({
     self,
-    users: [],
+    profiles: [],
     otherConnections: [connection(active, 'overview')]
   })
   expect(html).not.toContain('aria-label="Self"')
@@ -178,10 +178,10 @@ test('menu stays visible without a current user', () => {
   expect(
     renderSharingMenu({
       self: undefined,
-      users: [active],
+      profiles: [active],
       otherConnections: [connection(active, 'overview')]
     })
-  ).toContain('aria-label="Users in this workspace"')
+  ).toContain('aria-label="People in this workspace"')
 })
 
 describe('workspace sharing', () => {
@@ -248,7 +248,7 @@ describe('workspace sharing', () => {
       )
     })
     await ui.settle()
-    await ui.click('Users in this workspace')
+    await ui.click('People in this workspace')
     expect(ui.calls.some(call => call.path.endsWith('/members'))).toBe(false)
     expect(ui.document.body.textContent).toContain('Alex')
     expect(ui.document.body.textContent).not.toContain('Offline')
@@ -271,7 +271,7 @@ describe('workspace sharing', () => {
     expect(ui.document.body.textContent).toContain('Alex')
     expect(ui.document.body.textContent).toContain('(You)')
     expect(ui.document.querySelector('[aria-label="Loading workspace members"]')).toBeNull()
-    expect(ui.document.querySelector('[aria-label="Users in this workspace"]')).not.toBeNull()
+    expect(ui.document.querySelector('[aria-label="People in this workspace"]')).not.toBeNull()
   })
 
   test('members stay loading until the host publishes its first snapshot', async () => {
@@ -286,7 +286,7 @@ describe('workspace sharing', () => {
     await ui.settle()
     const selfAvatar = () => ui.document.querySelector('[aria-label="Alex (You), open sharing"]')
     expect(selfAvatar()).toBeNull()
-    await ui.click('Users in this workspace')
+    await ui.click('People in this workspace')
     expect(ui.document.querySelector('[aria-label="Loading workspace members"]')).not.toBeNull()
     expect(ui.calls.some(call => call.path.endsWith('/members'))).toBe(false)
     await act(async () => setAllWorkspaceMembers([]))
@@ -304,7 +304,7 @@ describe('workspace sharing', () => {
     const peers = [active, away, ...offline.slice(0, 3)]
     const engine = createFakeEngine({
       self,
-      users: [self, ...peers],
+      profiles: [self, ...peers],
       page: 'overview',
       otherConnections: peers.map(p => connection(p, p === away ? 'views/deleted' : 'scratchpad'))
     })
@@ -348,10 +348,12 @@ describe('workspace sharing', () => {
     expect(ui.document.querySelector('form')).not.toBeNull()
     await ui.click('Self (You), open sharing')
     expect(ui.document.querySelector('form')).toBeNull()
-    const users = ui.document.querySelector('[aria-label="Active users"]')!
-    expect(users.textContent).toContain('+2')
+    const profiles = ui.document.querySelector('[aria-label="Active people"]')!
+    expect(profiles.textContent).toContain('+2')
     expect(
-      Array.from(users.querySelectorAll('button, [tabindex]')).some(el => el.textContent === '+2')
+      Array.from(profiles.querySelectorAll('button, [tabindex]')).some(
+        el => el.textContent === '+2'
+      )
     ).toBe(false)
     await act(async () => {
       engine.setOtherConnections([])
@@ -359,13 +361,13 @@ describe('workspace sharing', () => {
     })
     expect(ui.document.querySelector('[aria-label="Self (You), open sharing"]')).not.toBeNull()
     expect(ui.document.querySelector('[aria-label="Active colleague"]')).toBeNull()
-    await ui.click('Users in this workspace')
+    await ui.click('People in this workspace')
     expect(ui.document.querySelector('form')).not.toBeNull()
     await act(async () => engine.setLocation({ page: 'overview', status: 'active' }))
     expect(ui.document.querySelector('[aria-label="Self (You), open sharing"]')).not.toBeNull()
   })
 
-  test('invitation uses the cloud API, shows a toast and pending participant, and supports retry', async () => {
+  test('invitation uses the cloud API, shows a toast and pending invitation, and supports retry', async () => {
     const notification = spyOn(toast, 'add')
     try {
       const ui = await mountAccount({
@@ -378,7 +380,7 @@ describe('workspace sharing', () => {
         )
       })
       await ui.settle()
-      await ui.click('Users in this workspace')
+      await ui.click('People in this workspace')
       const input = ui.document.querySelector<HTMLInputElement>('[aria-label="Email"]')!
       await ui.type(input, 'Tony@Example.com')
       const submit = async () => {
@@ -463,7 +465,7 @@ describe('workspace sharing', () => {
               : []
         })
         await ui.settle()
-        await ui.click('Users in this workspace')
+        await ui.click('People in this workspace')
         const list = ui.document.querySelector('[aria-label="Who has access"]')!
         const rows = list.children.length
         const address = existing === 'member' ? 'alex@example.com' : 'tony@example.com'
@@ -510,7 +512,7 @@ describe('workspace sharing', () => {
           )
         })
         await ui.settle()
-        await ui.click('Users in this workspace')
+        await ui.click('People in this workspace')
         const fetch = globalThis.fetch
         spyOn(globalThis, 'fetch').mockImplementation(
           Object.assign(
@@ -550,7 +552,7 @@ describe('workspace sharing', () => {
     })
   }
 
-  test('one participant list removes members, revokes invitations and restores failed removals', async () => {
+  test('the sharing menu removes members, revokes invitations and restores failed removals', async () => {
     const notification = spyOn(toast, 'add')
     try {
       const ui = await mountAccount({
@@ -580,7 +582,7 @@ describe('workspace sharing', () => {
       const snapshot = { members: [...data.members], invitations: [...data.invitations] }
       ui.setMembership(snapshot)
       await act(async () => setWorkspaceMembers('one', snapshot))
-      await ui.click('Users in this workspace')
+      await ui.click('People in this workspace')
       const list = ui.document.querySelector('[aria-label="Who has access"]')!
       expect(list.querySelectorAll('li')).toHaveLength(3)
       expect(list.textContent).toContain('Tony')

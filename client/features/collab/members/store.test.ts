@@ -3,7 +3,7 @@ import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-ut
 import { afterEach, expect, test } from 'bun:test'
 import { queryClient } from '@/client/api/query-client'
 import { setIdentity, getIdentity } from '../../identity/store'
-import { getCurrentUser } from '../host-state'
+import { getCurrentProfile } from '../host-state'
 import {
   setWorkspaceMembers,
   setAllWorkspaceMembers,
@@ -33,14 +33,14 @@ test('cloud members retain their IDs and expose type and agent owner', () => {
   expect(getWorkspaceMembers('one')).toEqual({ members: [alex, bot], invitations: [] })
   expect(getWorkspaceDirectory('one')?.map(({ id, type, ownerId }) => [id, type, ownerId])).toEqual(
     [
-      ['alex', 'human', undefined],
+      ['alex', 'user', undefined],
       ['bot', 'agent', 'alex']
     ]
   )
   expect(getWorkspaceDirectory('one')?.find(profile => profile.id === 'bot')?.avatar).toBe(
     grokBotIcon
   )
-  expect(getCurrentUser()?.id).toBe('alex')
+  expect(getCurrentProfile()?.id).toBe('alex')
 })
 test('per-workspace directory does not leak members or replace viewer', () => {
   setIdentity(alex)

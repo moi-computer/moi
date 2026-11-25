@@ -104,7 +104,7 @@ test('requests get a nameless Access profile only when Access is configured', as
     process.env.MOI_CLOUDFLARE_ACCESS_AUD = 'aud-moi'
     resetAppConfig()
     const profile = {
-      type: 'human' as const,
+      type: 'user' as const,
       id: SUB,
       color: colorForId(SUB),
       email: 'alex@example.com'

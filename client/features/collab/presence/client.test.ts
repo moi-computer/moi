@@ -8,10 +8,10 @@ import { CollabService } from '@/server/collab/service'
 
 import { ReconnectingSocket } from '@/client/runtime/reconnecting-socket'
 import { CollabClient, NO_ENGINE } from './client'
-import { getCurrentUser } from '../host-state'
+import { getCurrentProfile } from '../host-state'
 import { setIdentity } from '../../identity/store'
 import { setWorkspaceMembers, clearWorkspaceMembers } from '../members/store'
-import type { UserProfileInput } from '../host-state'
+import type { ProfileInput } from '../host-state'
 
 const originalLocation = Object.getOwnPropertyDescriptor(globalThis, 'location')
 const originalWebSocket = Object.getOwnPropertyDescriptor(globalThis, 'WebSocket')
@@ -20,7 +20,7 @@ let sockets: TestSocket[]
 let stop: (() => void) | undefined
 
 // Publish as an outer host would: one viewer, listed in the directory.
-function signIn(user: UserProfileInput, others: readonly UserProfileInput[] = []) {
+function signIn(user: ProfileInput, others: readonly ProfileInput[] = []) {
   setIdentity({
     id: user.id,
     type: 'user',
@@ -124,21 +124,21 @@ test('runtime without a current user stays idle and never joins anonymously', ()
     value: 'title'
   })
   expect(sockets).toHaveLength(0)
-  expect(getCurrentUser()).toBeUndefined()
+  expect(getCurrentProfile()).toBeUndefined()
   expect(engine.getSnapshot().status).toBe('disconnected')
 })
 
 test('an explicit user enables workspace presence without an applet and clearing it disconnects', () => {
   const engine = new CollabClient('workspace')
   stop = engine.start()
-  const profile = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const profile = { type: 'user', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(profile)
   expect(sockets).toHaveLength(1)
   const socket = sockets[0]!
   expect(socket.url).toBe('ws://localhost/api/workspaces/workspace/events')
   socket.open()
   expect(socket.sent[0]).toMatchObject({ type: 'join', profile })
-  expect(engine.getSnapshot().connections[0]?.userId).toEqual(profile.id)
+  expect(engine.getSnapshot().connections[0]?.identityId).toEqual(profile.id)
   signIn({ ...profile, name: 'Alicia' })
   expect(socket.sent.at(-1)).toMatchObject({ type: 'profile', profile: { name: 'Alicia' } })
   expect(sockets).toHaveLength(1)
@@ -148,7 +148,7 @@ test('an explicit user enables workspace presence without an applet and clearing
 })
 
 test('two tabs send the same resolved color for a host user without one', () => {
-  signIn({ type: 'human', id: 'alice' })
+  signIn({ type: 'user', id: 'alice' })
   const first = new CollabClient('workspace')
   const second = new CollabClient('workspace')
   stop = first.start()
@@ -159,7 +159,7 @@ test('two tabs send the same resolved color for a host user without one', () => 
     for (const socket of sockets) {
       expect(socket.sent[0]).toMatchObject({
         type: 'join',
-        profile: { type: 'human', id: 'alice', color: colorForId('alice') }
+        profile: { type: 'user', id: 'alice', color: colorForId('alice') }
       })
     }
   } finally {
@@ -168,7 +168,7 @@ test('two tabs send the same resolved color for a host user without one', () => 
 })
 
 test('reconnecting restores current presence and removed registrations stay gone', async () => {
-  signIn({ type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') })
+  signIn({ type: 'user', id: 'alice', name: 'Alice', color: colorForId('alice') })
   const engine = new CollabClient('workspace')
   stop = engine.start()
   sockets[0]!.open()
@@ -206,10 +206,10 @@ test('a rejected join retries after capacity frees and cleanup cancels pending w
     service.receive(`occupied-${index}`, {
       type: 'join',
       version: 1,
-      profile: { type: 'human', id: `occupied-${index}`, color: 'blue' }
+      profile: { type: 'user', id: `occupied-${index}`, color: 'blue' }
     })
   }
-  signIn({ type: 'human', id: 'alice', color: 'emerald' })
+  signIn({ type: 'user', id: 'alice', color: 'emerald' })
   const heartbeat = spyOn(globalThis, 'setInterval')
   const clearHeartbeat = spyOn(globalThis, 'clearInterval')
   const timer = spyOn(globalThis, 'setTimeout')
@@ -262,7 +262,7 @@ test('a rejected join retries after capacity frees and cleanup cancels pending w
 })
 
 test('errors after joining keep the connection available for further presence', () => {
-  signIn({ type: 'human', id: 'alice', color: 'emerald' })
+  signIn({ type: 'user', id: 'alice', color: 'emerald' })
   const client = new CollabClient('workspace')
   stop = client.start()
   const socket = sockets[0]!
@@ -280,7 +280,7 @@ test('errors after joining keep the connection available for further presence', 
 })
 
 test('profile edits publish immediately without changing the user id or reconnecting', () => {
-  const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const alice = { type: 'user', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(alice)
   const engine = new CollabClient('workspace')
   stop = engine.start()
@@ -290,12 +290,12 @@ test('profile edits publish immediately without changing the user id or reconnec
   expect(sockets).toHaveLength(1)
   expect(sockets[0]!.readyState).toBe(TestSocket.OPEN)
   expect(sockets[0]!.sent.at(-1)).toEqual({ type: 'profile', profile: edited })
-  expect(engine.getSnapshot().users).toEqual([edited])
+  expect(engine.getSnapshot().profiles).toEqual([edited])
 })
 
 test('a directory change that leaves the viewer alone sends nothing to the room', () => {
-  const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
-  const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } as const
+  const alice = { type: 'user', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const bob = { type: 'user', id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice, [bob])
   const engine = new CollabClient('workspace')
   stop = engine.start()
@@ -311,27 +311,27 @@ test('a directory change that leaves the viewer alone sends nothing to the room'
 })
 
 test('changing user reconnects and never sends workspace membership over the socket', async () => {
-  signIn({ type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') })
+  signIn({ type: 'user', id: 'alice', name: 'Alice', color: colorForId('alice') })
   const engine = new CollabClient('workspace')
   stop = engine.start()
   sockets[0]!.open()
-  signIn({ type: 'human', id: 'bob', name: 'Bob', color: 'blue' })
+  signIn({ type: 'user', id: 'bob', name: 'Bob', color: 'blue' })
   expect(sockets[0]!.readyState).toBe(3)
   await Bun.sleep(550)
   sockets[1]!.open()
   expect(sockets[1]!.sent[0]).toMatchObject({ type: 'join', profile: { id: 'bob' } })
-  expect(sockets[1]!.sent.every(message => !('users' in message))).toBe(true)
+  expect(sockets[1]!.sent.every(message => !('profiles' in message))).toBe(true)
 })
 
 test('disabled engine exposes host profiles without starting a transport', () => {
-  const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
-  const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } as const
+  const alice = { type: 'user', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const bob = { type: 'user', id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice)
   const engine = new CollabClient('workspace', false)
   stop = engine.start()
   expect(engine.enabled).toBe(false)
   expect(engine.workspaceId).toBe('workspace')
-  expect(engine.getCurrentUser()).toEqual(alice)
+  expect(engine.getCurrentProfile()).toEqual(alice)
   expect(engine.getDirectory()?.map(u => u.id)).toEqual(['alice'])
   let updates = 0
   const unsubscribe = engine.subscribeDirectory(() => updates++)
@@ -348,13 +348,13 @@ test('disabled engine exposes host profiles without starting a transport', () =>
   engine.deletePresence('focus')
   expect(sockets).toHaveLength(0)
   expect(engine.getSnapshot()).toMatchObject({ status: 'disconnected', connections: [] })
-  expect(engine.getUsersSnapshot()).toBe(engine.getSnapshot())
+  expect(engine.getProfilesSnapshot()).toBe(engine.getSnapshot())
   expect(engine.getPresenceSnapshot('views/board', 'field:title')).toEqual([])
   unsubscribe()
 })
 
 test('engine cleanup survives remounting and does not leave user listeners or retry sockets', async () => {
-  const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const alice = { type: 'user', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(alice)
   const engine = new CollabClient('workspace')
   stop = engine.start()
@@ -373,10 +373,10 @@ test('engine cleanup survives remounting and does not leave user listeners or re
 })
 
 test('the default engine exposes identity but no workspace directory or transport', () => {
-  const alice = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
-  const bob = { type: 'human', id: 'bob', name: 'Bob', color: 'blue' } as const
+  const alice = { type: 'user', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const bob = { type: 'user', id: 'bob', name: 'Bob', color: 'blue' } as const
   signIn(alice, [bob])
-  expect(NO_ENGINE.getCurrentUser()).toEqual(alice)
+  expect(NO_ENGINE.getCurrentProfile()).toEqual(alice)
   // No workspace means no member directory.
   expect(NO_ENGINE.getDirectory()).toBeUndefined()
   let updates = 0
@@ -393,7 +393,7 @@ test('the default engine exposes identity but no workspace directory or transpor
 })
 
 test('cloud presence waits for this workspace membership and closes when access is removed', () => {
-  const viewer = { type: 'human', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
+  const viewer = { type: 'user', id: 'alice', name: 'Alice', color: colorForId('alice') } as const
   signIn(viewer)
   const engine = new CollabClient('other-workspace')
   stop = engine.start()
@@ -417,7 +417,7 @@ test('cloud presence waits for this workspace membership and closes when access 
 })
 
 test('remote presence connects to the owner with the same membership rules', () => {
-  signIn({ type: 'human', id: 'visitor', name: 'Visitor' })
+  signIn({ type: 'user', id: 'visitor', name: 'Visitor' })
   clearWorkspaceMembers()
   const id = 'visitor-board'
   seedWorkspaceInfo(id, { user_id: 'alice', workspace_id: 'board' })
@@ -431,7 +431,7 @@ test('remote presence connects to the owner with the same membership rules', () 
   expect(new URL(sockets[0]!.url).pathname).toBe('/api/workspaces/alice:board/events')
   sockets[0]!.open()
   expect(engine.getSnapshot().status).toBe('connected')
-  expect(engine.getSnapshot().users.some(user => user.id === 'visitor')).toBe(true)
+  expect(engine.getSnapshot().profiles.some(user => user.id === 'visitor')).toBe(true)
   signOut()
   expect(engine.getSnapshot().status).toBe('disconnected')
 })
@@ -446,7 +446,7 @@ test('presence joins a shared workspace socket and leaving keeps it for shared u
   sockets[0]!.open()
   expect(sockets[0]!.sent).toEqual([])
 
-  signIn({ type: 'human', id: 'alice', name: 'Alice' })
+  signIn({ type: 'user', id: 'alice', name: 'Alice' })
   const engine = new CollabClient('workspace', true, socket)
   stop = engine.start()
   expect(sockets).toHaveLength(1)

@@ -21,7 +21,7 @@ describe('collab service', () => {
     service.receive(connectionId, {
       type: 'join',
       version: 1,
-      profile: { type: 'human', id, name: id, color: 'blue' },
+      profile: { type: 'user', id, name: id, color: 'blue' },
       location: { page: 'views/board', status: 'active' }
     })
   }
@@ -32,7 +32,7 @@ describe('collab service', () => {
     return message
   }
 
-  test('welcomes connections with separate user profiles and user IDs', () => {
+  test('welcomes connections with separate profiles and identity IDs', () => {
     join('a', 'anna')
     join('b', 'boris')
     const welcome = messages.find(
@@ -45,20 +45,20 @@ describe('collab service', () => {
       connections: [
         {
           connectionId: 'a',
-          userId: 'anna',
+          identityId: 'anna',
           location: { page: 'views/board', status: 'active' },
           presence: []
         },
         {
           connectionId: 'b',
-          userId: 'boris',
+          identityId: 'boris',
           location: { page: 'views/board', status: 'active' },
           presence: []
         }
       ],
-      users: [
-        { type: 'human', id: 'anna', name: 'anna', color: 'blue' },
-        { type: 'human', id: 'boris', name: 'boris', color: 'blue' }
+      profiles: [
+        { type: 'user', id: 'anna', name: 'anna', color: 'blue' },
+        { type: 'user', id: 'boris', name: 'boris', color: 'blue' }
       ]
     })
   })
@@ -66,10 +66,10 @@ describe('collab service', () => {
   test('broadcasts an agent’s cloud ID and optional inviter', () => {
     const profile = { id: 'assistant', type: 'agent', color: 'blue' } as const
     service.receive('tab', { type: 'join', version: 1, profile })
-    expect(latest().users).toEqual([profile])
+    expect(latest().profiles).toEqual([profile])
     service.receive('tab', { type: 'profile', profile: { ...profile, ownerId: 'anna' } })
-    expect(latest().users).toEqual([{ ...profile, ownerId: 'anna' }])
-    expect(latest().connections[0]?.userId).toBe('assistant')
+    expect(latest().profiles).toEqual([{ ...profile, ownerId: 'anna' }])
+    expect(latest().connections[0]?.identityId).toBe('assistant')
   })
 
   test('multiple connections share a profile without sharing registration ownership', async () => {
@@ -88,11 +88,11 @@ describe('collab service', () => {
     await Bun.sleep(60)
     expect(latest().connections).toHaveLength(2)
     expect(latest().connections[0]?.presence.map(item => item.registrationId)).toEqual(['field-b'])
-    expect(latest().users).toHaveLength(1)
+    expect(latest().profiles).toHaveLength(1)
     service.leave('tab-one')
     expect(latest().connections.map(item => item.connectionId)).toEqual(['tab-two'])
     expect(latest().connections[0]?.presence).toEqual([])
-    expect(latest().users).toHaveLength(1)
+    expect(latest().profiles).toHaveLength(1)
   })
 
   test('profiles disappear after their final connection leaves', () => {
@@ -100,31 +100,31 @@ describe('collab service', () => {
     join('one', 'anna')
     join('two', 'anna')
     service.leave('one')
-    expect(latest().users.map(user => user.id)).toEqual(['observer', 'anna'])
+    expect(latest().profiles.map(user => user.id)).toEqual(['observer', 'anna'])
     service.leave('two')
-    expect(latest().users.map(user => user.id)).toEqual(['observer'])
+    expect(latest().profiles.map(user => user.id)).toEqual(['observer'])
     join('new-observer')
-    expect(latest().users.map(user => user.id)).toEqual(['observer', 'new-observer'])
+    expect(latest().profiles.map(user => user.id)).toEqual(['observer', 'new-observer'])
   })
 
   test('profile updates reach other tabs while user ID changes require reconnecting', () => {
     join('one', 'anna')
     join('two', 'anna')
     const profile = {
-      type: 'human',
+      type: 'user',
       id: 'anna',
       name: 'Anna updated',
       color: 'blue',
       email: 'anna@example.com'
     } as const
     service.receive('one', { type: 'profile', profile })
-    expect(latest().users).toEqual([profile])
+    expect(latest().profiles).toEqual([profile])
     service.leave('one')
-    expect(latest().users).toEqual([profile])
+    expect(latest().profiles).toEqual([profile])
     expect(() =>
       service.receive('two', {
         type: 'profile',
-        profile: { type: 'human', id: 'boris', name: 'Boris', color: 'pink' }
+        profile: { type: 'user', id: 'boris', name: 'Boris', color: 'pink' }
       })
     ).toThrow('Reconnect')
     expect(() => service.receive('missing', { type: 'ping' })).toThrow('Join')
@@ -133,7 +133,7 @@ describe('collab service', () => {
 
   test('nameless profiles and clearing a name preserve supplied optional data across tabs', () => {
     const nameless = {
-      type: 'human',
+      type: 'user',
       id: 'anna',
       color: 'blue',
       email: 'anna@example.com',
@@ -142,20 +142,20 @@ describe('collab service', () => {
     service.receive('one', { type: 'join', version: 1, profile: nameless })
     const welcome = messages.find(item => item.message.type === 'welcome')?.message
     if (welcome?.type !== 'welcome') throw new Error('Missing welcome')
-    expect(welcome.users).toEqual([nameless])
-    expect(Object.hasOwn(welcome.users[0]!, 'name')).toBe(false)
+    expect(welcome.profiles).toEqual([nameless])
+    expect(Object.hasOwn(welcome.profiles[0]!, 'name')).toBe(false)
     service.receive('two', { type: 'join', version: 1, profile: nameless })
     service.receive('one', { type: 'profile', profile: { ...nameless, name: 'Anna' } })
     service.receive('one', { type: 'profile', profile: nameless })
-    expect(latest().users).toEqual([nameless])
+    expect(latest().profiles).toEqual([nameless])
     service.leave('one')
-    expect(latest().users).toEqual([nameless])
-    const minimal = { type: 'human', id: 'anna', color: 'blue' } as const
+    expect(latest().profiles).toEqual([nameless])
+    const minimal = { type: 'user', id: 'anna', color: 'blue' } as const
     service.receive('two', { type: 'profile', profile: minimal })
-    expect(latest().users).toEqual([minimal])
-    expect(Object.hasOwn(latest().users[0]!, 'name')).toBe(false)
-    expect(Object.hasOwn(latest().users[0]!, 'email')).toBe(false)
-    expect(Object.hasOwn(latest().users[0]!, 'avatar')).toBe(false)
+    expect(latest().profiles).toEqual([minimal])
+    expect(Object.hasOwn(latest().profiles[0]!, 'name')).toBe(false)
+    expect(Object.hasOwn(latest().profiles[0]!, 'email')).toBe(false)
+    expect(Object.hasOwn(latest().profiles[0]!, 'avatar')).toBe(false)
   })
 
   test('presence and location updates are coalesced and deletion clears a registration', async () => {

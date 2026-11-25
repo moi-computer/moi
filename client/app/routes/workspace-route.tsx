@@ -1,7 +1,7 @@
 import { WorkspaceRegistration } from './workspace-registration'
 import { RecoveryMessage } from '@/client/features/workspace/setup/workspace-recovery-states'
 import { WorkspacePendingScreen } from '@/client/features/workspace/workspace-pending-screen'
-import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
+import { useWorkspaceMembership } from '@/client/features/collab/members/hooks'
 import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-transition'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider } from '@/client/features/collab'
@@ -71,7 +71,7 @@ function WorkspaceLive({ id, children }: WorkspaceLiveProps) {
 }
 
 function WorkspaceContent({ id }: WorkspaceRouteProps) {
-  useWorkspaceMembers(id)
+  useWorkspaceMembership(id)
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
   const { isLoading: layoutLoading, layout, harness } = useWorkspaceLayoutCtx()

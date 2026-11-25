@@ -1,15 +1,15 @@
-import { User } from '@/client/features/collab/components/user'
+import { Profile } from '@/client/features/collab/components/profile'
 import { agentClientLabel } from '@/client/lib/agent-client'
 import { identityProfile } from '@/client/features/collab/host-state'
 import { Spinner } from '@/client/components/ui/spinner'
-import { useWorkspaceMembers } from '@/client/features/collab/members/hooks'
+import { useWorkspaceMembership } from '@/client/features/collab/members/hooks'
 import { MembershipMenu } from '@/client/features/collab/sharing/membership-menu'
 import { useWorkspaceId } from '../workspace-context'
 import { SettingsPage, SettingsSection } from './settings-layout'
 
 export function AgentsSettings() {
   const workspaceId = useWorkspaceId()
-  const { members } = useWorkspaceMembers(workspaceId)
+  const { members } = useWorkspaceMembership(workspaceId)
   const agents = members?.filter(member => member.type === 'agent')
   return (
     <SettingsPage title="Agents">
@@ -21,7 +21,7 @@ export function AgentsSettings() {
         <SettingsSection>
           {agents.map(agent => (
             <div key={agent.id} className="flex items-center gap-3 px-3.5 py-3">
-              <User
+              <Profile
                 profile={identityProfile({ ...agent, name: agent.name || 'Unnamed agent' })}
                 description={agentClientLabel(agent.client)}
                 className="flex-1"
