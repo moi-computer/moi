@@ -80,12 +80,12 @@ function WorkspaceEntry({ id }: WorkspaceRouteProps) {
 
 // Shared updates and presence use the same workspace connection.
 function WorkspaceLive({ id }: WorkspaceRouteProps) {
-  const { environment, localDevPresence } = useAppConfig()
+  const { environment, testLocalCollab } = useAppConfig()
   const socket = useWorkspaceSocket(id)
   return (
     <CollabProvider
       workspaceId={id}
-      enabled={environment === 'cloud' || localDevPresence === true}
+      enabled={environment === 'cloud' || testLocalCollab === true}
       socket={socket}
     >
       <WorkspaceContent id={id} />

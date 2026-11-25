@@ -261,7 +261,7 @@ export function isLoopbackHost(hostname: string): boolean {
   return ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(hostname)
 }
 
-export function localDevPresenceEnabled(): boolean {
+export function testLocalCollabEnabled(): boolean {
   if (process.env.MOI_TEST_LOCAL_COLLAB !== '1' || process.env.MOI_DEV !== '1' || isBundled)
     return false
   const { environment, cloudflareAccess, demo, unixSocket } = getAppConfig()
@@ -282,6 +282,6 @@ export function clientAppConfig(): ClientAppConfig {
     environment,
     demo,
     demoInstallUrl,
-    ...(localDevPresenceEnabled() && { localDevPresence: true })
+    ...(testLocalCollabEnabled() && { testLocalCollab: true })
   }
 }

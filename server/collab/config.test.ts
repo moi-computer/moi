@@ -36,13 +36,13 @@ afterEach(async () => {
 describe('collab startup configuration', () => {
   test('local dev can opt into presence and keeps cloud instructions hidden', async () => {
     process.env.MOI_DEV = '1'
-    expect(clientAppConfig().localDevPresence).toBeUndefined()
+    expect(clientAppConfig().testLocalCollab).toBeUndefined()
     process.env.MOI_TEST_LOCAL_COLLAB = '1'
     await Bun.write(
       join(workspacePath, '.moi', '.workspace.json'),
       JSON.stringify({ version: 1, experimental: { collab: true } })
     )
-    expect(clientAppConfig()).toMatchObject({ environment: 'local', localDevPresence: true })
+    expect(clientAppConfig()).toMatchObject({ environment: 'local', testLocalCollab: true })
     expect(await getCollabReferencePath(workspacePath)).toBeUndefined()
   })
 
@@ -54,7 +54,7 @@ describe('collab startup configuration', () => {
     process.env.MOI_TEST_LOCAL_COLLAB = '1'
     process.env.MOI_ENVIRONMENT = 'cloud'
     initializeAppConfig()
-    expect(clientAppConfig().localDevPresence).toBeUndefined()
+    expect(clientAppConfig().testLocalCollab).toBeUndefined()
     expect(await getCollabReferencePath(workspacePath)).toBe(referencePath)
   })
 })

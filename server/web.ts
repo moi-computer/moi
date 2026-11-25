@@ -11,7 +11,7 @@ import { startOperations, stopOperations } from './operations/server'
 import index from '../client/index.html'
 import devSandbox from '../client/dev/index.html'
 import { api } from './api'
-import { getAppConfig, isLoopbackHost, localDevPresenceEnabled } from './app-config'
+import { getAppConfig, isLoopbackHost, testLocalCollabEnabled } from './app-config'
 import { harnessStore } from './harness/auth'
 import { PORT } from './constants'
 import { control } from './control'
@@ -122,7 +122,7 @@ await Promise.all(registeredWorkspaces.map(failInterruptedViewStarts))
 // meant for people (docs/config.md). A socket file left by a previous
 // run would make the bind fail.
 const { environment, unixSocket } = getAppConfig()
-const localDevPresence = localDevPresenceEnabled()
+const testLocalCollab = testLocalCollabEnabled()
 if (unixSocket) await rm(unixSocket, { force: true })
 const listen = unixSocket
   ? { unix: unixSocket }
@@ -184,10 +184,7 @@ export const app = Bun.serve<WsData>({
     '/api/workspaces/:id/events': async (req: Request, server: Bun.Server<WsData>) => {
       const url = new URL(req.url)
       const origin = req.headers.get('origin')
-      if (
-        localDevPresence &&
-        (!isLoopbackHost(url.hostname) || (origin && origin !== url.origin))
-      ) {
+      if (testLocalCollab && (!isLoopbackHost(url.hostname) || (origin && origin !== url.origin))) {
         return new Response('Invalid origin', { status: 403 })
       }
       const workspaceId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
@@ -202,7 +199,7 @@ export const app = Bun.serve<WsData>({
       return upgrade(server, req, {
         channel: 'workspace',
         workspaceId,
-        workspacePath: environment === 'cloud' || localDevPresence ? workspace.path : undefined,
+        workspacePath: environment === 'cloud' || testLocalCollab ? workspace.path : undefined,
         ...(profile ? { verifiedProfile: profile } : {})
       })
     }
