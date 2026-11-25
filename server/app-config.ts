@@ -262,7 +262,8 @@ export function isLoopbackHost(hostname: string): boolean {
 }
 
 export function localDevPresenceEnabled(): boolean {
-  if (isBundled || process.env.MOI_DEV !== '1') return false
+  if (process.env.MOI_TEST_LOCAL_COLLAB !== '1' || process.env.MOI_DEV !== '1' || isBundled)
+    return false
   const { environment, cloudflareAccess, demo, unixSocket } = getAppConfig()
   return (
     environment === 'local' &&
