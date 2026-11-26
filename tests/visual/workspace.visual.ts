@@ -118,18 +118,18 @@ describe('Workspace', () => {
       const workspace = page.getByRole('link', { name: 'Open acme-store', exact: true })
       await expect(workspace).toBeVisible()
       pause.resolve()
-      const bar = page.getByRole('progressbar', { name: 'Resuming your computer' })
-      await expect(bar).toBeVisible()
+      const spinner = page.getByRole('status', { name: 'Resuming your computer' })
+      await expect(page.getByRole('dialog', { name: 'Resuming your computer' })).toBeVisible()
       expect(starts).toEqual([])
       showTab.resolve()
       await page.waitUntil('one visible resume', () => starts.length > 0)
-      await expect(bar).toBeVisible()
+      await expect(spinner).toBeVisible()
       await takeSnapshot('resuming machine')
       const readsBeforeResume = suggestionsReads
       const previewsBeforeResume = previewReads
       running = true
       sendRunning.resolve()
-      await expect(bar).toHaveCount(0)
+      await expect(spinner).toHaveCount(0)
       await page.waitUntil(
         'interrupted suggestions read retried',
         () => suggestionsReads > readsBeforeResume
@@ -184,14 +184,54 @@ describe('Workspace', () => {
       await expect(workspace).toBeVisible()
       sleep.resolve()
       await page.waitUntil('idle notification delivered', () => delivered)
-      const bar = page.getByRole('progressbar', { name: 'Resuming your computer' })
-      await expect(bar).toHaveCount(0)
+      const spinner = page.getByRole('status', { name: 'Resuming your computer' })
+      await expect(spinner).toHaveCount(0)
       expect(starts).toEqual([])
       await takeSnapshot('idle machine stays asleep')
       await workspace.click()
       await page.waitUntil('interaction requests resume', () => starts.length > 0)
-      await expect(bar).toBeVisible()
+      await expect(spinner).toBeVisible()
       expect(starts).toEqual(['POST'])
+    },
+    {
+      api: {
+        '/api/config': { environment: 'cloud', demo: false },
+        '/cloud/api/me': {
+          id: 'owner',
+          type: 'user',
+          name: 'Owner',
+          email: 'owner@example.com',
+          isAnonymous: false
+        }
+      }
+    }
+  )
+
+  test(
+    'retry starts the computer again after startup fails',
+    async page => {
+      let starts = 0
+      page.route('**/api/workspaces/suggestions', route =>
+        route.fulfill(
+          starts < 2
+            ? { status: 503, headers: { 'X-Moi-Machine-State': 'hibernated' } }
+            : { json: [] }
+        )
+      )
+      page.route('**/cloud/api/machine/start', route => {
+        starts++
+        return route.fulfill({
+          json: { status: starts === 1 ? 'error' : 'running', revision: starts }
+        })
+      })
+      await page.goto('/#/')
+      const retry = page.getByRole('button', { name: 'Retry', exact: true })
+      await expect(retry).toBeVisible()
+      expect(starts).toBe(1)
+      await takeSnapshot('computer resume failed')
+      await retry.click()
+      await expect(page.getByRole('dialog')).toHaveCount(0)
+      expect(starts).toBe(2)
     },
     {
       api: {

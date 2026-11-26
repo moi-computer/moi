@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { useAppConfig } from '@/client/api/app-config'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { CloudMachineResume } from '@/client/features/machine/cloud-machine-resume'
+import { MachineResumeOverlay } from '@/client/features/machine/machine-resume-overlay'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { AppContext, type AppContextValue } from '@/client/runtime/app-context'
 import { appEvents } from '@/client/runtime/app-events'
@@ -45,7 +45,8 @@ export function AppProvider({ children }: AppProviderProps) {
 
   return (
     <AppContext value={appContext}>
-      {environment === 'cloud' ? <CloudMachineResume>{children}</CloudMachineResume> : children}
+      {children}
+      {environment === 'cloud' && <MachineResumeOverlay />}
     </AppContext>
   )
 }

@@ -1,24 +1,24 @@
-import { type ReactNode, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { type Query, useQueryClient } from '@tanstack/react-query'
 
 import { HttpError } from '@/client/api/http'
-import { Dialog, DialogContent, DialogTitle } from '@/client/components/ui/dialog'
-import { Progress } from '@/ui-components/progress'
 import { isMachineStatus, machine, type MachineSnapshot } from './store'
 
 // Mounted only in the cloud. The host bridge owns the WebSocket.
-type CloudMachineResumeProps = { children: ReactNode }
-
-export function CloudMachineResume({ children }: CloudMachineResumeProps) {
+export function useMachineResume() {
   const snapshot = useSyncExternalStore(machine.subscribe, machine.getSnapshot)
   const interrupted = snapshot !== undefined && snapshot.status !== 'running'
   const queries = useQueryClient()
   const [wakeRequested, setWakeRequested] = useState(interrupted)
 
+  const [failed, setFailed] = useState(false)
+
   useEffect(() => {
     let seenRunning = machine.getSnapshot()?.status === 'running'
     const observe = (next: MachineSnapshot | undefined) => {
+      if (next?.status === 'error') setFailed(true)
       if (next?.status === 'running') {
+        setFailed(false)
         seenRunning = true
         setWakeRequested(false)
       } else if (next && !seenRunning) {
@@ -86,7 +86,7 @@ export function CloudMachineResume({ children }: CloudMachineResumeProps) {
   }, [queries])
 
   useEffect(() => {
-    if (!interrupted || !wakeRequested) return
+    if (!interrupted || !wakeRequested || failed) return
     let active = true
     let pending = false
     let accepted = false
@@ -118,7 +118,8 @@ export function CloudMachineResume({ children }: CloudMachineResumeProps) {
           return
         }
         if (response.status === 429) delay = 60_000
-        if (response.ok) {
+        else if (!response.ok) setFailed(true)
+        else {
           const next: MachineSnapshot = await response.json()
           if (!active) return
           machine.set(next)
@@ -126,7 +127,7 @@ export function CloudMachineResume({ children }: CloudMachineResumeProps) {
           accepted = status === 'provisioning' || status === 'stopping'
         }
       } catch {
-        // A dropped Start response is safe to retry. Hidden tabs stay idle.
+        if (active) setFailed(true)
       } finally {
         pending = false
       }
@@ -146,26 +147,7 @@ export function CloudMachineResume({ children }: CloudMachineResumeProps) {
       clearTimeout(timer)
       document.removeEventListener('visibilitychange', resume)
     }
-  }, [interrupted, wakeRequested])
+  }, [interrupted, wakeRequested, failed])
 
-  return (
-    <>
-      {children}
-      {interrupted && wakeRequested && (
-        <Dialog open disablePointerDismissal>
-          <DialogContent
-            showCloseButton={false}
-            className="w-28 gap-0 bg-transparent p-0 shadow-none"
-          >
-            <DialogTitle className="sr-only">Resuming your computer</DialogTitle>
-            <Progress
-              aria-label="Resuming your computer"
-              value={null}
-              className="[&_[data-slot=progress-indicator]]:w-1/3 motion-safe:[&_[data-slot=progress-indicator]]:animate-pulse"
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-    </>
-  )
+  return { visible: interrupted && wakeRequested, failed, retry: () => setFailed(false) }
 }
