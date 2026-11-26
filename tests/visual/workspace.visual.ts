@@ -484,15 +484,20 @@ describe('Workspace', () => {
   test(
     'expanded demo banner',
     async page => {
+      await page.addInitScript(() => {
+        const browser: Window = window
+        const schedule = browser.setTimeout.bind(browser)
+        browser.setTimeout = (handler, delay, ...args) =>
+          schedule(handler, delay === 3 * 60_000 ? 0 : delay, ...args)
+      })
       await page.goto(WORKSPACE_PAGE)
-      const banner = page.getByRole('button', { name: 'Set up Moi', exact: true })
-      await expect(
-        page.getByText('You’re exploring a demo workspace.', { exact: false })
-      ).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Collapse demo banner' })).toBeVisible()
       await takeSnapshot('expanded workspace header banner')
-      await page.getByRole('button', { name: 'Collapse demo banner' }).click()
+      // Click the center of the banner, away from the setup and collapse controls.
+      await page
+        .locator('header [data-vivid]:has(button[aria-label="Collapse demo banner"])')
+        .click()
       await expect(page.getByRole('button', { name: 'Collapse demo banner' })).toHaveCount(0)
-      await banner.click()
       const dialog = page.getByRole('dialog', { name: 'Set up your Moi' })
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('link', { name: 'Sign in' })).toBeVisible()
