@@ -508,12 +508,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
       </div>
 
       <PanelHeader>
-        {demo && (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 texture-checker-4 [mask-image:linear-gradient(to_right,transparent_25%,black_95%)] [--texture-checker-fill:var(--accent)]"
-          />
-        )}
         <div className="relative flex min-w-0 flex-1 items-center gap-4">
           <WorkspaceMenu onOpenTheme={() => setWidgetMode('theming')} />
           <WorkspaceTabs

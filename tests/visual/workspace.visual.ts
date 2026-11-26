@@ -493,10 +493,7 @@ describe('Workspace', () => {
       await page.goto(WORKSPACE_PAGE)
       await expect(page.getByRole('button', { name: 'Collapse demo banner' })).toBeVisible()
       await takeSnapshot('expanded workspace header banner')
-      // Click the center of the banner, away from the setup and collapse controls.
-      await page
-        .locator('header [data-vivid]:has(button[aria-label="Collapse demo banner"])')
-        .click()
+      await page.getByRole('button', { name: 'Set up Moi', exact: true }).click()
       await expect(page.getByRole('button', { name: 'Collapse demo banner' })).toHaveCount(0)
       const dialog = page.getByRole('dialog', { name: 'Set up your Moi' })
       await expect(dialog).toBeVisible()
