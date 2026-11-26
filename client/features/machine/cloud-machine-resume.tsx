@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useLayoutEffect, useSyncExternalStore } from 'react'
+import { type ReactNode, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { type Query, useQueryClient } from '@tanstack/react-query'
 
 import { HttpError } from '@/client/api/http'
@@ -7,10 +7,44 @@ import { Progress } from '@/ui-components/progress'
 import { isMachineStatus, machine, type MachineSnapshot } from './store'
 
 // Mounted only in the cloud. The host bridge owns the WebSocket.
-export function CloudMachineResume({ children }: { children: ReactNode }) {
+type CloudMachineResumeProps = { children: ReactNode }
+
+export function CloudMachineResume({ children }: CloudMachineResumeProps) {
   const snapshot = useSyncExternalStore(machine.subscribe, machine.getSnapshot)
   const interrupted = snapshot !== undefined && snapshot.status !== 'running'
   const queries = useQueryClient()
+  const [wakeRequested, setWakeRequested] = useState(interrupted)
+
+  useEffect(() => {
+    let seenRunning = machine.getSnapshot()?.status === 'running'
+    const observe = (next: MachineSnapshot | undefined) => {
+      if (next?.status === 'running') {
+        seenRunning = true
+        setWakeRequested(false)
+      } else if (next && !seenRunning) {
+        // The first snapshot belongs to a fresh navigation, not an idle tab.
+        setWakeRequested(true)
+      }
+    }
+    observe(machine.getSnapshot())
+    return machine.subscribe(observe)
+  }, [])
+
+  useEffect(() => {
+    const wake = () => {
+      const current = machine.getSnapshot()
+      if (current && current.status !== 'running' && document.visibilityState === 'visible')
+        setWakeRequested(true)
+    }
+    document.addEventListener('pointerdown', wake, true)
+    document.addEventListener('keydown', wake, true)
+    document.addEventListener('visibilitychange', wake)
+    return () => {
+      document.removeEventListener('pointerdown', wake, true)
+      document.removeEventListener('keydown', wake, true)
+      document.removeEventListener('visibilitychange', wake)
+    }
+  }, [])
 
   useLayoutEffect(() => {
     const interruptedReads = new Set<Query>()
@@ -52,7 +86,7 @@ export function CloudMachineResume({ children }: { children: ReactNode }) {
   }, [queries])
 
   useEffect(() => {
-    if (!interrupted) return
+    if (!interrupted || !wakeRequested) return
     let active = true
     let pending = false
     let accepted = false
@@ -78,7 +112,11 @@ export function CloudMachineResume({ children }: { children: ReactNode }) {
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)])
         })
         if (!active) return
-        if (response.status === 401 || response.status === 403) return
+        if (response.status === 401 || response.status === 403) {
+          const returnTo = location.pathname + location.search + location.hash
+          location.replace('/cloud/login?returnTo=' + encodeURIComponent(returnTo))
+          return
+        }
         if (response.status === 429) delay = 60_000
         if (response.ok) {
           const next: MachineSnapshot = await response.json()
@@ -108,12 +146,12 @@ export function CloudMachineResume({ children }: { children: ReactNode }) {
       clearTimeout(timer)
       document.removeEventListener('visibilitychange', resume)
     }
-  }, [interrupted])
+  }, [interrupted, wakeRequested])
 
   return (
     <>
       {children}
-      {interrupted && (
+      {interrupted && wakeRequested && (
         <Dialog open disablePointerDismissal>
           <DialogContent
             showCloseButton={false}

@@ -153,6 +153,102 @@ describe('Workspace', () => {
   )
 
   test(
+    'a visible idle cloud tab stays asleep until interaction',
+    async page => {
+      const sleep = Promise.withResolvers<void>()
+      let delivered = false
+      const starts: string[] = []
+      page.route('**/test/idle-event', async route => {
+        await sleep.promise
+        route.fulfill({ body: '' })
+      })
+      page.route('**/test/idle-delivered', route => {
+        delivered = true
+        route.fulfill({ body: '' })
+      })
+      await page.addInitScript(() => {
+        void fetch('/test/idle-event').then(() => {
+          const api = (window as Window & { moi?: IdentityHostApi }).moi!
+          api.machine.set({ status: 'running', revision: 1 })
+          api.machine.set({ status: 'stopping', revision: 2 })
+          api.machine.set({ status: 'hibernated', revision: 3 })
+          void fetch('/test/idle-delivered')
+        })
+      })
+      page.route('**/cloud/api/machine/start', route => {
+        starts.push(route.request().method())
+        route.fulfill({ json: { status: 'provisioning', revision: 4 } })
+      })
+      await page.goto('/#/')
+      const workspace = page.getByRole('link', { name: 'Open acme-store', exact: true })
+      await expect(workspace).toBeVisible()
+      sleep.resolve()
+      await page.waitUntil('idle notification delivered', () => delivered)
+      const bar = page.getByRole('progressbar', { name: 'Resuming your computer' })
+      await expect(bar).toHaveCount(0)
+      expect(starts).toEqual([])
+      await takeSnapshot('idle machine stays asleep')
+      await workspace.click()
+      await page.waitUntil('interaction requests resume', () => starts.length > 0)
+      await expect(bar).toBeVisible()
+      expect(starts).toEqual(['POST'])
+    },
+    {
+      api: {
+        '/api/config': { environment: 'cloud', demo: false },
+        '/cloud/api/me': {
+          id: 'owner',
+          type: 'user',
+          name: 'Owner',
+          email: 'owner@example.com',
+          isAnonymous: false
+        }
+      }
+    }
+  )
+
+  test(
+    'expired cloud resume returns to login',
+    async page => {
+      const expire = Promise.withResolvers<void>()
+      let destination = ''
+      page.route('**/test/expire', async route => {
+        await expire.promise
+        route.fulfill({ body: '' })
+      })
+      await page.addInitScript(() => {
+        if (location.pathname.startsWith('/cloud/login')) return
+        void fetch('/test/expire').then(() => {
+          const api = (window as Window & { moi?: IdentityHostApi }).moi!
+          api.machine.set({ status: 'hibernated', revision: 1 })
+        })
+      })
+      page.route('**/cloud/api/machine/start', route => route.fulfill({ status: 401 }))
+      page.route('**/cloud/login?*', route => {
+        destination = route.request().url()
+        route.fulfill({ contentType: 'text/html', body: '<h1>Sign in</h1>' })
+      })
+      await page.goto('/#/')
+      await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
+      expire.resolve()
+      await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+      expect(new URL(destination).searchParams.get('returnTo')).toBe('/#/')
+    },
+    {
+      api: {
+        '/api/config': { environment: 'cloud', demo: false },
+        '/cloud/api/me': {
+          id: 'owner',
+          type: 'user',
+          name: 'Owner',
+          email: 'owner@example.com',
+          isAnonymous: false
+        }
+      }
+    }
+  )
+
+  test(
     'onboarding',
     async page => {
       await page.goto('/#/')
