@@ -484,13 +484,6 @@ describe('Workspace', () => {
   test(
     'expanded demo banner',
     async page => {
-      // Advance only the five-minute banner timeout; keep the app's other timers intact.
-      await page.addInitScript(() => {
-        const browser: Window = window
-        const schedule = browser.setTimeout.bind(browser)
-        browser.setTimeout = (handler, delay, ...args) =>
-          schedule(handler, delay === 300_000 ? 0 : delay, ...args)
-      })
       await page.goto(WORKSPACE_PAGE)
       const banner = page.getByRole('button', { name: 'Set up Moi', exact: true })
       await expect(

@@ -10,7 +10,7 @@ type BannerState = 'waiting' | 'expanded' | 'dismissed'
 
 export function DemoBanner() {
   const workspaceId = useWorkspaceId()
-  const [state, setState] = useState<BannerState>('expanded')
+  const [state, setState] = useState<BannerState>('waiting')
 
   useWorkspaceEvent(workspaceId, event => {
     if (event.type === 'chat:message-sent' && state === 'waiting') setState('expanded')
@@ -18,7 +18,7 @@ export function DemoBanner() {
 
   useEffect(() => {
     if (state !== 'waiting') return
-    const timer = setTimeout(() => setState('expanded'), 5 * 60 * 1000)
+    const timer = setTimeout(() => setState('expanded'), 1_000)
     return () => clearTimeout(timer)
   }, [state])
 
@@ -26,12 +26,12 @@ export function DemoBanner() {
   const trigger = useRef<HTMLButtonElement>(null)
 
   return (
-    <div className="relative h-7 w-28 shrink-0">
+    <div className="h-7 w-28 shrink-0">
       <div
         data-vivid
         className={cn(
-          'absolute top-0 right-0 z-10 flex h-full w-full max-w-[calc(100cqw-1.5rem)] flex-col items-start justify-end rounded-md bg-background text-foreground inset-shadow-[0_0_16px_0_color-mix(in_srgb,var(--color-white)_80%,transparent)] transition-[width,height,border-radius,padding] duration-200 ease-out motion-reduce:transition-none',
-          expanded && 'h-[174px] w-[371px] rounded-lg pb-3 pl-3'
+          'absolute right-3 flex h-7 w-28 max-w-[calc(100%-1.5rem)] flex-col items-start justify-end rounded-md bg-background text-foreground inset-shadow-[0_0_16px_0_color-mix(in_srgb,var(--color-white)_80%,transparent)] transition-[width,height,border-radius,padding] duration-200 ease-out motion-reduce:transition-none',
+          expanded && 'h-36 w-full rounded-lg pb-3 pl-3'
         )}
       >
         {expanded && (
