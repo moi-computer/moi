@@ -35,7 +35,7 @@ export function MachineResumeOverlay() {
           ) : (
             <Spinner
               aria-label={title}
-              className="size-6 transition-[visibility] delay-3000 duration-0 starting:invisible"
+              className="size-6 text-muted-foreground transition-[visibility] delay-3000 duration-0 starting:invisible"
               stroke={1.5}
             />
           )}
