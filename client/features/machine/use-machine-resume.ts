@@ -1,48 +1,54 @@
-import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { type Query, useQueryClient } from '@tanstack/react-query'
 
-import { HttpError } from '@/client/api/http'
+import { HttpError, requestJson } from '@/client/api/http'
 import { isMachineStatus, machine, type MachineSnapshot } from './store'
+
+const WAKE_UPDATE_TIMEOUT_MS = 15_000
+
+type ResumeState = 'idle' | 'checking' | 'waiting-for-stop' | 'waking' | 'failed'
+
+function resumeState(status: MachineSnapshot['status'] | undefined): ResumeState {
+  if (!status || status === 'running') return 'idle'
+  if (status === 'stopping') return 'waiting-for-stop'
+  if (status === 'error') return 'failed'
+  return 'waking'
+}
 
 // Mounted only in the cloud. The host bridge owns the WebSocket.
 export function useMachineResume() {
-  const snapshot = useSyncExternalStore(machine.subscribe, machine.getSnapshot)
-  const interrupted = snapshot !== undefined && snapshot.status !== 'running'
   const queries = useQueryClient()
-  const [wakeRequested, setWakeRequested] = useState(interrupted)
-
-  const [failed, setFailed] = useState(false)
+  const [state, setState] = useState<ResumeState>('idle')
 
   useEffect(() => {
-    let seenRunning = machine.getSnapshot()?.status === 'running'
-    const observe = (next: MachineSnapshot | undefined) => {
-      if (next?.status === 'error') setFailed(true)
-      if (next?.status === 'running') {
-        setFailed(false)
-        seenRunning = true
-        setWakeRequested(false)
-      } else if (next && !seenRunning) {
-        // The first snapshot belongs to a fresh navigation, not an idle tab.
-        setWakeRequested(true)
+    const controller = new AbortController()
+    const { signal } = controller
+    const wake = (event: Event) => {
+      if (document.visibilityState !== 'visible' || !document.hasFocus()) return
+      let next = resumeState(machine.getSnapshot()?.status)
+      if (next === 'idle' || next === 'waiting-for-stop') {
+        if (event.type !== 'focus' && event.type !== 'visibilitychange') return
+        next = 'checking'
       }
+      setState(current => (current === 'idle' || current === 'waiting-for-stop' ? next : current))
     }
-    observe(machine.getSnapshot())
-    return machine.subscribe(observe)
-  }, [])
-
-  useEffect(() => {
-    const wake = () => {
-      const current = machine.getSnapshot()
-      if (current && current.status !== 'running' && document.visibilityState === 'visible')
-        setWakeRequested(true)
-    }
-    document.addEventListener('pointerdown', wake, true)
-    document.addEventListener('keydown', wake, true)
-    document.addEventListener('visibilitychange', wake)
+    const unsubscribe = machine.subscribe((next, prev) => {
+      if (next?.status === 'running') return setState('idle')
+      setState(current => {
+        if (current === 'waiting-for-stop') return resumeState(next?.status)
+        if (current === 'checking' && next?.status === 'stopping' && prev?.status !== 'stopping')
+          return 'idle'
+        if (current === 'waking' && next?.status === 'error') return 'failed'
+        return current
+      })
+    })
+    document.addEventListener('pointerdown', wake, { capture: true, signal })
+    document.addEventListener('keydown', wake, { capture: true, signal })
+    document.addEventListener('visibilitychange', wake, { signal })
+    window.addEventListener('focus', wake, { signal })
     return () => {
-      document.removeEventListener('pointerdown', wake, true)
-      document.removeEventListener('keydown', wake, true)
-      document.removeEventListener('visibilitychange', wake)
+      controller.abort()
+      unsubscribe()
     }
   }, [])
 
@@ -86,68 +92,48 @@ export function useMachineResume() {
   }, [queries])
 
   useEffect(() => {
-    if (!interrupted || !wakeRequested || failed) return
-    let active = true
-    let pending = false
-    let accepted = false
-    let timer: ReturnType<typeof setTimeout>
+    if (state !== 'checking' && state !== 'waking') return
     const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout>
 
-    async function resume() {
-      clearTimeout(timer)
-      if (
-        pending ||
-        document.visibilityState !== 'visible' ||
-        machine.getSnapshot()?.status === 'running'
-      )
-        return
-      pending = true
-      let delay = 15_000
+    async function request(action: 'start' | 'status') {
       try {
-        // Normally the host pushes running before the recovery timer fires.
-        const action = accepted ? 'status' : 'start'
-        const response = await fetch('/cloud/api/machine/' + action, {
-          method: accepted ? 'GET' : 'POST',
+        const next = await requestJson<MachineSnapshot>('/cloud/api/machine/' + action, {
+          method: action === 'start' ? 'POST' : 'GET',
           cache: 'no-store',
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)])
         })
-        if (!active) return
-        if (response.status === 401 || response.status === 403) {
+        if (controller.signal.aborted) return
+        machine.set(next)
+        const status = machine.getSnapshot()?.status
+        if (state === 'checking') return setState(resumeState(status))
+        if (action === 'start' && status === 'provisioning') {
+          // Batiok normally pushes running. Check once if we missed the update.
+          timer = setTimeout(() => void request('status'), WAKE_UPDATE_TIMEOUT_MS)
+          return
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return
+        if (state === 'checking') return setState(resumeState(machine.getSnapshot()?.status))
+        if (error instanceof HttpError && (error.status === 401 || error.status === 403)) {
           const returnTo = location.pathname + location.search + location.hash
           location.replace('/cloud/login?returnTo=' + encodeURIComponent(returnTo))
           return
         }
-        if (response.status === 429) delay = 60_000
-        else if (!response.ok) setFailed(true)
-        else {
-          const next: MachineSnapshot = await response.json()
-          if (!active) return
-          machine.set(next)
-          const status = machine.getSnapshot()?.status
-          accepted = status === 'provisioning' || status === 'stopping'
-        }
-      } catch {
-        if (active) setFailed(true)
-      } finally {
-        pending = false
       }
-      if (
-        active &&
-        document.visibilityState === 'visible' &&
-        machine.getSnapshot()?.status !== 'running'
-      )
-        timer = setTimeout(resume, delay)
+      if (machine.getSnapshot()?.status !== 'running') setState('failed')
     }
 
-    document.addEventListener('visibilitychange', resume)
-    void resume()
+    void request(state === 'checking' ? 'status' : 'start')
     return () => {
-      active = false
       controller.abort()
       clearTimeout(timer)
-      document.removeEventListener('visibilitychange', resume)
     }
-  }, [interrupted, wakeRequested, failed])
+  }, [state])
 
-  return { visible: interrupted && wakeRequested, failed, retry: () => setFailed(false) }
+  return {
+    visible: state === 'waking' || state === 'failed',
+    failed: state === 'failed',
+    retry: () => setState('waking')
+  }
 }

@@ -10,6 +10,19 @@ import { API, HARNESSES, suite, WORKSPACE } from './fixtures'
 const { describe, test } = suite(import.meta.path)
 const WORKSPACE_PAGE = `/#/workspace/${WORKSPACE}`
 
+const cloudMachineFixture = {
+  api: {
+    '/api/config': { environment: 'cloud', demo: false },
+    '/cloud/api/me': {
+      id: 'owner',
+      type: 'user',
+      name: 'Owner',
+      email: 'owner@example.com',
+      isAnonymous: false
+    }
+  }
+}
+
 test('floating chat keeps its open and closed state after reload', async page => {
   await page.addInitScript(() => {
     localStorage.setItem(
@@ -119,7 +132,7 @@ describe('Workspace', () => {
       await expect(workspace).toBeVisible()
       pause.resolve()
       const spinner = page.getByRole('status', { name: 'Resuming your computer' })
-      await expect(page.getByRole('dialog', { name: 'Resuming your computer' })).toBeVisible()
+      await expect(page.getByRole('dialog', { name: 'Resuming your computer' })).toHaveCount(0)
       expect(starts).toEqual([])
       showTab.resolve()
       await page.waitUntil('one visible resume', () => starts.length > 0)
@@ -138,26 +151,15 @@ describe('Workspace', () => {
       expect(previewReads).toBe(previewsBeforeResume)
       expect(starts).toEqual(['POST'])
     },
-    {
-      api: {
-        '/api/config': { environment: 'cloud', demo: false },
-        '/cloud/api/me': {
-          id: 'owner',
-          type: 'user',
-          name: 'Owner',
-          email: 'owner@example.com',
-          isAnonymous: false
-        }
-      }
-    }
+    cloudMachineFixture
   )
 
   test(
-    'a visible idle cloud tab stays asleep until interaction',
+    'Stop after a recent click leaves Moi quiet until the next click',
     async page => {
       const sleep = Promise.withResolvers<void>()
       let delivered = false
-      const starts: string[] = []
+      const calls: string[] = []
       page.route('**/test/idle-event', async route => {
         await sleep.promise
         route.fulfill({ body: '' })
@@ -166,17 +168,25 @@ describe('Workspace', () => {
         delivered = true
         route.fulfill({ body: '' })
       })
+      page.route('**/test/before-stop', route => route.fulfill({ body: '' }))
       await page.addInitScript(() => {
-        void fetch('/test/idle-event').then(() => {
+        void fetch('/test/idle-event').then(async () => {
           const api = (window as Window & { moi?: IdentityHostApi }).moi!
+          document.dispatchEvent(new PointerEvent('pointerdown'))
           api.machine.set({ status: 'running', revision: 1 })
+          document.dispatchEvent(new PointerEvent('pointerdown'))
+          await fetch('/test/before-stop')
           api.machine.set({ status: 'stopping', revision: 2 })
           api.machine.set({ status: 'hibernated', revision: 3 })
           void fetch('/test/idle-delivered')
         })
       })
+      page.route('**/cloud/api/machine/status', route => {
+        calls.push('Status')
+        return route.fulfill({ json: { status: 'running', revision: 1 } })
+      })
       page.route('**/cloud/api/machine/start', route => {
-        starts.push(route.request().method())
+        calls.push('Start')
         route.fulfill({ json: { status: 'provisioning', revision: 4 } })
       })
       await page.goto('/#/')
@@ -186,34 +196,70 @@ describe('Workspace', () => {
       await page.waitUntil('idle notification delivered', () => delivered)
       const spinner = page.getByRole('status', { name: 'Resuming your computer' })
       await expect(spinner).toHaveCount(0)
-      expect(starts).toEqual([])
+      expect(calls).toEqual([])
       await takeSnapshot('idle machine stays asleep')
       await workspace.click()
-      await page.waitUntil('interaction requests resume', () => starts.length > 0)
+      await page.waitUntil('interaction requests resume', () => calls.includes('Start'))
       await expect(spinner).toBeVisible()
-      expect(starts).toEqual(['POST'])
+      expect(calls).toEqual(['Start'])
     },
-    {
-      api: {
-        '/api/config': { environment: 'cloud', demo: false },
-        '/cloud/api/me': {
-          id: 'owner',
-          type: 'user',
-          name: 'Owner',
-          email: 'owner@example.com',
-          isAnonymous: false
-        }
-      }
-    }
+    cloudMachineFixture
   )
+
+  for (const cachedStatus of ['running', 'stopping'] as const) {
+    test(
+      `returning with a cached ${cachedStatus} machine finishes the wake after switching away`,
+      async page => {
+        const returnToTab = Promise.withResolvers<void>()
+        await page.route('**/test/return-to-tab', async route => {
+          await returnToTab.promise
+          await route.fulfill({ json: { status: cachedStatus, revision: 1 } })
+        })
+        await page.addInitScript(() => {
+          void fetch('/test/return-to-tab').then(async response => {
+            const api = (window as Window & { moi?: IdentityHostApi }).moi!
+            api.machine.set(await response.json())
+            window.dispatchEvent(new Event('focus'))
+            document.dispatchEvent(new Event('visibilitychange'))
+            Object.defineProperty(document, 'visibilityState', { value: 'hidden' })
+            window.dispatchEvent(new Event('blur'))
+            document.dispatchEvent(new Event('visibilitychange'))
+            const sleep = () => api.machine.set({ status: 'hibernated', revision: 3 })
+            if (api.machine.getSnapshot()?.status === 'running') sleep()
+            else
+              api.machine.subscribe(next => {
+                if (next?.status === 'stopping') queueMicrotask(sleep)
+              })
+          })
+        })
+        const calls: string[] = []
+        await page.route('**/cloud/api/machine/status', route => {
+          calls.push('Status')
+          return route.fulfill({ json: { status: cachedStatus, revision: 2 } })
+        })
+        await page.route('**/cloud/api/machine/start', route => {
+          calls.push('Start')
+          return route.fulfill({ json: { status: 'provisioning', revision: 4 } })
+        })
+        await page.goto('/#/')
+        await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
+        returnToTab.resolve()
+        await expect(page.getByRole('dialog', { name: 'Resuming your computer' })).toBeVisible()
+        await page.waitUntil('one wake request', () => calls.includes('Start'))
+        expect(calls).toEqual(['Status', 'Start'])
+      },
+      cloudMachineFixture
+    )
+  }
 
   test(
     'retry starts the computer again after startup fails',
     async page => {
+      const results = ['error', 'stopped', 'none', 'stopping', 'hibernated', 'running']
       let starts = 0
       page.route('**/api/workspaces/suggestions', route =>
         route.fulfill(
-          starts < 2
+          starts < results.length
             ? { status: 503, headers: { 'X-Moi-Machine-State': 'hibernated' } }
             : { json: [] }
         )
@@ -221,30 +267,63 @@ describe('Workspace', () => {
       page.route('**/cloud/api/machine/start', route => {
         starts++
         return route.fulfill({
-          json: { status: starts === 1 ? 'error' : 'running', revision: starts }
+          json: { status: results[starts - 1], revision: starts }
         })
       })
       await page.goto('/#/')
+      await page.getByRole('link', { name: 'Open acme-store', exact: true }).click()
       const retry = page.getByRole('button', { name: 'Retry', exact: true })
       await expect(retry).toBeVisible()
       expect(starts).toBe(1)
       await takeSnapshot('computer resume failed')
+      for (let expectedStarts = 2; expectedStarts < results.length; expectedStarts++) {
+        await retry.click()
+        await page.waitUntil('Start received', () => starts === expectedStarts)
+        await expect(retry).toBeVisible()
+      }
       await retry.click()
       await expect(page.getByRole('dialog')).toHaveCount(0)
-      expect(starts).toBe(2)
+      expect(starts).toBe(results.length)
     },
-    {
-      api: {
-        '/api/config': { environment: 'cloud', demo: false },
-        '/cloud/api/me': {
-          id: 'owner',
-          type: 'user',
-          name: 'Owner',
-          email: 'owner@example.com',
-          isAnonymous: false
-        }
-      }
-    }
+    cloudMachineFixture
+  )
+
+  test(
+    'each wake attempt checks Status once if Batiok sends no update',
+    async page => {
+      const calls: string[] = []
+      const statuses = ['provisioning', 'running']
+      let revision = 0
+      page.route('**/api/workspaces/suggestions', route =>
+        route.fulfill(
+          statuses.length
+            ? { status: 503, headers: { 'X-Moi-Machine-State': 'hibernated' } }
+            : { json: [] }
+        )
+      )
+      page.route('**/cloud/api/machine/status', route => {
+        calls.push('Status')
+        return route.fulfill({ json: { status: statuses.shift(), revision: ++revision } })
+      })
+      page.route('**/cloud/api/machine/start', route => {
+        calls.push('Start')
+        return route.fulfill({ json: { status: 'provisioning', revision: ++revision } })
+      })
+      await page.goto('/#/')
+      await page.getByRole('link', { name: 'Open acme-store', exact: true }).click()
+      const retry = page.getByRole('button', { name: 'Retry', exact: true })
+      await page.waitUntil('fallback Status offers Retry', () => retry.isVisible(), 25_000)
+      expect(calls).toEqual(['Start', 'Status'])
+      await retry.click()
+      await page.waitUntil(
+        'Retry completes through fallback Status',
+        () => !statuses.length,
+        25_000
+      )
+      await expect(page.getByRole('dialog')).toHaveCount(0)
+      expect(calls).toEqual(['Start', 'Status', 'Start', 'Status'])
+    },
+    cloudMachineFixture
   )
 
   test(
@@ -261,6 +340,7 @@ describe('Workspace', () => {
         void fetch('/test/expire').then(() => {
           const api = (window as Window & { moi?: IdentityHostApi }).moi!
           api.machine.set({ status: 'hibernated', revision: 1 })
+          window.dispatchEvent(new Event('focus'))
         })
       })
       page.route('**/cloud/api/machine/start', route => route.fulfill({ status: 401 }))
@@ -274,18 +354,7 @@ describe('Workspace', () => {
       await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
       expect(new URL(destination).searchParams.get('returnTo')).toBe('/#/')
     },
-    {
-      api: {
-        '/api/config': { environment: 'cloud', demo: false },
-        '/cloud/api/me': {
-          id: 'owner',
-          type: 'user',
-          name: 'Owner',
-          email: 'owner@example.com',
-          isAnonymous: false
-        }
-      }
-    }
+    cloudMachineFixture
   )
 
   test(
