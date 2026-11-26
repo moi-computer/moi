@@ -40,6 +40,7 @@ export type AppEvent =
 export type ServerEvent = (SharedWorkspaceEvent & { workspaceId: string }) | HarnessEvent | AppEvent
 
 export type ClientEvent =
+  | { type: 'chat:message-sent'; workspaceId: string }
   | ServerEvent
   | { type: 'app:connected' }
   | { type: 'workspace:connected'; workspaceId: string }

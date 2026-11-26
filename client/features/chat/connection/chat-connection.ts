@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 
+import { appEvents } from '@/client/runtime/app-events'
 import { wsUrl } from '@/client/lib/ws-url'
 import { ReconnectingSocket } from '@/client/runtime/reconnecting-socket'
 import { liveStore } from '@/client/features/chat/chat-store'
@@ -54,6 +55,8 @@ export function handleFrame(data: Record<string, unknown>) {
 export function sendMessage(msg: ClientMessage) {
   if (socket.isOpen) socket.send(msg)
   else queue.push(msg)
+  if (msg.type === 'chat')
+    appEvents.emit({ type: 'chat:message-sent', workspaceId: msg.workspaceId })
 }
 
 // Test seam: inject the QueryClient the frame handler reads, without opening a

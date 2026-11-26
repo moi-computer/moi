@@ -124,7 +124,7 @@ function DemoDialogContent() {
       <div className="relative grid max-h-[calc(100dvh-2rem)] overflow-y-auto md:grid-cols-[3fr_2fr] md:overflow-visible">
         <div className="rounded-xl bg-background p-6 text-foreground shadow-sm md:p-8">
           <div className="flex flex-col gap-0.5">
-            <DialogTitle>Set up your personal Moi</DialogTitle>
+            <DialogTitle>Set up your Moi</DialogTitle>
             <DialogDescription className="mt-1">
               This is a demo workspace. Sign in and connect your agent to unlock all features.
             </DialogDescription>
