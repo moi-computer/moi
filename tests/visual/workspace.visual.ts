@@ -500,9 +500,20 @@ describe('Workspace', () => {
       await page.getByRole('button', { name: 'Collapse demo banner' }).click()
       await expect(page.getByRole('button', { name: 'Collapse demo banner' })).toHaveCount(0)
       await banner.click()
-      await expect(page.getByRole('dialog', { name: 'Set up your Moi' })).toBeVisible()
+      const dialog = page.getByRole('dialog', { name: 'Set up your Moi' })
+      await expect(dialog).toBeVisible()
+      await expect(dialog.getByRole('link', { name: 'Sign in' })).toBeVisible()
+      await takeSnapshot('demo dialog with vivid checker')
     },
-    { api: { '/api/config': { environment: 'cloud', demo: true } } }
+    {
+      api: {
+        '/api/config': { environment: 'cloud', demo: true },
+        [`/api/workspaces/${WORKSPACE}`]: {
+          ...(API[`/api/workspaces/${WORKSPACE}`] as WorkspaceLayoutResponse),
+          theme: { font: 'sans', radius: 'soft', agent: 'blob', color: 'rose' }
+        }
+      }
+    }
   )
 
   test(

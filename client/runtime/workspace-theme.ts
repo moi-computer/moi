@@ -1,3 +1,7 @@
+// Import the vivid palette here as plain CSS. Putting it in the Tailwind entry
+// causes the current plugin to drop color mixes for button text and hover states.
+import '../vivid-surface.css'
+
 import { useEffect } from 'react'
 import type { CSSProperties } from 'react'
 
@@ -9,7 +13,7 @@ import {
   resolveThemeColorOverrides,
   resolveWorkspaceTheme
 } from '@/lib/themes'
-import type { ThemeColorMode, ThemeColorToken } from '@/lib/themes'
+import type { ThemeColorToken } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 const FONT_LINK_ID = 'moi-fonts'
@@ -27,6 +31,8 @@ const WORKSPACE_COLOR_PROPERTIES = THEME_COLOR_TOKENS.map(
 )
 const WORKSPACE_RADIUS_PROPERTY = '--radius' as const
 const WORKSPACE_COLOR_ALIASES = {
+  '--vivid-background': 'var(--primary)',
+  '--vivid-foreground': 'var(--primary-foreground)',
   '--secondary': 'var(--accent)',
   '--secondary-foreground': 'var(--accent-foreground)'
 } as const
@@ -59,12 +65,9 @@ export function getWorkspaceThemeFontStyle(theme: WorkspaceLayout['theme']): Wor
   return style
 }
 
-export function getWorkspaceThemeColorStyle(
-  theme: WorkspaceLayout['theme'],
-  colorMode: ThemeColorMode = 'workspace'
-): WorkspaceThemeStyle {
+export function getWorkspaceThemeColorStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
-  const colors = resolveThemeColorOverrides(theme, colorMode)
+  const colors = resolveThemeColorOverrides(theme)
 
   for (const [token, property] of WORKSPACE_COLOR_PROPERTIES) {
     style[property] = colors?.[token]
@@ -87,13 +90,10 @@ export function getWorkspaceThemeRadiusStyle(theme: WorkspaceLayout['theme']): W
   return style
 }
 
-export function getWorkspaceThemeStyle(
-  theme: WorkspaceLayout['theme'],
-  colorMode: ThemeColorMode = 'workspace'
-): WorkspaceThemeStyle {
+export function getWorkspaceThemeStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {
   return {
     ...getWorkspaceThemeFontStyle(theme),
-    ...getWorkspaceThemeColorStyle(theme, colorMode),
+    ...getWorkspaceThemeColorStyle(theme),
     ...getWorkspaceThemeRadiusStyle(theme)
   }
 }

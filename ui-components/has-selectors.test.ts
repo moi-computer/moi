@@ -29,7 +29,6 @@ test('shared components avoid universal subjects inside relational :is selectors
   const theme = [
     await Bun.file(Bun.resolveSync('tailwindcss/theme.css', import.meta.dir)).text(),
     await Bun.file(join(import.meta.dir, '../client/theme.css')).text(),
-    '@custom-variant dark-or-vivid (&:is(.dark *, [data-vivid], [data-vivid] *));',
     '@tailwind utilities;'
   ].join('\n')
   const compiler = await compile(theme)

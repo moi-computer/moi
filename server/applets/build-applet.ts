@@ -283,13 +283,6 @@ async function writeSyntheticTailwindCss(
     // page-wide but the applet's scoped sheet must bring its own copy; it gets
     // scoped to the applet subtree like every other rule (applet-css.ts).
     `@layer base { * { @apply border-border outline-ring/50; } }`,
-    // Mirror the host's class-based dark mode (client/index.css) so an applet's
-    // `dark:` variants flip with the app theme. Without this Tailwind falls
-    // back to `@media (prefers-color-scheme: dark)`, which diverges from the
-    // host and injects OS-preference media queries into the page.
-    `@custom-variant dark (&:is(.dark *));`,
-    // Dark themes and vivid surfaces use the stronger texture treatment.
-    `@custom-variant dark-or-vivid (&:is(.dark *, [data-vivid], [data-vivid] *));`,
     `@source "${sourceDir}";`
   ].join('\n')
   await Bun.write(cssPath, contents)

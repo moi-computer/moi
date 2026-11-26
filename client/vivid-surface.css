@@ -1,0 +1,15 @@
+/* Plain CSS loaded alongside the Tailwind entry so the browser resolves workspace colors. */
+[data-vivid] {
+  --background: var(--vivid-background);
+  --foreground: var(--vivid-foreground);
+  --accent-foreground: var(--foreground);
+  --secondary: var(--accent);
+  --secondary-foreground: var(--accent-foreground);
+  --primary: color-mix(in srgb, var(--background) 2%, oklch(1 0 0) 98%);
+  --primary-foreground: color-mix(in srgb, var(--background) 20%, oklch(0 0 0) 80%);
+  --muted: color-mix(in srgb, var(--background) 95%, var(--foreground) 5%);
+  --muted-foreground: color-mix(in srgb, var(--background) 50%, var(--foreground) 50%);
+  --accent: color-mix(in srgb, var(--primary) 3%, var(--foreground) 4%);
+  --border: color-mix(in srgb, var(--foreground) 15%, transparent);
+  --ring: color-mix(in srgb, var(--background) 50%, var(--primary) 50%);
+}

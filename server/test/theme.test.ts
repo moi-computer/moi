@@ -53,23 +53,11 @@ describe('color themes', () => {
     })
   })
 
-  test('uses the selected color as the widget surface without a circular primary reference', () => {
-    const primary = 'oklch(0.7426 0.1817 56.01)'
-    const colors = deriveThemeColors(primary, 'widget')
-
-    expect(colors.background).toBe(primary)
-    expect(wcagContrast(primary, colors.foreground)).toBeGreaterThanOrEqual(3)
-    expect(colors.primary).toContain('var(--background)')
-    expect(colors.primary).not.toContain('var(--primary)')
-  })
-
-  test('preset text meets the existing contrast floor on workspace and widget surfaces', () => {
+  test('preset primary and foreground colors meet the contrast floor', () => {
     for (const preset of Object.values(COLOR_THEMES)) {
       const primary = preset.primary ?? DEFAULT_PRIMARY_COLOR
       const normal = deriveThemeColors(primary)
-      const widget = deriveThemeColors(primary, 'widget')
       expect(wcagContrast(primary, normal.primaryForeground)).toBeGreaterThanOrEqual(3)
-      expect(wcagContrast(primary, widget.foreground)).toBeGreaterThanOrEqual(3)
     }
   })
 })

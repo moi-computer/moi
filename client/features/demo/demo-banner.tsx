@@ -4,15 +4,12 @@ import { IconX, IconArrowUpRight } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
-import { getWorkspaceThemeColorStyle } from '@/client/runtime/workspace-theme'
-import { useWorkspaceThemeSetting } from '@/client/features/workspace/workspace-layout-context'
 import { DemoDialog } from './demo-dialog'
 
 type BannerState = 'waiting' | 'expanded' | 'dismissed'
 
 export function DemoBanner() {
   const workspaceId = useWorkspaceId()
-  const theme = useWorkspaceThemeSetting()
   const [state, setState] = useState<BannerState>('expanded')
 
   useWorkspaceEvent(workspaceId, event => {
@@ -31,7 +28,7 @@ export function DemoBanner() {
   return (
     <div className="relative h-7 w-28 shrink-0">
       <div
-        style={getWorkspaceThemeColorStyle(theme, 'widget')}
+        data-vivid
         className={cn(
           'absolute top-0 right-0 z-10 flex h-full w-full max-w-[calc(100cqw-1.5rem)] flex-col items-start justify-end rounded-md bg-background text-foreground inset-shadow-[0_0_16px_0_color-mix(in_srgb,var(--color-white)_80%,transparent)] transition-[width,height,border-radius,padding] duration-200 ease-out motion-reduce:transition-none',
           expanded && 'h-[174px] w-[371px] rounded-lg pb-3 pl-3'

@@ -107,8 +107,6 @@ export type ColorTheme =
   | 'sky'
   | 'lavender'
 
-export type ThemeColorMode = 'workspace' | 'widget'
-
 export const DEFAULT_PRIMARY_COLOR = 'oklch(0.205 0 0)'
 
 function foregroundForPrimary(primary: string): string {
@@ -116,33 +114,19 @@ function foregroundForPrimary(primary: string): string {
 }
 
 const THEME_COLOR_DERIVATIONS = {
-  workspace: {
-    primary: primary => primary,
-    primaryForeground: primary => foregroundForPrimary(primary),
-    background: () => 'color-mix(in srgb, var(--primary) 2%, oklch(1 0 0) 98%)',
-    foreground: () => 'color-mix(in srgb, var(--primary) 20%, oklch(0 0 0) 80%)',
-    muted: () => 'color-mix(in srgb, var(--background) 95%, var(--foreground) 5%)',
-    mutedForeground: () => 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
-    accent: () => 'color-mix(in srgb, var(--primary) 3%, var(--foreground) 4%)',
-    accentForeground: () => 'var(--foreground)',
-    border: () => 'color-mix(in srgb, var(--foreground) 7%, transparent)',
-    ring: () => 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
-  },
-  widget: {
-    background: primary => primary,
-    foreground: primary => foregroundForPrimary(primary),
-    primary: () => 'color-mix(in srgb, var(--background) 2%, oklch(1 0 0) 98%)',
-    primaryForeground: () => 'color-mix(in srgb, var(--background) 20%, oklch(0 0 0) 80%)',
-    muted: () => 'color-mix(in srgb, var(--background) 95%, var(--foreground) 5%)',
-    mutedForeground: () => 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
-    accent: () => 'color-mix(in srgb, var(--primary) 3%, var(--foreground) 4%)',
-    accentForeground: () => 'var(--foreground)',
-    border: () => 'color-mix(in srgb, var(--foreground) 15%, transparent)',
-    ring: () => 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
-  }
-} satisfies Record<ThemeColorMode, Record<string, (primary: string) => string>>
+  primary: primary => primary,
+  primaryForeground: primary => foregroundForPrimary(primary),
+  background: () => 'color-mix(in srgb, var(--primary) 2%, oklch(1 0 0) 98%)',
+  foreground: () => 'color-mix(in srgb, var(--primary) 20%, oklch(0 0 0) 80%)',
+  muted: () => 'color-mix(in srgb, var(--background) 95%, var(--foreground) 5%)',
+  mutedForeground: () => 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
+  accent: () => 'color-mix(in srgb, var(--primary) 3%, var(--foreground) 4%)',
+  accentForeground: () => 'var(--foreground)',
+  border: () => 'color-mix(in srgb, var(--foreground) 7%, transparent)',
+  ring: () => 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
+} satisfies Record<string, (primary: string) => string>
 
-export type ThemeColorToken = keyof (typeof THEME_COLOR_DERIVATIONS)['workspace']
+export type ThemeColorToken = keyof typeof THEME_COLOR_DERIVATIONS
 export type ThemeColors = Record<ThemeColorToken, string>
 
 export type ColorThemeConfig = {
@@ -151,18 +135,12 @@ export type ColorThemeConfig = {
   primary?: string
 }
 
-export const THEME_COLOR_TOKENS = Object.keys(
-  THEME_COLOR_DERIVATIONS.workspace
-) as ThemeColorToken[]
+export const THEME_COLOR_TOKENS = Object.keys(THEME_COLOR_DERIVATIONS) as ThemeColorToken[]
 
-export function deriveThemeColors(
-  primary: string,
-  mode: ThemeColorMode = 'workspace'
-): ThemeColors {
+export function deriveThemeColors(primary: string): ThemeColors {
   const colors = {} as ThemeColors
-  const derivations = THEME_COLOR_DERIVATIONS[mode]
   for (const token of THEME_COLOR_TOKENS) {
-    colors[token] = derivations[token](primary)
+    colors[token] = THEME_COLOR_DERIVATIONS[token](primary)
   }
   return colors
 }
@@ -231,11 +209,9 @@ export function resolveWorkspaceTheme(theme?: Partial<WorkspaceTheme>): Workspac
 }
 
 export function resolveThemeColorOverrides(
-  theme?: Partial<WorkspaceTheme>,
-  mode: ThemeColorMode = 'workspace'
+  theme?: Partial<WorkspaceTheme>
 ): ThemeColors | undefined {
   const resolved = resolveWorkspaceTheme(theme)
-  const color = COLOR_THEMES[resolved.color]
-  const primary = color.primary ?? (mode === 'widget' ? DEFAULT_PRIMARY_COLOR : undefined)
-  return primary ? deriveThemeColors(primary, mode) : undefined
+  const { primary } = COLOR_THEMES[resolved.color]
+  return primary ? deriveThemeColors(primary) : undefined
 }
