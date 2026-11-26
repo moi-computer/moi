@@ -35,6 +35,12 @@ test('host bridge boots before React has been preloaded', async () => {
       installIdentityHostApi();
       const api = window.moi;
       if (api.collab) throw new Error('Legacy API leaked');
+      let updates = 0;
+      const unsubscribe = api.machine.subscribe(() => updates++);
+      api.machine.set({ status: 'running', revision: 5 });
+      api.machine.set({ status: 'hibernated', revision: 4 });
+      if (updates !== 1 || api.machine.getSnapshot().status !== 'running') throw new Error('Stale machine snapshot');
+      unsubscribe();
       api.identity.set({ id: 'user', type: 'user', name: 'Name', email: 'name@example.com', isAnonymous: false });
       api.workspaceMembers.setAll([
         { id: 'workspace', members: [], invitations: [] },

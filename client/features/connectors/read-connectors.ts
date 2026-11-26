@@ -1,10 +1,12 @@
+import { HttpError } from '@/client/api/http'
 import type { McpServer } from '@/lib/types'
 
 export async function readConnectors(
   response: Response,
   onProgress: (connectors: McpServer[]) => void
 ): Promise<McpServer[]> {
-  if (!response.ok || !response.body) throw new Error('Could not load connectors')
+  if (!response.ok) throw new HttpError(response, 'Could not load connectors')
+  if (!response.body) throw new Error('Could not load connectors')
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
   let buffer = ''
   try {

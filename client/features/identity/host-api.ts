@@ -1,3 +1,4 @@
+import { machine } from '../machine/store'
 import { appEvents } from '@/client/runtime/app-events'
 import { setIdentity, getIdentityRevision } from './store'
 import {
@@ -11,6 +12,7 @@ import type { Identity } from './types'
 import type { WorkspaceMembers, WorkspaceMembersSnapshot } from '../collab/members/types'
 
 export type IdentityHostApi = {
+  machine: typeof machine
   identity: { set: (identity: Identity | null) => void; getRevision: () => number }
   remoteWorkspaces: { sync: () => void }
   workspaceMembers: {
@@ -26,6 +28,7 @@ export function installIdentityHostApi() {
   if (typeof window === 'undefined') return
   const host = window as Window & { moi?: Partial<IdentityHostApi> & Record<string, unknown> }
   host.moi ??= {}
+  host.moi.machine = machine
   host.moi.identity = { set: setIdentity, getRevision: getIdentityRevision }
   host.moi.remoteWorkspaces = { sync: () => appEvents.syncRemoteWorkspaces() }
   host.moi.workspaceMembers = {

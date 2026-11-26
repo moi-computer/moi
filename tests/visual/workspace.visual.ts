@@ -1,5 +1,6 @@
 import { DEFAULT_VIEWPORT, expect, takeSnapshot } from '@uiverify/bun'
 
+import type { IdentityHostApi } from '@/client/features/identity/host-api'
 import type { Identity } from '@/client/features/identity/types'
 import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
 import type { ClientAppConfig, WorkspaceEntry, WorkspaceLayoutResponse } from '@/lib/types'
@@ -67,6 +68,88 @@ describe('Workspace', () => {
       await expect(page.getByRole('button', { name: 'Suggestions' })).toHaveCount(0)
     },
     { api: { '/api/config': { environment: 'cloud', demo: false } } }
+  )
+
+  test(
+    'paused cloud machine resumes when the tab becomes visible',
+    async page => {
+      const pause = Promise.withResolvers<void>()
+      const showTab = Promise.withResolvers<void>()
+      const sendRunning = Promise.withResolvers<void>()
+      const starts: string[] = []
+      let suggestionsReads = 0
+      let previewReads = 0
+      let running = false
+      page.route('**/test/show-tab', async route => {
+        await showTab.promise
+        route.fulfill({ body: '' })
+      })
+      page.route('**/test/running-event', async route => {
+        await sendRunning.promise
+        route.fulfill({ body: '' })
+      })
+      await page.addInitScript(() => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+        void fetch('/test/show-tab').then(() => {
+          Reflect.deleteProperty(document, 'visibilityState')
+          document.dispatchEvent(new Event('visibilitychange'))
+        })
+        void fetch('/test/running-event').then(() => {
+          const api = (window as Window & { moi?: IdentityHostApi }).moi!
+          api.machine.set({ status: 'running', revision: 3 })
+          api.machine.set({ status: 'hibernated', revision: 2 })
+        })
+      })
+      page.route('**/api/workspaces/suggestions', async route => {
+        suggestionsReads++
+        if (running) return route.fulfill({ json: [] })
+        await pause.promise
+        route.fulfill({ status: 503, headers: { 'X-Moi-Machine-State': 'hibernated' } })
+      })
+      page.route('**/api/workspaces/previews', route => {
+        previewReads++
+        return route.fulfill({ json: API['/api/workspaces/previews'] })
+      })
+      page.route('**/cloud/api/machine/start', route => {
+        starts.push(route.request().method())
+        route.fulfill({ json: { status: 'provisioning', revision: 2 } })
+      })
+      await page.goto('/#/')
+      const workspace = page.getByRole('link', { name: 'Open acme-store', exact: true })
+      await expect(workspace).toBeVisible()
+      pause.resolve()
+      const bar = page.getByRole('progressbar', { name: 'Resuming your computer' })
+      await expect(bar).toBeVisible()
+      expect(starts).toEqual([])
+      showTab.resolve()
+      await page.waitUntil('one visible resume', () => starts.length > 0)
+      await expect(bar).toBeVisible()
+      await takeSnapshot('resuming machine')
+      const readsBeforeResume = suggestionsReads
+      const previewsBeforeResume = previewReads
+      running = true
+      sendRunning.resolve()
+      await expect(bar).toHaveCount(0)
+      await page.waitUntil(
+        'interrupted suggestions read retried',
+        () => suggestionsReads > readsBeforeResume
+      )
+      await expect(workspace).toBeVisible()
+      expect(previewReads).toBe(previewsBeforeResume)
+      expect(starts).toEqual(['POST'])
+    },
+    {
+      api: {
+        '/api/config': { environment: 'cloud', demo: false },
+        '/cloud/api/me': {
+          id: 'owner',
+          type: 'user',
+          name: 'Owner',
+          email: 'owner@example.com',
+          isAnonymous: false
+        }
+      }
+    }
   )
 
   test(

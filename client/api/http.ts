@@ -1,16 +1,21 @@
 export class HttpError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string
-  ) {
+  readonly status: number
+  readonly machineState: string | null
+
+  constructor(response: Response, message: string) {
     super(message)
     this.name = 'HttpError'
+    this.status = response.status
+    this.machineState =
+      response.status === 503 && response.url.startsWith(`${globalThis.location?.origin}/api/`)
+        ? response.headers.get('X-Moi-Machine-State')
+        : null
   }
 }
 
 async function errorFrom(response: Response, fallback: string) {
   const detail = await response.text()
-  return new HttpError(response.status, detail || fallback)
+  return new HttpError(response, detail || fallback)
 }
 
 export async function requestJson<T>(

@@ -22,6 +22,7 @@ import { initConnection } from '@/client/features/chat/connection/chat-connectio
 import { setLocalUser } from '@/client/features/collab/host-state'
 import { setAllWorkspaceMembers } from '@/client/features/collab/members/store'
 import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
+import { installIdentityHostApi } from '@/client/features/identity/host-api'
 import { setIdentity } from '@/client/features/identity/store'
 import type { Identity } from '@/client/features/identity/types'
 import { UI_COMPONENT_PREVIEWS } from '@/client/features/dev/ui-components/ui-component-previews'
@@ -47,6 +48,7 @@ if (target.startsWith('ui/')) {
   )
 } else {
   // What the cloud host does before React starts, when a test supplies `members`.
+  installIdentityHostApi()
   const published = (window as VisualWindow).visualCloudHost
   if (published) {
     setIdentity(published.identity)

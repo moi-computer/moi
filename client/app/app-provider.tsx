@@ -1,7 +1,9 @@
 import { type ReactNode, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
+import { useAppConfig } from '@/client/api/app-config'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { CloudMachineResume } from '@/client/features/machine/cloud-machine-resume'
 import { BROWSER_TAB_ID } from '@/client/lib/browser-tab-id'
 import { AppContext, type AppContextValue } from '@/client/runtime/app-context'
 import { appEvents } from '@/client/runtime/app-events'
@@ -15,6 +17,7 @@ type AppProviderProps = {
 // App-wide events outlive workspace routes.
 export function AppProvider({ children }: AppProviderProps) {
   const queryClient = useQueryClient()
+  const { environment } = useAppConfig()
 
   useEffect(() => {
     const unsubscribe = appEvents.subscribe(async event => {
@@ -40,5 +43,9 @@ export function AppProvider({ children }: AppProviderProps) {
     }
   }, [queryClient])
 
-  return <AppContext value={appContext}>{children}</AppContext>
+  return (
+    <AppContext value={appContext}>
+      {environment === 'cloud' ? <CloudMachineResume>{children}</CloudMachineResume> : children}
+    </AppContext>
+  )
 }
