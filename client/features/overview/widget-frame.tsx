@@ -2,17 +2,19 @@ import type { ReactNode } from 'react'
 
 import { motion } from 'motion/react'
 
-import { IconMinus, IconPlus } from '@tabler/icons-react'
+import { IconMinus, IconPencil, IconPlus } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
 
 import { Button } from '@/client/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { isDefaultWidget } from '@/lib/default-widgets'
 
 type WidgetFrameProps = {
   customizing?: boolean
   hidden?: boolean
   widgetId?: string
+  onEdit?: (id: string) => void
   onRemove?: () => void
   children?: ReactNode
 }
@@ -21,10 +23,11 @@ export function WidgetFrame({
   customizing,
   hidden,
   widgetId,
+  onEdit,
   onRemove,
   children
 }: WidgetFrameProps) {
-  const vivid = !widgetId || !isDefaultWidget(widgetId)
+  const builtIn = widgetId && isDefaultWidget(widgetId)
 
   return (
     <motion.div
@@ -45,7 +48,7 @@ export function WidgetFrame({
         // Stable hook for widget thumbnails: the capture clone overrides this
         // element's chrome (radius/shadow/stroke) so thumbnails come out square.
         data-widget-chrome
-        data-vivid={vivid ? true : undefined}
+        data-vivid={builtIn ? undefined : true}
         className={cn(
           'absolute inset-0 overflow-hidden rounded-2xl text-foreground squircle',
           customizing && 'pointer-events-none'
@@ -55,17 +58,32 @@ export function WidgetFrame({
       </div>
 
       {customizing && onRemove && (
-        <div className="absolute -top-2 -right-2 opacity-0 transition-opacity group-hover/widget:opacity-100">
-          <Button
-            size="icon-sm"
-            variant="outline"
-            className="rounded-full"
-            aria-label={hidden ? 'Restore widget' : 'Hide widget'}
-            onPointerDown={event => event.stopPropagation()}
-            onClick={onRemove}
-          >
-            {hidden ? <IconPlus stroke={1.75} /> : <IconMinus stroke={1.75} />}
-          </Button>
+        <div
+          className="absolute -top-2 -right-2 flex gap-1 opacity-0 transition-opacity group-hover/widget:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100"
+          onPointerDown={event => event.stopPropagation()}
+        >
+          {onEdit && widgetId && !builtIn && (
+            <Tooltip>
+              <TooltipTrigger
+                render={<Button size="icon-sm" variant="outline" className="rounded-full" />}
+                aria-label={`Edit ${widgetId} in chat`}
+                onClick={() => onEdit(widgetId)}
+              >
+                <IconPencil stroke={1.75} />
+              </TooltipTrigger>
+              <TooltipContent>Edit</TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger
+              render={<Button size="icon-sm" variant="outline" className="rounded-full" />}
+              aria-label={hidden ? 'Add to overview' : 'Hide widget'}
+              onClick={onRemove}
+            >
+              {hidden ? <IconPlus stroke={1.75} /> : <IconMinus stroke={1.75} />}
+            </TooltipTrigger>
+            <TooltipContent>{hidden ? 'Add to overview' : 'Hide'}</TooltipContent>
+          </Tooltip>
         </div>
       )}
     </motion.div>

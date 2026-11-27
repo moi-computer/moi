@@ -1,3 +1,4 @@
+import { stageTextAttachment } from '@/client/features/chat/composer/attachments/draft-attachments'
 import { useFloatingChatOpen } from './workspace-preferences'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
@@ -334,6 +335,15 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     openChat('Create widget')
   }
 
+  function editWidget(id: string) {
+    const name = id.replaceAll('-', ' ')
+    const label = name.charAt(0).toUpperCase() + name.slice(1)
+    stageTextAttachment(
+      { workspaceId, sessionId: composerSessionId },
+      { label, source: `widget:${id}`, text: `Selected Overview widget: widgets/${id}` }
+    )
+  }
+
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!openSet.has('scratchpad')
       ? ([
@@ -444,6 +454,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
               views={allViews}
               onOpenView={viewId => openTab(viewTabId(viewId))}
               onCreateView={onCreateView}
+              onEditWidget={editWidget}
               onCreateWidget={onCreateWidget}
             />
           ) : activeTab === 'scratchpad' ? (

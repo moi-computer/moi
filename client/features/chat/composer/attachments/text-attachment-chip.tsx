@@ -1,4 +1,3 @@
-import { IconLibrary } from '@tabler/icons-react'
 import { AttachmentChip } from './attachment-chip'
 
 type TextAttachmentChipProps = {
@@ -7,5 +6,5 @@ type TextAttachmentChipProps = {
 }
 
 export function TextAttachmentChip({ label, onRemove }: TextAttachmentChipProps) {
-  return <AttachmentChip label={label} icon={IconLibrary} onRemove={onRemove} />
+  return <AttachmentChip label={label} onRemove={onRemove} />
 }

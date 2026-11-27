@@ -1,4 +1,3 @@
-import { IconFile } from '@tabler/icons-react'
 import type { StagedAttachment } from './types'
 import { AttachmentChip } from './attachment-chip'
 
@@ -11,7 +10,6 @@ export function FileAttachmentChip({ attachment, onRemove }: FileAttachmentChipP
   return (
     <AttachmentChip
       label={attachment.label}
-      icon={IconFile}
       onRemove={onRemove}
       previewUrl={attachment.previewUrl}
       loading={attachment.status === 'uploading'}

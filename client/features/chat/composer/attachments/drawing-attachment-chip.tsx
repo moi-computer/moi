@@ -1,4 +1,3 @@
-import { IconScribble } from '@tabler/icons-react'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/components/ui/hover-card'
 import type { StagedAttachment } from './types'
 import { AttachmentChip } from './attachment-chip'
@@ -15,9 +14,7 @@ export function DrawingAttachmentChip({ attachment, onRemove }: DrawingAttachmen
   return (
     <HoverCard>
       <HoverCardTrigger
-        render={
-          <AttachmentChip tabIndex={0} label={label} icon={IconScribble} onRemove={onRemove} />
-        }
+        render={<AttachmentChip tabIndex={0} label={label} onRemove={onRemove} />}
       />
       {previewUrl && (
         <HoverCardContent

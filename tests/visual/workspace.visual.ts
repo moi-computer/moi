@@ -45,6 +45,43 @@ test('floating chat keeps its open and closed state after reload', async page =>
   await expect(page.getByRole('button', { name: 'Close chat', exact: true })).toHaveCount(0)
 })
 
+test(
+  'edit a widget in the current chat draft',
+  async page => {
+    await page.route('**/widgets/launch-brief/module?*', route =>
+      route.fulfill({ contentType: 'text/javascript', body: 'export default () => "Launch brief"' })
+    )
+    await page.goto(WORKSPACE_PAGE)
+    const composer = page.getByPlaceholder('Do anything')
+    await composer.fill('Change the heading')
+    await page.getByRole('button', { name: 'Customize', exact: true }).click()
+    // Freeze the continuous Customize wiggle for the snapshot.
+    await page.addStyleTag({ content: '[class~="group/widget"] { transform: none !important }' })
+    const edit = page.getByRole('button', { name: 'Edit launch-brief in chat' })
+    await page.locator('[data-applet-thumbnail="widgets/launch-brief"]').hover()
+    await expect(edit).toBeVisible()
+    await takeSnapshot('widget edit controls')
+    await edit.click()
+    await expect(edit).toBeVisible()
+    await expect(composer).toHaveValue('Change the heading')
+    await expect(
+      page.getByRole('button', { name: 'Remove Launch brief', exact: true })
+    ).toBeVisible()
+    await takeSnapshot('widget attached to chat')
+  },
+  {
+    api: {
+      [`/api/workspaces/${WORKSPACE}`]: {
+        ...(API[`/api/workspaces/${WORKSPACE}`] as WorkspaceLayoutResponse),
+        widgetGrid: [{ i: 'launch-brief', x: 0, y: 0 }]
+      },
+      [`/api/workspaces/${WORKSPACE}/widgets`]: {
+        widgets: [{ id: 'launch-brief', config: { colSpan: 2, rowSpan: 1 } }]
+      }
+    }
+  }
+)
+
 describe('Workspace', () => {
   test('home', async page => {
     // Standalone Moi never asks Cloud for remote workspaces.

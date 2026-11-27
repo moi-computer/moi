@@ -1,7 +1,7 @@
 import { TextAttachmentChip } from '../composer/attachments/text-attachment-chip'
 import { memo } from 'react'
 
-import { IconChevronRight, IconFile } from '@tabler/icons-react'
+import { IconChevronRight, IconTextScan2 } from '@tabler/icons-react'
 
 import type { Part, Turn } from '@/lib/types'
 
@@ -240,7 +240,7 @@ function FilePart({ mediaType, previewUrl, label }: FilePartProps) {
   }
   return (
     <div className="flex items-center gap-1.5 rounded-lg border border-border bg-accent px-2.5 py-1.5 text-xs text-accent-foreground">
-      <IconFile size={16} stroke={1.75} />
+      <IconTextScan2 size={16} stroke={1.75} />
       <span className="truncate">{label ?? mediaType}</span>
     </div>
   )

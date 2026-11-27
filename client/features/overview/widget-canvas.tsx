@@ -23,6 +23,7 @@ export type WidgetCanvasProps = {
   bottomInset?: number
   renderItem: (id: string) => ReactNode
   onMove?: (positions: GridPosition[]) => void
+  onEdit?: (id: string) => void
   onRemove?: (id: string) => void
 }
 
@@ -32,6 +33,7 @@ type WidgetGridProps = {
   emptyState?: ReactNode
   renderItem: (id: string) => ReactNode
   onMove?: (positions: GridPosition[]) => void
+  onEdit?: (id: string) => void
   onRemove?: (id: string) => void
 }
 
@@ -41,6 +43,7 @@ function WidgetGrid({
   emptyState,
   renderItem,
   onMove,
+  onEdit,
   onRemove
 }: WidgetGridProps) {
   const layout = packItems(items)
@@ -87,6 +90,7 @@ function WidgetGrid({
                 <WidgetFrame
                   customizing={customizing}
                   widgetId={item.i}
+                  onEdit={onEdit}
                   onRemove={onRemove ? () => onRemove(item.i) : undefined}
                 >
                   {renderItem(item.i)}
@@ -115,6 +119,7 @@ export function WidgetCanvas({
   bottomInset = 0,
   renderItem,
   onMove,
+  onEdit,
   onRemove
 }: WidgetCanvasProps) {
   return (
@@ -132,6 +137,7 @@ export function WidgetCanvas({
             emptyState={emptyState}
             renderItem={renderItem}
             onMove={onMove}
+            onEdit={onEdit}
             onRemove={onRemove}
           />
         )}

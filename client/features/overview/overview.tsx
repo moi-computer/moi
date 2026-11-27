@@ -158,6 +158,7 @@ function usePanelHeight() {
 }
 
 type OverviewProps = {
+  onEditWidget?: (id: string) => void
   onCreateWidget?: () => void
   onCreateView?: () => void
   onOpenView: (viewId: string) => void
@@ -171,6 +172,7 @@ type OverviewProps = {
 }
 
 export function Overview({
+  onEditWidget,
   onCreateWidget,
   onCreateView,
   onOpenView,
@@ -262,6 +264,7 @@ export function Overview({
           bottomInset={panelOpen ? panelHeight : 0}
           renderItem={renderItem}
           onMove={move}
+          onEdit={onEditWidget}
           onRemove={hide}
         />
 
