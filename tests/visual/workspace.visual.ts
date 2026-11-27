@@ -56,6 +56,23 @@ describe('Workspace', () => {
     expect(cloudRequests).toEqual([])
   })
 
+  test('user menu links to Discord and feedback', async page => {
+    await page.goto('/#/')
+    await page.getByRole('button', { name: 'User menu' }).click()
+    const discord = page.getByRole('menuitem', { name: 'Join Discord' })
+    const feedback = page.getByRole('menuitem', { name: 'Send feedback' })
+    await expect(discord).toBeVisible()
+    await expect(discord).toHaveAttribute('href', 'https://discord.gg/4BgC4kE3gu')
+    await expect(discord).toHaveAttribute('target', '_blank')
+    await expect(feedback).toHaveAttribute(
+      'href',
+      'https://moi.notion.site/d59bcba2169883f1bf670177b3f54638?pvs=105'
+    )
+    await expect(page.getByRole('menuitem', { name: 'Settings' })).toBeVisible()
+    await expect(page.getByRole('separator')).toHaveCount(2)
+    await takeSnapshot()
+  })
+
   test(
     'home shows workspace cards while optional lists load',
     async page => {

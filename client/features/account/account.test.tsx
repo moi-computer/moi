@@ -37,6 +37,26 @@ test('local account menu retains inherited identity and no signout', async () =>
   expect(ui.document.body.textContent).toContain('Alex')
   expect(ui.document.body.textContent).toContain('This computer')
   expect(ui.document.body.textContent).not.toContain('Sign out')
+  const discord = ui.document.querySelector<HTMLAnchorElement>(
+    'a[href="https://discord.gg/4BgC4kE3gu"]'
+  )
+  const feedback = ui.document.querySelector<HTMLAnchorElement>(
+    'a[href="https://moi.notion.site/d59bcba2169883f1bf670177b3f54638?pvs=105"]'
+  )
+  expect(discord?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Join Discord')
+  expect(discord?.target).toBe('_blank')
+  expect(discord?.rel).toBe('noreferrer')
+  expect(feedback?.textContent).toContain('Send feedback')
+  expect(feedback?.target).toBe('_blank')
+  expect(feedback?.rel).toBe('noreferrer')
+  const menuOrder = [...ui.document.querySelectorAll('[role="menuitem"], [role="separator"]')].map(
+    node =>
+      node.getAttribute('role') === 'separator'
+        ? 'separator'
+        : node.textContent?.replace(/\s+/g, ' ').trim()
+  )
+  expect(menuOrder).toEqual(['separator', 'Send feedback', 'Join Discord', 'separator', 'Settings'])
+  expect(ui.document.body.innerHTML).not.toContain('mlfrg.notion.site')
   expect(ui.calls).toEqual([])
 })
 test.each([{ signedOut: true }, { anonymous: true }, { demo: true }])(

@@ -1,5 +1,5 @@
 import { Link } from 'wouter'
-import { IconLogout, IconMessage2Share, IconSettings } from '@tabler/icons-react'
+import { IconBrandDiscord, IconLogout, IconMessage2Share, IconSettings } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { toast } from '@/client/components/ui/toast'
@@ -15,7 +15,8 @@ import { ProfileAvatar } from '@/client/features/collab/components/profile-avata
 import { Profile } from '@/client/features/collab/components/profile'
 import { useAccount } from './account-provider'
 
-const FEEDBACK_URL = 'https://mlfrg.notion.site/3c678a44b6788042b734d775dd2e935e?pvs=105'
+const DISCORD_URL = 'https://discord.gg/4BgC4kE3gu'
+const FEEDBACK_URL = 'https://moi.notion.site/d59bcba2169883f1bf670177b3f54638?pvs=105'
 
 export function AccountMenu() {
   const account = useAccount()
@@ -59,8 +60,17 @@ export function AccountMenu() {
         <DropdownMenuGroup>
           <DropdownMenuItem render={<a href={FEEDBACK_URL} target="_blank" rel="noreferrer" />}>
             <IconMessage2Share stroke={1.75} />
-            Leave feedback
+            Send feedback
           </DropdownMenuItem>
+          <DropdownMenuItem render={<a href={DISCORD_URL} target="_blank" rel="noreferrer" />}>
+            <IconBrandDiscord stroke={1.75} />
+            Join Discord
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuGroup>
           <DropdownMenuItem render={<Link href="/settings" />}>
             <IconSettings stroke={1.75} />
             Settings
