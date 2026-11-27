@@ -375,6 +375,37 @@ describe('Workspace', () => {
   )
 
   test(
+    'home hides unavailable workspace sections',
+    async page => {
+      for (const endpoint of [
+        '/cloud/api/workspaces/invitations',
+        '/api/workspaces/suggestions',
+        '/api/workspaces/trash'
+      ]) {
+        await page.route(`**${endpoint}`, route =>
+          route.fulfill({ status: 401, body: 'Sign in required' })
+        )
+      }
+      await page.goto('/#/')
+      await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
+      await expect(page.getByText('Sign in required')).toHaveCount(0)
+      for (const name of ['Invitations', 'Suggestions', 'Trash', 'Retry', 'Try again']) {
+        await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
+      }
+    },
+    { api: { '/api/config': { environment: 'cloud', demo: false } } }
+  )
+
+  test('home opens when onboarding settings are unavailable', async page => {
+    await page.route('**/api/settings', route =>
+      route.fulfill({ status: 503, body: 'Settings unavailable' })
+    )
+    await page.goto('/#/')
+    await expect(page.getByRole('link', { name: 'Open acme-store', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0)
+  })
+
+  test(
     'onboarding',
     async page => {
       await page.goto('/#/')
@@ -420,13 +451,84 @@ describe('Workspace', () => {
   )
 
   test(
+    'demo banner in the workspace header',
+    async page => {
+      await page.goto(WORKSPACE_PAGE)
+      const pane = page.locator('[data-slot="workspace-pane"]')
+      const header = pane.locator('header')
+      const banner = header.getByRole('button', { name: 'Set up Moi', exact: true })
+      await expect(pane.getByRole('button', { name: 'Create tab', exact: true })).toBeVisible()
+      await expect(banner).toBeVisible()
+      await expect(header.getByRole('button', { name: 'Users in this workspace' })).toHaveCount(0)
+      await expect(header.getByRole('group', { name: 'Recently active agents' })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Set up Moi' })).toHaveCount(1)
+      await expect(page.locator('[data-slot="workspace-split-chat"]')).toBeVisible()
+      await expect(pane.locator('[data-slot="workspace-split-chat"]')).toHaveCount(0)
+      await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible()
+      await takeSnapshot('workspace header banner')
+      const collapse = header.getByRole('button', { name: 'Collapse demo banner' })
+      await expect(collapse).toHaveCount(0)
+      await page.getByPlaceholder('Do anything').fill('Summarize this workspace')
+      await page.getByRole('button', { name: 'Send message' }).click()
+      await expect(collapse).toBeVisible()
+      await collapse.click()
+      await banner.click()
+      await expect(page.getByRole('dialog', { name: 'Set up your Moi' })).toBeVisible()
+    },
+    {
+      viewports: { wide: { width: 1440, height: 900 } },
+      api: { '/api/config': { environment: 'cloud', demo: true } }
+    }
+  )
+
+  test(
+    'expanded demo banner',
+    async page => {
+      await page.addInitScript(() => {
+        const browser: Window = window
+        const schedule = browser.setTimeout.bind(browser)
+        browser.setTimeout = (handler, delay, ...args) =>
+          schedule(handler, delay === 3 * 60_000 ? 0 : delay, ...args)
+      })
+      await page.goto(WORKSPACE_PAGE)
+      await expect(page.getByRole('button', { name: 'Collapse demo banner' })).toBeVisible()
+      await takeSnapshot('expanded workspace header banner')
+      await page.getByRole('button', { name: 'Set up Moi', exact: true }).click()
+      await expect(page.getByRole('button', { name: 'Collapse demo banner' })).toHaveCount(0)
+      const dialog = page.getByRole('dialog', { name: 'Set up your Moi' })
+      await expect(dialog).toBeVisible()
+      await expect(dialog.getByRole('link', { name: 'Sign in' })).toBeVisible()
+      await takeSnapshot('demo dialog with vivid checker')
+    },
+    {
+      api: {
+        '/api/config': { environment: 'cloud', demo: true },
+        [`/api/workspaces/${WORKSPACE}`]: {
+          ...(API[`/api/workspaces/${WORKSPACE}`] as WorkspaceLayoutResponse),
+          theme: { font: 'sans', radius: 'soft', agent: 'blob', color: 'rose' }
+        }
+      }
+    }
+  )
+
+  test(
     'demo home',
     async page => {
+      const optionalRequests: string[] = []
+      for (const list of ['invitations', 'suggestions', 'trash']) {
+        await page.route(`**/api/workspaces/${list}`, route => {
+          optionalRequests.push(list)
+          return route.fallback()
+        })
+      }
       // The demo serves home at /demo; a query string must not break the match.
       await page.goto('/#/demo?ref=launch')
       await expect(page.getByText('acme-store').first()).toBeVisible()
       await expect(page.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/demo')
-      await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toHaveCount(0)
+      for (const name of ['Invitations', 'Suggestions', 'Trash', 'Retry']) {
+        await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
+      }
+      expect(optionalRequests).toEqual([])
     },
     {
       api: {

@@ -141,10 +141,9 @@ export function useDeleteWorkspace(action: 'delete' | 'leave' = 'delete') {
   })
 }
 
-export function useTrashedWorkspaces(enabled: boolean) {
+export function useTrashedWorkspaces() {
   return useQuery<WorkspaceEntry[]>({
     queryKey: trashedWorkspacesKey,
-    enabled,
     queryFn: () => requestJson('/api/workspaces/trash'),
     staleTime: 60_000
   })

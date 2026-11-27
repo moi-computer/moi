@@ -12,6 +12,7 @@ import { ChatPanel } from '@/client/features/chat/chat-panel'
 import { ChatPopup } from '@/client/features/chat/chat-popup'
 import { ThemePanel } from '@/client/features/workspace/theme-panel'
 import { Overview } from '@/client/features/overview/overview'
+import { DemoBanner } from '@/client/features/demo/demo-banner'
 import { useAppConfig } from '@/client/api/app-config'
 import { WorkspaceSharingMenu } from '@/client/features/collab'
 import { PanelHeader } from '@/client/components/shared/panel-header'
@@ -112,7 +113,7 @@ function tabItemFor(
 }
 
 export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentProps) {
-  const { environment } = useAppConfig()
+  const { demo, environment } = useAppConfig()
   const { layout, workspaceId, name } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
   const viewActions = useViewActions()
@@ -507,7 +508,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
       </div>
 
       <PanelHeader>
-        <div className="flex min-w-0 flex-1 items-center gap-4">
+        <div className="relative flex min-w-0 flex-1 items-center gap-4">
           <WorkspaceMenu onOpenTheme={() => setWidgetMode('theming')} />
           <WorkspaceTabs
             tabs={tabItems}
@@ -518,13 +519,17 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
             onReorder={reorderTabs}
           />
         </div>
-        {environment === 'cloud' && (
-          <WorkspaceSharingMenu
-            workspaceName={name?.trim() || undefined}
-            workspaceId={workspaceId}
-            describeTab={tab => tabItemFor(tab, allViews, false, () => false)}
-            onOpenTab={openTab}
-          />
+        {demo ? (
+          <DemoBanner />
+        ) : (
+          environment === 'cloud' && (
+            <WorkspaceSharingMenu
+              workspaceName={name?.trim() || undefined}
+              workspaceId={workspaceId}
+              describeTab={tab => tabItemFor(tab, allViews, false, () => false)}
+              onOpenTab={openTab}
+            />
+          )
         )}
       </PanelHeader>
     </WorkspacePane>

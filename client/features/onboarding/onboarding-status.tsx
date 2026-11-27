@@ -1,7 +1,9 @@
 import { Button } from '@/client/components/ui/button'
 import { Spinner } from '@/client/components/ui/spinner'
 
-type OnboardingStatusProps = { error?: Error; onRetry: () => void }
+type OnboardingStatusProps =
+  | { error?: undefined; onRetry?: undefined }
+  | { error?: Error; onRetry: () => void }
 export function OnboardingStatus({ error, onRetry }: OnboardingStatusProps) {
   if (error)
     return (

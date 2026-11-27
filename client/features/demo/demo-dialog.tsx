@@ -100,10 +100,14 @@ function DemoDialogContent() {
 
   return (
     <DialogContent
-      data-vivid
       showCloseButton={false}
-      className="block w-full max-w-md overflow-hidden rounded-2xl bg-primary texture-checker-16 p-2 text-primary-foreground sm:max-w-md md:max-w-2xl"
+      className="block w-full max-w-md overflow-hidden rounded-2xl p-2 sm:max-w-md md:max-w-2xl"
     >
+      <div
+        aria-hidden="true"
+        data-vivid
+        className="pointer-events-none absolute inset-0 bg-background texture-checker-16 text-foreground"
+      />
       <div className="absolute inset-0 bg-[linear-gradient(to_right,color-mix(in_oklch,var(--background)_14%,transparent),color-mix(in_oklch,var(--background)_6%,transparent))]" />
       {/* Film grain keeps the illustration gradient from banding. */}
       <svg
@@ -124,7 +128,7 @@ function DemoDialogContent() {
       <div className="relative grid max-h-[calc(100dvh-2rem)] overflow-y-auto md:grid-cols-[3fr_2fr] md:overflow-visible">
         <div className="rounded-xl bg-background p-6 text-foreground shadow-sm md:p-8">
           <div className="flex flex-col gap-0.5">
-            <DialogTitle>Set up your personal Moi</DialogTitle>
+            <DialogTitle>Set up your Moi</DialogTitle>
             <DialogDescription className="mt-1">
               This is a demo workspace. Sign in and connect your agent to unlock all features.
             </DialogDescription>
@@ -145,7 +149,9 @@ function DemoDialogContent() {
                 stroke={0.75}
                 className="mt-0.5 size-8 shrink-0 text-muted-foreground"
               />
-              <span className="text-sm text-foreground">Share what you've built with anyone</span>
+              <span className="text-sm text-foreground">
+                Share what you've built with other people and bring your agents to Moi
+              </span>
             </li>
             <li className="flex items-center gap-3">
               <IconMessageChatbot

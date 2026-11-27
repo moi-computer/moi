@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import tailwind from 'bun-plugin-tailwind'
 import { join } from 'path'
 import postcss from 'postcss'
 import type { Root } from 'postcss'
@@ -24,6 +25,35 @@ function topLevelDeclarationCounts(root: Root, selector: string): Map<string, nu
 }
 
 describe('semantic color token CSS', () => {
+  test('preserves the vivid palette mixes in the production stylesheet', async () => {
+    const build = await Bun.build({
+      entrypoints: [join(import.meta.dir, '../../client/runtime/workspace-theme.ts')],
+      plugins: [tailwind],
+      minify: true
+    })
+    expect(build.success).toBe(true)
+    const stylesheet = build.outputs.find(output => output.path.endsWith('.css'))
+    if (!stylesheet) throw new Error('Missing compiled stylesheet')
+    const mixes = new Set<string>()
+    postcss.parse(await stylesheet.text()).walkRules(rule => {
+      if (!rule.selector.includes('[data-vivid]')) return
+      rule.walkDecls(declaration => {
+        if (declaration.value.includes('color-mix(')) mixes.add(declaration.prop)
+      })
+    })
+    for (const token of [
+      '--primary',
+      '--primary-foreground',
+      '--muted',
+      '--muted-foreground',
+      '--accent',
+      '--border',
+      '--ring'
+    ]) {
+      expect(mixes).toContain(token)
+    }
+  })
+
   test('keeps direct mappings unique and declared once in their owning scopes', async () => {
     const [indexCss, themeCss] = await Promise.all([
       Bun.file(join(import.meta.dir, '../../client/index.css')).text(),

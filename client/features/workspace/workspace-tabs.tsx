@@ -206,8 +206,8 @@ export function WorkspaceTabs({
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
-      <div className="no-scrollbar min-w-0 scroll-fade-x overflow-x-auto overflow-y-hidden [--scroll-fade-reveal:16px]">
-        <div className="flex w-max items-center gap-1">
+      <div className="-m-1 no-scrollbar min-w-0 scroll-fade-x overflow-x-auto overflow-y-hidden [--scroll-fade-reveal:16px]">
+        <div className="flex w-max items-center gap-1 p-1">
           {fixedTabs.map(tab => (
             <WorkspaceTab
               key={tab.key}

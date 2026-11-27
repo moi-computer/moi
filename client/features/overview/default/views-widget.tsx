@@ -117,10 +117,7 @@ function ViewItem({ view, Icon, onOpen }: ViewItemProps) {
         className="group flex w-20 cursor-pointer flex-col items-center gap-2 text-sm text-foreground"
       >
         <div className="size-16 rounded-2xl transition-shadow duration-300 ease-out squircle group-hover:shadow-xl group-hover/item:shadow-xl">
-          <div
-            data-vivid
-            className="flex size-full items-center justify-center rounded-2xl bg-primary text-primary-foreground inset-shadow-[0_0_10px_color-mix(in_oklab,var(--color-white)_30%,transparent)] squircle"
-          >
+          <div className="flex size-full items-center justify-center rounded-2xl bg-primary text-primary-foreground inset-shadow-[0_0_10px_color-mix(in_oklab,var(--color-white)_30%,transparent)] squircle">
             <Icon size={32} stroke={1.25} />
           </div>
         </div>

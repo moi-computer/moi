@@ -75,10 +75,8 @@ overflow and stacking. `ScopedPortal` copies the current applet scope onto the
 portalled subtree, which keeps scoped CSS working. This wrapper is already
 baked into the checked-in overlay sources.
 
-Known limitation: portalled content resolves theme variables from the
-host `:root`, not the widget frame's inline per-widget derivations
-(`data-vivid`, dark-surface tokens) — with the default theme they match;
-a heavily themed workspace can show slightly off-theme popups. Copying
-frame tokens onto the wrapper is a possible follow-up.
+Portalled content inherits the workspace palette from the host document. A
+widget's `data-vivid` applies to its DOM subtree, so overlays mounted
+under `document.body` use the regular workspace colors.
 
 Drawer stays inside the applet root so it covers only the current view.

@@ -7,8 +7,6 @@ import { IconMinus, IconPlus } from '@tabler/icons-react'
 import { cn } from '@/client/lib/cn'
 
 import { Button } from '@/client/components/ui/button'
-import { useWorkspaceThemeSetting } from '@/client/features/workspace/workspace-layout-context'
-import { getWorkspaceThemeStyle } from '@/client/runtime/workspace-theme'
 import { isDefaultWidget } from '@/lib/default-widgets'
 
 type WidgetFrameProps = {
@@ -26,7 +24,6 @@ export function WidgetFrame({
   onRemove,
   children
 }: WidgetFrameProps) {
-  const theme = useWorkspaceThemeSetting()
   const vivid = !widgetId || !isDefaultWidget(widgetId)
 
   return (
@@ -49,7 +46,6 @@ export function WidgetFrame({
         // element's chrome (radius/shadow/stroke) so thumbnails come out square.
         data-widget-chrome
         data-vivid={vivid ? true : undefined}
-        style={vivid ? getWorkspaceThemeStyle(theme, 'widget') : undefined}
         className={cn(
           'absolute inset-0 overflow-hidden rounded-2xl text-foreground squircle',
           customizing && 'pointer-events-none'

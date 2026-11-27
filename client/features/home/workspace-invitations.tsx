@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useLocation } from 'wouter'
 import { parseRemoteWorkspaceTarget } from '@/lib/workspace-config'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAppConfig } from '@/client/api/app-config'
 import { jsonRequest } from '@/client/api/http'
 import { Button } from '@/client/components/ui/button'
 import { cloudRequest } from '@/client/features/account/api'
@@ -20,13 +19,11 @@ type WorkspaceInvitation = {
 const invitationsKey = ['workspace-invitations']
 
 export function WorkspaceInvitations() {
-  const cloud = useAppConfig().environment === 'cloud'
   const client = useQueryClient()
   const [, navigate] = useLocation()
   const [choice, setChoice] = useState<WorkspaceInvitation>()
   const query = useQuery({
     queryKey: invitationsKey,
-    enabled: cloud,
     queryFn: async () =>
       (await (await cloudRequest('/api/workspaces/invitations')).json()) as {
         invitations: WorkspaceInvitation[]
@@ -57,8 +54,7 @@ export function WorkspaceInvitations() {
       navigate(`/workspace/${entry.id}`)
     }
   })
-  if (!cloud) return null
-  const invitations = query.data?.invitations ?? []
+  const invitations = query.isSuccess ? query.data.invitations : []
   return (
     <>
       {invitations.length > 0 && (

@@ -14,7 +14,7 @@ const TEXTURES = [
   { label: 'Inset shadow', className: 'texture-inset-shadow' }
 ] as const
 
-type SurfaceMode = 'base' | 'dark' | 'widget' | 'vivid'
+type SurfaceMode = 'base' | 'dark' | 'vivid'
 
 type SurfaceConfig = {
   mode: SurfaceMode
@@ -25,7 +25,6 @@ type SurfaceConfig = {
 const SURFACES: SurfaceConfig[] = [
   { mode: 'base', label: 'Base', description: 'Workspace tokens' },
   { mode: 'dark', label: 'Dark', description: 'Dark variant' },
-  { mode: 'widget', label: 'Widget', description: 'Redefined tokens' },
   { mode: 'vivid', label: 'Vivid', description: 'data-vivid' }
 ]
 
@@ -40,28 +39,21 @@ type TexturePreviewProps = {
 
 function TexturePreview({ color, mode, textureClassName, textureLabel }: TexturePreviewProps) {
   const theme: WorkspaceTheme = { ...DEFAULT_WORKSPACE_THEME, color }
-  const style = getWorkspaceThemeStyle(theme, mode === 'widget' ? 'widget' : 'workspace')
-  const isVivid = mode === 'vivid'
+  const style = getWorkspaceThemeStyle(theme)
 
   return (
     <div className={cn('h-full', mode === 'dark' && 'dark')} style={style}>
       <div
-        data-vivid={isVivid ? true : undefined}
+        data-vivid={mode === 'vivid' || undefined}
         aria-label={`${COLOR_THEMES[color].label}, ${textureLabel}, ${mode}`}
         className={cn(
-          'relative h-28 overflow-hidden rounded-lg border p-3',
-          isVivid ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground',
+          'relative h-28 overflow-hidden rounded-lg border bg-background p-3 text-foreground',
           textureClassName
         )}
       >
         <div className="flex items-start justify-between gap-2">
           <span className="text-xs font-medium">Aa 123</span>
-          <span
-            className={cn(
-              'rounded-md px-2 py-1 text-[10px] font-medium',
-              isVivid ? 'bg-background text-foreground' : 'bg-primary text-primary-foreground'
-            )}
-          >
+          <span className="rounded-md bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground">
             Primary
           </span>
         </div>
@@ -88,8 +80,8 @@ export function TextureLabPage() {
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Texture lab</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Every texture across every color theme. Each row compares the base surface, dark variant,
-          widget token derivation, and a vivid container.
+          Every texture across every color theme. Each row compares the base, dark, and vivid
+          surfaces.
         </p>
       </div>
 
@@ -106,7 +98,7 @@ export function TextureLabPage() {
             </div>
 
             <div className="overflow-x-auto rounded-xl border">
-              <div className="grid min-w-[56rem] grid-cols-[9rem_repeat(4,minmax(10rem,1fr))] gap-px bg-border">
+              <div className="grid min-w-[40rem] grid-cols-[9rem_repeat(3,minmax(10rem,1fr))] gap-px bg-border">
                 <div className="bg-muted px-3 py-2 text-xs font-medium text-muted-foreground">
                   Texture
                 </div>

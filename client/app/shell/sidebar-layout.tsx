@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 
-import { IconPlus, IconSandbox, IconSmartHome } from '@tabler/icons-react'
+import { IconPlus, IconSmartHome } from '@tabler/icons-react'
 import { Link, useLocation } from 'wouter'
 
 import { homePath, useAppConfig } from '@/client/api/app-config'
@@ -16,7 +16,6 @@ import {
 import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
 import { useAccount } from '@/client/features/account/account-provider'
 import { AccountMenu } from '@/client/features/account/account-menu'
-import { DemoDialog } from '@/client/features/demo/demo-dialog'
 import { ReorderableList } from '@/client/components/shared/reorderable-list'
 import type { ReorderableRenderState } from '@/client/components/shared/reorderable-list'
 import { WorkspaceIcon } from '@/client/components/shared/workspace-icon'
@@ -125,26 +124,9 @@ function Sidebar({ workspaces }: SidebarProps) {
           )}
         </nav>
 
-        <div className="flex shrink-0 flex-col items-center gap-4">
+        <div className="flex shrink-0 flex-col items-center gap-4 empty:hidden">
           {environment === 'local' && <UpdateButton />}
-          {demo ? (
-            <Tooltip>
-              <DemoDialog
-                trigger={
-                  <TooltipTrigger
-                    render={
-                      <Button size="icon" aria-label="Set up Moi">
-                        <IconSandbox stroke={1.5} />
-                      </Button>
-                    }
-                  />
-                }
-              />
-              <TooltipContent side="right">Set up Moi</TooltipContent>
-            </Tooltip>
-          ) : (
-            <AccountMenu />
-          )}
+          {!demo && <AccountMenu />}
         </div>
       </aside>
     </TooltipProvider>

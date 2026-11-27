@@ -12,7 +12,8 @@ import { useWorkspaceSuggestions } from './api'
 import { WorkspaceListRow, WorkspaceListSection } from './workspace-list-section'
 
 export function WorkspaceSuggestions() {
-  const { data: workspaces = [] } = useWorkspaceSuggestions()
+  const suggestions = useWorkspaceSuggestions()
+  const workspaces = suggestions.isSuccess ? suggestions.data : []
   const [, navigate] = useLocation()
   const importFlow = useWorkspaceImport({
     onSuccess: entry => navigate(`/workspace/${entry.id}`)

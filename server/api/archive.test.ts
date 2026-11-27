@@ -58,14 +58,15 @@ afterEach(async () => {
 test('each archive stops its chat before archiving and requests can overlap', async () => {
   const workspace = await registerWorkspace(join(tempDir, 'claude'), { harness: 'claude-code' })
   const calls: string[] = []
-  let releaseFirst: (() => void) | undefined
-  const firstStopped = new Promise<void>(resolve => {
-    releaseFirst = resolve
-  })
+  const firstEntered = Promise.withResolvers<void>()
+  const releaseFirst = Promise.withResolvers<void>()
 
   claudeCodeHarness.interrupt = async (_, sessionId) => {
     calls.push(`stop:${sessionId}`)
-    if (sessionId === 'first') await firstStopped
+    if (sessionId === 'first') {
+      firstEntered.resolve()
+      await releaseFirst.promise
+    }
   }
   claudeCodeHarness.archiveSession = async (_, sessionId) => {
     calls.push(`archive:${sessionId}`)
@@ -74,7 +75,7 @@ test('each archive stops its chat before archiving and requests can overlap', as
   const firstRequest = api.request(`/api/workspaces/${workspace.id}/sessions/first/archive`, {
     method: 'POST'
   })
-  await Promise.resolve()
+  await firstEntered.promise
   const secondResponse = await api.request(
     `/api/workspaces/${workspace.id}/sessions/second/archive`,
     { method: 'POST' }
@@ -86,7 +87,7 @@ test('each archive stops its chat before archiving and requests can overlap', as
   expect(calls.indexOf('stop:second')).toBeLessThan(calls.indexOf('archive:second'))
   expect(calls).not.toContain('archive:first')
 
-  releaseFirst?.()
+  releaseFirst.resolve()
   expect((await firstRequest).status).toBe(200)
   expect(calls.indexOf('stop:first')).toBeLessThan(calls.indexOf('archive:first'))
 })

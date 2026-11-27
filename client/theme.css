@@ -19,6 +19,9 @@
  * redefining any variable themselves.
  */
 
+@custom-variant dark (&:is(.dark *));
+@custom-variant dark-or-vivid (&:is(.dark *, [data-vivid], [data-vivid] *));
+
 @theme inline {
   --font-sans: var(--sans);
   --font-mono: var(--mono);
