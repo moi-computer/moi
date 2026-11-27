@@ -44,7 +44,9 @@ describe('owner startup', () => {
           return Response.json(id ? { user: { id, isAnonymous: false } } : null)
         }
         if (path === '/api/workspaces' || path === '/api/workspaces/order')
-          return Response.json([{ id: 'existing', name: 'Existing workspace' }])
+          return Response.json([
+            { id: 'existing', name: 'Existing workspace', path: join(root, 'existing') }
+          ])
         return Response.json([])
       }
     })
@@ -220,19 +222,20 @@ async function setup(register?: (req: Request) => Promise<Response>) {
       if (path === '/absolute-redirect')
         return Response.redirect(new URL('/cloud/login?next=%2F#signin', req.url).href)
       if (path === '/external-redirect') return Response.redirect('https://example.com/login')
-      if (path === '/cloud/api/auth/get-session')
+      if (path === '/cloud/api/auth/get-session') {
+        const cookie = req.headers.get('cookie') ?? ''
+        const users: Record<string, string> = {
+          'session=visitor': 'visitor',
+          'session=second-browser': 'visitor',
+          'session=other': 'other-visitor'
+        }
+        const id = users[cookie]
         return Response.json(
-          req.headers.get('cookie') === 'session=visitor'
-            ? {
-                user: {
-                  id: 'visitor',
-                  name: 'Visitor',
-                  email: 'visitor@example.com',
-                  isAnonymous: false
-                }
-              }
+          id
+            ? { user: { id, name: 'Visitor', email: id + '@example.com', isAnonymous: false } }
             : null
         )
+      }
       if (path === '/cloud/api/bootstrap')
         return Response.json({
           identity: { id: 'visitor', type: 'user' },
@@ -243,7 +246,8 @@ async function setup(register?: (req: Request) => Promise<Response>) {
           headers: { 'content-type': 'text/html' }
         })
       forwarded.push(path)
-      if (register && path === '/api/workspaces') return register(req)
+      if (register && (path === '/api/workspaces' || path.startsWith('/api/workspaces/')))
+        return register(req)
       if (path === '/redirect')
         return new Response(null, {
           status: 302,
@@ -333,7 +337,8 @@ test('visitor can accept, open and leave the mock workspace', async () => {
   const { codexHarness } = await import('../server/harness/codex')
   const available = spyOn(codexHarness, 'availability').mockResolvedValue({ status: 'available' })
   const { origin, request, forwarded, referencePath } = await setup(async req => {
-    if (req.method === 'POST') return api.fetch(req)
+    if (req.method === 'POST' || new URL(req.url).pathname !== '/api/workspaces')
+      return api.fetch(req)
     return Response.json(await listWorkspaces())
   })
   setRegistryPath(referencePath + '.registry.json')
@@ -367,7 +372,28 @@ test('visitor can accept, open and leave the mock workspace', async () => {
   const registration = await request('/api/workspaces', open)
   expect(registration.status).toBe(201)
   const entry = await registration.json()
-  expect(entry).toMatchObject({ path: referencePath, remote, harness: 'codex' })
+  expect(entry).toMatchObject({ remote, harness: 'codex' })
+  expect(entry.path.startsWith(referencePath + '/')).toBe(true)
+  const { syncRemoteWorkspaces } = await import('../server/workspaces/remote')
+  const cloudClient = await import('../server/remote/client')
+  const memberships = spyOn(cloudClient, 'fetchRemoteWorkspaces').mockResolvedValue([])
+  cleanups.push(() => memberships.mockRestore())
+  const second = { headers: { cookie: 'session=second-browser' } }
+  expect((await (await request('/api/workspaces', { ...open, ...second })).json()).id).toBe(
+    entry.id
+  )
+  await syncRemoteWorkspaces()
+  for (const session of [{}, second]) {
+    expect(await (await request('/api/workspaces', session)).json()).toMatchObject([
+      { id: entry.id, remote }
+    ])
+    expect(await (await request('/api/workspaces/' + entry.id, session)).json()).toMatchObject({
+      isRemote: true,
+      apiBase: '/api/workspaces/alice:owner-board',
+      harness: 'codex',
+      cwd: entry.path
+    })
+  }
   expect(await (await request('/api/workspaces')).json()).toMatchObject([{ id: entry.id }])
   expect(forwarded).toContain('/api/workspaces')
   const owner = await request(
@@ -389,11 +415,21 @@ test('visitor can accept, open and leave the mock workspace', async () => {
   expect(redirect.headers.get('location')).toBe('/cloud/login')
   expect(redirect.headers.get('set-cookie')).toContain('session=visitor')
 
+  const otherAccount = { headers: { cookie: 'session=other' } }
+  await request('/cloud/api/invitations/mock-owner-invite/accept', {
+    ...otherAccount,
+    method: 'POST'
+  })
+  expect(await (await request('/api/workspaces', otherAccount)).json()).toEqual([])
+  expect((await request('/api/workspaces/' + entry.id, otherAccount)).status).toBe(404)
+
   const leavePath = `/api/workspaces/${entry.id}`
   const leave = { method: 'DELETE' }
+  const beforeLeave = forwarded.length
   expect((await fetch(origin + leavePath, leave)).status).toBe(401)
   expect((await request(leavePath, leave)).status).toBe(204)
-  expect(forwarded).not.toContain(leavePath)
+  expect((await request(leavePath, second)).status).toBe(404)
+  expect(forwarded.slice(beforeLeave)).not.toContain(leavePath)
   expect(await (await request('/api/workspaces')).json()).toEqual([])
   expect(await (await request('/cloud/api/workspaces/remote')).json()).toEqual({ workspaces: [] })
   expect((await request('/api/workspaces/alice:owner-board')).status).toBe(404)
@@ -405,7 +441,7 @@ test('visitor can accept, open and leave the mock workspace', async () => {
   ).toBe(404)
   await request('/api/workspaces/other', leave)
   expect(forwarded).toContain('/api/workspaces/other')
-})
+}, 30_000)
 
 test('owner content and collaboration require accepted membership', async () => {
   const { origin, request, ownerRequests } = await setup()
@@ -633,7 +669,9 @@ test('startup reset unregisters only the mock and preserves the visitor folder',
   const path = join(root, 'visitor')
   const config = Bun.file(join(path, '.moi/.workspace.json'))
   await Bun.write(config, JSON.stringify({ version: 2, remote }))
+  const visitorRoot = join(root, 'visitor-backings')
   const entries = [
+    { id: 'local-backing', path: join(visitorRoot, 'mock-owned-' + 'a'.repeat(24)) },
     { id: 'visitor', path, remote },
     { id: 'owner', path: join(root, 'owner') },
     { id: 'other', path: join(root, 'other'), remote: { ...remote, user_id: 'bob' } }
@@ -648,13 +686,13 @@ test('startup reset unregisters only the mock and preserves the visitor folder',
         : new Response('Leaving remote workspaces is not available yet', { status: 403 })
   })
   try {
-    await resetMockRegistration(visitor.url.origin, registryPath)
+    await resetMockRegistration(visitor.url.origin, registryPath, visitorRoot)
     expect((await Bun.file(registryPath).json()).map((entry: { id: string }) => entry.id)).toEqual([
       'owner',
       'other'
     ])
     expect(await config.json()).toEqual({ version: 2, remote })
-    await resetMockRegistration(visitor.url.origin, registryPath)
+    await resetMockRegistration(visitor.url.origin, registryPath, visitorRoot)
     expect(await Bun.file(registryPath).json()).toHaveLength(2)
   } finally {
     visitor.stop(true)

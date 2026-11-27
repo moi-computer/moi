@@ -91,6 +91,8 @@ bun scripts/mock-remote-workspace.ts
 
 Open [localhost:9898](http://localhost:9898).
 
+Two browsers signed into the same account share one visitor folder. The mock proxy presents that folder as a remote workspace, so the visitor machine can sync its real Cloud memberships without removing it.
+
 Each start resets invitations and unregisters the mock. Reload the mock page after restarting.
 
 Moi defaults to `13337` (override with `MOCK_VISITOR_ORIGIN`). Pass its `MOI_DATA_DIR` if customized.

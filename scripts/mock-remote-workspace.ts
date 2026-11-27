@@ -1,7 +1,7 @@
 // Local remote-workspace fixture and browser proxy.
-import { mkdir, rename, rm, symlink } from 'node:fs/promises'
+import { mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import {
   createServer,
   request as httpRequest,
@@ -14,7 +14,8 @@ import { buffer } from 'node:stream/consumers'
 import envPaths from 'env-paths'
 
 import { colorForId } from '../lib/collab/colors'
-import { sameRemoteWorkspace } from '../lib/workspace-config'
+import type { WorkspaceEntry, WorkspaceInfoResponse } from '../lib/types'
+import { sameRemoteWorkspace, workspaceApiBase } from '../lib/workspace-config'
 import { COLLAB_PROTOCOL_VERSION } from '../lib/collab/protocol'
 import type { WorkspaceMember } from '../client/features/collab/members/types'
 
@@ -184,16 +185,14 @@ export function createMockRemoteInvitations() {
   }
 }
 
-async function prepareMockReference(referencePath: string) {
-  const { initializeRemoteWorkspaceConfig, loadWorkspaceFileConfig } =
-    await import('../server/workspaces/layout')
-  try {
-    await initializeRemoteWorkspaceConfig(referencePath, mockTarget)
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
-    if (!sameRemoteWorkspace((await loadWorkspaceFileConfig(referencePath)).remote, mockTarget))
-      throw new Error('The mock visitor folder belongs to a different workspace')
-  }
+// Keep the visitor's personal state on its machine. Only the proxy knows that
+// this local folder represents a share: real Cloud sync cannot vouch for a mock member.
+function mockRemoteEntry(entry: WorkspaceEntry): WorkspaceEntry {
+  return { ...entry, name: mockTarget.workspace_id, remote: mockTarget }
+}
+
+function isMockVisitorFolder(path: string, root: string) {
+  return dirname(path) === root && /^mock-owned-[a-f0-9]{24}$/.test(basename(path))
 }
 
 // Development-only reverse proxy. Batiok owns sign-in and the visitor machine.
@@ -209,7 +208,7 @@ export function createMockRemoteProxy(
       throw new Error('Mock upstreams must be local HTTP origins')
   }
   const cloud = createMockRemoteInvitations()
-  let mockWorkspaceId: string | undefined
+  const visitorFolders = new Map<string, string>()
   const agentInvitePaths = new Set<string>()
   const memberStreams = new Set<ServerResponse>()
   const remote = /^\/api\/workspaces\/alice:owner-board(?=\/|\?|$)/
@@ -265,6 +264,14 @@ export function createMockRemoteProxy(
   const fixtureAccess = async (req: IncomingMessage) => {
     const path = new URL(req.url!, 'http://localhost').pathname
     const id = testWorkspaceEntry && testWorkspace.exec(path)?.[1]
+    const personalId = /^\/api\/workspaces\/([^/]+)/.exec(path)?.[1]
+    const visitor = personalId && visitorFolders.get(personalId)
+    if (visitor) {
+      const auth = await authorize(req)
+      if (auth.response) return auth.response
+      if (visitor !== auth.testId) return new Response('Workspace not found', { status: 404 })
+      return cloud(new Request('http://localhost/mock/access', { headers: auth.headers }))
+    }
     if (!id) return remote.test(path) ? ownerAccess(req) : undefined
     const auth = await authorize(req)
     if (auth.response) return auth.response
@@ -382,8 +389,9 @@ export function createMockRemoteProxy(
         res.end(body)
         return
       }
-      const leave =
-        req.method === 'DELETE' && mockWorkspaceId && path === `/api/workspaces/${mockWorkspaceId}`
+      const personalId = /^\/api\/workspaces\/([^/]+)\/?$/.exec(path)?.[1]
+      const visitor = personalId && visitorFolders.get(personalId)
+      const leave = req.method === 'DELETE' && visitor
       if (remoteWorkspaceRequest || sharing || leave) {
         const auth = await authorize(req)
         if (auth.response) {
@@ -391,6 +399,7 @@ export function createMockRemoteProxy(
           res.end(await auth.response.text())
           return
         }
+        if (leave && visitor !== auth.testId) return void res.writeHead(404).end()
         const { headers, session } = auth
         const mockPath = leave
           ? '/mock/leave'
@@ -431,7 +440,7 @@ export function createMockRemoteProxy(
         req.method === 'GET' && (path === '/api/workspaces' || path === '/api/workspaces/trash')
       let fixtureSession: Awaited<ReturnType<typeof authorize>> | undefined
       let fixturePosition: number | undefined
-      if ((testWorkspaceEntry && reorder) || (listing && (testWorkspaceEntry || mockWorkspaceId))) {
+      if ((testWorkspaceEntry && reorder) || listing) {
         const auth = await authorize(req)
         if (auth.response)
           return void res.writeHead(auth.response.status).end(await auth.response.text())
@@ -452,19 +461,29 @@ export function createMockRemoteProxy(
         body = await buffer(req)
         const input = await new Response(body.toString()).json().catch(() => undefined)
         if (sameRemoteWorkspace(input?.remote, mockTarget)) {
-          const access = await ownerAccess(req)
+          const auth = await authorize(req)
+          if (auth.response)
+            return void res.writeHead(auth.response.status).end(await auth.response.text())
+          const access = await cloud(
+            new Request('http://localhost/mock/access', { headers: auth.headers })
+          )
           if (!access.ok) {
             res.writeHead(access.status, { 'content-type': 'application/json' })
             res.end(await access.text())
             return
           }
-          // Batiok has no record of this fixture. Import its local reference on the
-          // visitor after the mock confirms membership, keeping the chosen agent.
           if (input.harness !== undefined && !['claude-code', 'codex'].includes(input.harness)) {
             res.writeHead(400).end('Unknown workspace type')
             return
           }
-          await prepareMockReference(referencePath)
+          const folder = join(referencePath, auth.testId)
+          // Applets run on the mock owner. A visitor folder needs no applet dependencies.
+          await mkdir(join(folder, '.moi'), { recursive: true })
+          await writeFile(join(folder, '.moi/package.json'), '{"private":true}\n', {
+            flag: 'wx'
+          }).catch(error => {
+            if (error.code !== 'EEXIST') throw error
+          })
           const registration = await fetch(url, {
             method: 'POST',
             headers: {
@@ -472,11 +491,15 @@ export function createMockRemoteProxy(
               origin: url.origin,
               'content-type': 'application/json'
             },
-            body: JSON.stringify({ path: referencePath, harness: input.harness }),
+            body: JSON.stringify({ path: folder, harness: input.harness }),
             redirect: 'manual'
           })
-          const reply = await registration.text()
-          if (registration.ok) mockWorkspaceId = JSON.parse(reply).id
+          let reply = await registration.text()
+          if (registration.ok) {
+            const entry: WorkspaceEntry = JSON.parse(reply)
+            visitorFolders.set(entry.id, auth.testId)
+            reply = JSON.stringify(mockRemoteEntry(entry))
+          }
           res
             .writeHead(registration.status, {
               'content-type': registration.headers.get('content-type') ?? 'text/plain',
@@ -491,16 +514,44 @@ export function createMockRemoteProxy(
         { method: req.method, headers: upstreamHeaders },
         async reply => {
           const headers = { ...reply.headers }
+          if (visitor && req.method === 'GET' && reply.statusCode === 200) {
+            try {
+              const { cwd, harness, agentId }: WorkspaceInfoResponse = JSON.parse(
+                (await buffer(reply)).toString()
+              )
+              const info: WorkspaceInfoResponse = {
+                version: 2,
+                isRemote: true,
+                cwd,
+                harness,
+                agentId,
+                remote: mockTarget,
+                apiBase: workspaceApiBase(mockTarget.workspace_id, mockTarget.user_id)
+              }
+              delete headers['content-length']
+              res.writeHead(200, headers).end(JSON.stringify(info))
+            } catch {
+              res.writeHead(502).end('Could not read the mock visitor workspace')
+            }
+            return
+          }
           if (fixtureSession?.testId && reply.statusCode === 200) {
             const fixtureId = fixtureSession.testId
             try {
-              const entries: { id: string }[] = JSON.parse((await buffer(reply)).toString())
-              const reference = entries.findIndex(entry => entry.id === mockWorkspaceId)
-              if (reference !== -1) {
+              const rows: WorkspaceEntry[] = JSON.parse((await buffer(reply)).toString())
+              const entries: { id: string }[] = []
+              for (const entry of rows) {
+                if (!entry.path || !isMockVisitorFolder(entry.path, referencePath)) {
+                  entries.push(entry)
+                  continue
+                }
+                const viewer = basename(entry.path)
+                visitorFolders.set(entry.id, viewer)
+                if (viewer !== fixtureId) continue
                 const access = await cloud(
                   new Request('http://localhost/mock/access', { headers: fixtureSession.headers })
                 )
-                if (!access.ok) entries.splice(reference, 1)
+                if (access.ok) entries.push(mockRemoteEntry(entry))
               }
               const owned = await testWorkspaceEntry?.(fixtureId, path === '/api/workspaces/trash')
               if (fixturePosition !== undefined) positions.set(fixtureId, fixturePosition)
@@ -639,7 +690,8 @@ export async function resetMockRegistration(
   registryPath = join(
     process.env.MOI_DATA_DIR || envPaths('moi', { suffix: '' }).data,
     'workspaces.json'
-  )
+  ),
+  visitorRoot?: string
 ) {
   const url = new URL(visitorOrigin)
   if (url.protocol !== 'http:' || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
@@ -652,7 +704,11 @@ export async function resetMockRegistration(
     remote?: { user_id: string; workspace_id: string }
   }[]
   for (const entry of entries) {
-    if (entry.remote?.user_id !== 'alice' || entry.remote.workspace_id !== 'owner-board') continue
+    if (
+      !sameRemoteWorkspace(entry.remote, mockTarget) &&
+      !(visitorRoot && isMockVisitorFolder(entry.path, visitorRoot))
+    )
+      continue
     const registry = (await Bun.file(registryPath).json()) as { id: string; path: string }[]
     if (!registry.some(item => item.id === entry.id && item.path === entry.path))
       throw new Error(
@@ -677,7 +733,12 @@ export async function resetMockRegistration(
 
 if (import.meta.main) {
   const root = resolve(process.env.MOCK_OWNER_DATA_DIR ?? join(tmpdir(), 'moi-mock-owner'))
-  await resetMockRegistration(process.env.MOCK_VISITOR_ORIGIN ?? 'http://localhost:13337')
+  const referencePath = join(root, 'visitor-backings')
+  await resetMockRegistration(
+    process.env.MOCK_VISITOR_ORIGIN ?? 'http://localhost:13337',
+    undefined,
+    referencePath
+  )
   // Set isolation before loading server modules, which capture DATA_DIR at import time.
   process.env.MOI_DATA_DIR = root
   process.env.MOI_SECRET_BACKEND = 'file'
@@ -689,8 +750,6 @@ if (import.meta.main) {
   const { registerWorkspace, getWorkspace, listTrashedWorkspaces } =
     await import('../server/workspaces/registry')
   const { saveLayout, loadLayout } = await import('../server/workspaces/layout')
-  const { remoteReferenceFolderName } =
-    await import('../server/workspaces/remote-workspace-reference')
   const { buildAllViews } = await import('../server/applets/views')
   const { buildAllWidgets } = await import('../server/applets/widgets')
   const { createDefaultWorkspaceLayout } = await import('../lib/workspace-layout')
@@ -874,7 +933,6 @@ export default function LaunchPlan() {
 
   const proxyPort = Number(process.env.MOCK_PROXY_PORT ?? 9898)
   const batiok = process.env.MOCK_BATIOK_ORIGIN ?? 'http://localhost:8787'
-  const referencePath = join(root, 'visitor-references', remoteReferenceFolderName(mockTarget))
   const proxy = createMockRemoteProxy(
     batiok,
     ownerServer.url.origin,

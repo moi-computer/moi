@@ -209,10 +209,15 @@ describe('workspace sharing', () => {
       const path = '/cloud/api/workspaces/alice:board/agent-invitations'
       expect(ui.calls.some(call => call.path === path)).toBe(false)
       ui.failures.mutation = true
+      const button = [...ui.document.querySelectorAll('button')].find(
+        button => button.textContent === 'Copy prompt'
+      )!
       await ui.click('Copy prompt')
-      const button = ui.document.querySelector('section button')!
-      expect(button.textContent).toBe('Loading invite…')
-      expect(button.hasAttribute('disabled')).toBe(true)
+      expect(button.textContent).toBe('Copy prompt')
+      expect(button.getAttribute('aria-busy')).toBe('true')
+      expect(button.querySelector('svg.tabler-icon-text-scan-2')).not.toBeNull()
+      await ui.click('Copy prompt')
+      expect(ui.calls.filter(call => call.path === path)).toHaveLength(1)
       await act(async () => ui.mutationRequest.resolve())
       expect(copied).toEqual([])
       expect(notification).toHaveBeenCalledWith({
@@ -226,18 +231,26 @@ describe('workspace sharing', () => {
         'Follow the instructions at this one-time link to join my Moi workspace “SF Trip”: https://example.com/invite/test'
       ])
       expect(button.textContent).toBe('Copied')
+      expect(button.querySelector('svg.tabler-icon-check')).not.toBeNull()
+      expect(button.disabled).toBe(true)
+      button.click()
       expect(notification).toHaveBeenCalledTimes(1)
       await act(async () => {
         await Bun.sleep(1550)
       })
+      expect(button.textContent).toBe('Copied')
+      await act(async () => {
+        await Bun.sleep(1500)
+      })
       expect(button.textContent).toBe('Copy prompt')
+      expect(button.disabled).toBe(false)
       expect(ui.calls.filter(call => call.path === path)).toHaveLength(2)
     } finally {
       notification.mockRestore()
       if (original) Object.defineProperty(navigator, 'clipboard', original)
       else Reflect.deleteProperty(navigator, 'clipboard')
     }
-  })
+  }, 10_000)
 
   test('disabled presence shows published workspace members and reflects membership updates', async () => {
     const ui = await mountAccount({
