@@ -38,10 +38,27 @@ test('reports an abnormal Claude auth exit as unavailable', () => {
   expect(claudeAuthReadiness({ exitCode: 2, timedOut: false })).toEqual(unavailable)
 })
 
-test('reads the manual URL from CLI output, including terminal hyperlinks', () => {
-  const url = 'https://claude.com/oauth/authorize?response_type=code&state=test'
-  expect(claudeLoginUrl(`Visit: \x1b]8;;${url}\x07${url}\x1b]8;;\x07\n`)).toBe(url)
-  expect(claudeLoginUrl('Visit: https://claude.com/oauth')).toBeUndefined()
+const legacyUrl = 'https://claude.com/oauth/authorize?response_type=code&state=test-state'
+const opaqueUrl = 'https://claude.ai/oauth/authorize?abc_DEF-123%2B%2F%3D'
+
+test.each([legacyUrl, opaqueUrl, 'https://login.claude.ai/start', 'https://auth.claude.com/login'])(
+  'reads a complete sign-in URL from a terminal hyperlink: %s',
+  url => {
+    expect(claudeLoginUrl(`Visit: \x1b]8;;${url}\x07${url}\x1b]8;;\x07\n`)).toBe(url)
+    // stdout can split the URL across chunks.
+    expect(claudeLoginUrl(`Visit: ${url}`)).toBeUndefined()
+  }
+)
+
+test('skips unrelated links before the opaque sign-in URL', () => {
+  const output = [
+    'http://claude.ai/oauth/authorize?opaque',
+    'https://notclaude.com/oauth/authorize?response_type=code&state=test',
+    'https://claude.ai@elsewhere.example/login',
+    'https://claude.ai.example.org/oauth/authorize?opaque',
+    opaqueUrl
+  ].join('\n')
+  expect(claudeLoginUrl(output + '\n')).toBe(opaqueUrl)
 })
 
 // Each flow launches a CLI subprocess; local flows also launch PowerShell on Windows.
@@ -56,7 +73,7 @@ test.each(['local', 'cloud', 'automatic', 'cancelled'] as const)(
     const appConfig = config.getAppConfig()
     const cfg = spyOn(config, 'getAppConfig')
     const open = spyOn(browser, 'openBrowser').mockResolvedValue()
-    const manualUrl = 'https://claude.com/oauth/authorize?response_type=code&state=test-state'
+    const manualUrl = flow === 'cloud' || flow === 'automatic' ? opaqueUrl : legacyUrl
     // Preserve encoded characters, ampersands, and exclamation marks through the helper.
     const callbackUrl = `${manualUrl}&redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback&test=a!b%20c`
     try {
@@ -91,7 +108,7 @@ for await (const chunk of Bun.stdin.stream()) {
   code += new TextDecoder().decode(chunk)
   if (code.includes('\\n')) break
 }
-process.exit(code.trim() === 'test-code#test-state' ? 0 : 1)
+process.exit(code === 'test-code#test-state\\n' ? 0 : 1)
 `
       )
       const environment = flow === 'cloud' ? 'cloud' : 'local'
@@ -114,8 +131,13 @@ process.exit(code.trim() === 'test-code#test-state' ? 0 : 1)
           await login.cancel?.()
           await expect(login.completed).rejects.toThrow('Claude sign-in failed')
         } else if (flow !== 'automatic') {
-          await expect(login.submitCode?.('wrong-state#old')).rejects.toThrow('full code')
-          await login.submitCode?.('test-code#test-state')
+          for (const invalid of ['bare-code', '#state', 'code#', 'a#b#c', 'a\nb#state']) {
+            await expect(login.submitCode?.(invalid)).rejects.toThrow('full code')
+          }
+          if (manualUrl === legacyUrl) {
+            await expect(login.submitCode?.('wrong-state#old')).rejects.toThrow('full code')
+          }
+          await login.submitCode?.('  test-code#test-state\n')
         }
         if (flow !== 'cancelled') await login.completed
         if (environment === 'local') {

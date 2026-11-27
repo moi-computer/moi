@@ -67,8 +67,7 @@ export function claudeLoginUrl(output: string): string | undefined {
   const text = stripVTControlCharacters(output)
   return text.match(/https:\/\/[^\s]+(?=\s)/g)?.find(value => {
     try {
-      const url = new URL(value)
-      return url.searchParams.get('response_type') === 'code' && url.searchParams.has('state')
+      return /(^|\.)claude\.(ai|com)$/.test(new URL(value).hostname)
     } catch {
       return false
     }
@@ -157,12 +156,14 @@ export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
           proc.kill()
         },
         submitCode: async code => {
-          const parts = code.trim().split('#')
-          if (parts.length !== 2 || !parts[0] || parts[1] !== state || /\s/.test(code.trim())) {
+          const input = code.trim()
+          const match = /^[^#\s]+#([^#\s]+)$/.exec(input)
+          // For opaque links only the CLI can check the pasted state.
+          if (!match || (state !== null && match[1] !== state)) {
             throw new Error('Copy the full code from this sign-in attempt and try again')
           }
           if (proc.exitCode !== null) throw new Error('Sign-in expired. Start again')
-          proc.stdin.write(code.trim() + '\n')
+          proc.stdin.write(input + '\n')
           await proc.stdin.flush()
         }
       }
