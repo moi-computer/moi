@@ -149,7 +149,7 @@ export function WorkspaceSharingMenu({
         <PopoverContent
           initialFocus={false}
           align="end"
-          className="w-96 max-w-[calc(100vw-2rem)] gap-2 bg-transparent p-0 shadow-none"
+          className="group/sharing-menu w-96 max-w-[calc(100vw-2rem)] gap-2 bg-transparent p-0 shadow-none"
         >
           <WorkspaceMembers workspaceId={workspaceId} profiles={users} membership={membership} />
           <AgentInvite workspaceId={workspaceId} workspaceName={workspaceName} />
