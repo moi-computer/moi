@@ -8,7 +8,7 @@ Some options can also be set with environment variables, which win over the file
 
 ```json
 {
-  "cloudDemo": false,
+  "demo": false,
   "demoInstallUrl": "https://moi.computer",
   "cloudflareAccess": { "teamDomain": "acme", "audience": ["<AUD tag>"] },
   "workspacesDir": "/data/workspaces",
@@ -21,10 +21,10 @@ Some options can also be set with environment variables, which win over the file
 
 | Option           | Env                    | Default                |
 | ---------------- | ---------------------- | ---------------------- |
-| `cloudDemo`      | `MOI_CLOUD_DEMO`       | `false`                |
+| `demo`           | `MOI_DEMO`             | `false`                |
 | `demoInstallUrl` | `MOI_DEMO_INSTALL_URL` | `https://moi.computer` |
 
-For the public cloud demo. `cloudDemo` blocks creating workspaces (the UI shows a promo instead) and turns off the `moi` system commands except `start` and `version`. `demoInstallUrl` is where that promo links. In demo mode the home page is served at `/demo` instead of `/`, which is left to whatever fronts the demo. If the demo gate must never fail open, set `MOI_CLOUD_DEMO=1` in the environment: an unreadable file can't switch it off.
+For the public cloud demo. `demo` blocks creating workspaces (the UI shows a promo instead) and turns off the `moi` system commands except `start` and `version`. `demoInstallUrl` is where that promo links. In demo mode the home page is served at `/demo` instead of `/`, which is left to whatever fronts the demo. If the demo gate must never fail open, set `MOI_DEMO=1` in the environment: an unreadable file can't switch it off.
 
 ## Cloudflare Access
 
