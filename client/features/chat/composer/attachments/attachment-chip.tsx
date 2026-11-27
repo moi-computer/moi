@@ -1,10 +1,25 @@
 import type { ComponentPropsWithRef } from 'react'
-import { IconLoader2, IconTextScan2, IconX } from '@tabler/icons-react'
+import {
+  IconLoader2,
+  IconPlus,
+  IconScribble,
+  IconTextScan2,
+  IconX,
+  type TablerIcon
+} from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
+import type { AttachmentIconId } from '@/lib/types'
+
+const attachmentIcons = {
+  plus: IconPlus,
+  scribble: IconScribble,
+  default: IconTextScan2
+} satisfies Record<AttachmentIconId, TablerIcon>
 
 type AttachmentChipProps = ComponentPropsWithRef<'div'> & {
   label: string
+  icon?: AttachmentIconId
   onRemove?: () => void
   previewUrl?: string
   loading?: boolean
@@ -14,6 +29,7 @@ type AttachmentChipProps = ComponentPropsWithRef<'div'> & {
 // Upload status is an overlay; it doesn't introduce another layout.
 export function AttachmentChip({
   label,
+  icon,
   onRemove,
   previewUrl,
   loading,
@@ -38,16 +54,19 @@ export function AttachmentChip({
       {previewUrl ? (
         <ImageChipContent label={label} previewUrl={previewUrl} onRemove={onRemove} />
       ) : (
-        <LabelChipContent label={label} onRemove={onRemove} />
+        <LabelChipContent label={label} icon={icon} onRemove={onRemove} />
       )}
       {children}
     </div>
   )
 }
 
-type LabelChipContentProps = Pick<AttachmentChipProps, 'label' | 'onRemove'>
+type LabelChipContentProps = Pick<AttachmentChipProps, 'label' | 'icon' | 'onRemove'>
 
-function LabelChipContent({ label, onRemove }: LabelChipContentProps) {
+function LabelChipContent({ label, icon = 'default', onRemove }: LabelChipContentProps) {
+  const Icon = Object.hasOwn(attachmentIcons, icon)
+    ? attachmentIcons[icon]
+    : attachmentIcons.default
   return (
     <>
       {onRemove ? (
@@ -59,12 +78,12 @@ function LabelChipContent({ label, onRemove }: LabelChipContentProps) {
           aria-label={`Remove ${label}`}
           className="size-6 shrink-0 hover:bg-transparent hover:text-current"
         >
-          <IconTextScan2 stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
+          <Icon stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
           <IconX stroke={1.75} className="hidden group-focus-within:block group-hover:block" />
         </Button>
       ) : (
         <span className="flex size-6 shrink-0 items-center justify-center">
-          <IconTextScan2 size={16} stroke={1.75} />
+          <Icon size={16} stroke={1.75} />
         </span>
       )}
       <span className="truncate">{label}</span>

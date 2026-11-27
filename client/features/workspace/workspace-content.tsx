@@ -36,6 +36,8 @@ import { useViewDrafts } from '@/client/features/views/use-view-drafts'
 import { useWorkspaceComposerState } from '@/client/features/chat/composer/use-workspace-composer-state'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import {
+  attachmentKey,
+  liveStore,
   hasRunningWorkspaceActivity,
   isSessionRunning,
   useLive
@@ -45,20 +47,26 @@ import { WorkspaceMenu } from '@/client/features/workspace/workspace-menu'
 import { effectiveOpenTabs, tabAvailable } from '@/client/features/workspace/tab-resolution'
 import { useWorkspaceNavigation } from '@/client/features/workspace/use-workspace-navigation'
 import { useWorkspaceEvent } from '@/client/runtime/use-client-events'
-import { useUiStore } from '@/client/store/ui'
 import {
   type CreateWorkspaceTabItem,
   type WorkspaceTabItem,
   WorkspaceTabs
 } from '@/client/features/workspace/workspace-tabs'
 import { isDefaultWidget } from '@/lib/default-widgets'
-import { composerDraftKey, draftSessionId } from '@/lib/session-drafts'
+import { draftSessionId } from '@/lib/session-drafts'
 import type { CompiledView, PendingView, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
 import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
 
 import { WorkspaceFrame, useWorkspaceFrame } from './workspace-frame'
 import { WorkspacePane } from './workspace-pane'
 import { UnavailablePage } from './unavailable-page'
+
+const newWidgetAttachment = {
+  source: 'overview:new-widget',
+  label: 'New widget',
+  icon: 'plus',
+  text: 'Create a new widget for this workspace’s overview.'
+} as const
 
 const Scratchpad = lazy(() =>
   import('@/client/features/scratchpad/scratchpad').then(module => ({
@@ -308,12 +316,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     setTabs({ open, active: tabsState.active })
   }
 
-  const openChat = (intent?: string) => {
-    if (intent !== undefined) {
-      useUiStore
-        .getState()
-        .setComposerDraft(composerDraftKey(workspaceId, composerSessionId), intent)
-    }
+  const openChat = () => {
     if (mode === 'fullscreen') {
       setFloatingChatOpen(true)
       if (floatingChatOpen) {
@@ -333,7 +336,12 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   const onCreateView = createView
   const onCreateWidget = () => {
     selectSession(null)
-    openChat('Create widget')
+    const targetSession = pinnedSessionId ?? draftSessionId('overview')
+    const attachments = liveStore.getState().attachments[attachmentKey(workspaceId, targetSession)]
+    if (!attachments?.some(item => item.source === newWidgetAttachment.source)) {
+      stageTextAttachment({ workspaceId, sessionId: targetSession }, newWidgetAttachment)
+    }
+    openChat()
   }
 
   function editWidget(id: string) {

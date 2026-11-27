@@ -15,6 +15,7 @@ import { formatChatTitle } from './chat-title'
 
 const attachment = {
   type: 'text' as const,
+  icon: 'plus' as const,
   source: 'view:orders',
   label: 'Order #1042',
   text: 'Order ID: 1042'
@@ -34,6 +35,13 @@ describe('text attachments', () => {
       const raw = `<moi-attachments>${JSON.stringify([item])}</moi-attachments>`
       expect(splitAttachments(raw)).toEqual({ text: raw, attachments: [] })
     }
+  })
+
+  test('uses the default icon when replaying an unknown icon from another client', () => {
+    const item = { ...attachment, icon: 'calendar' }
+    expect(isTextAttachments([item])).toBe(false)
+    const raw = `<moi-attachments>${JSON.stringify([item])}</moi-attachments>`
+    expect(splitAttachments(raw)).toEqual({ text: '', attachments: [{ ...item, icon: 'default' }] })
   })
 
   test('copies the label and preserves text exactly', () => {

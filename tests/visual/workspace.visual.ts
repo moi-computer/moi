@@ -3,7 +3,12 @@ import { DEFAULT_VIEWPORT, expect, takeSnapshot } from '@uiverify/bun'
 import type { IdentityHostApi } from '@/client/features/identity/host-api'
 import type { Identity } from '@/client/features/identity/types'
 import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
-import type { ClientAppConfig, WorkspaceEntry, WorkspaceLayoutResponse } from '@/lib/types'
+import type {
+  ClientAppConfig,
+  WorkspaceEntry,
+  WorkspaceLayoutResponse,
+  WorkspaceState
+} from '@/lib/types'
 
 import { API, HARNESSES, suite, WORKSPACE } from './fixtures'
 
@@ -43,6 +48,32 @@ test('floating chat keeps its open and closed state after reload', async page =>
   await page.goto(WORKSPACE_PAGE)
   await expect(page.getByRole('button', { name: 'Agent', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Close chat', exact: true })).toHaveCount(0)
+})
+
+test('new widget stages a removable instruction in the composer', async page => {
+  const statePath = `/api/workspaces/${WORKSPACE}/state`
+  const state = API[statePath] as WorkspaceState
+  await page.route('**/sessions/*/selection', route =>
+    route.fulfill({ json: { ...state, revision: state.revision + 1, selected: {} } })
+  )
+  await page.goto(WORKSPACE_PAGE)
+  const create = page.getByRole('button', { name: 'New widget', exact: true })
+  const chip = page.getByRole('button', { name: 'Remove New widget', exact: true })
+  const composer = page.getByPlaceholder('Do anything')
+  await create.click()
+  await expect(chip).toBeVisible()
+  await expect(composer).toHaveValue('')
+  await takeSnapshot('new widget instruction')
+  await chip.click()
+  await expect(chip).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Customize', exact: true }).click()
+  await create.click()
+  await expect(chip).toBeVisible()
+  await composer.fill('A weekly reading list')
+  await create.click()
+  await expect(chip).toHaveCount(1)
+  await expect(composer).toHaveValue('A weekly reading list')
 })
 
 test(

@@ -8,7 +8,12 @@ import { attachmentsForSend, prepareDraftAttachments } from '../../chat-send'
 
 const workspaceId = 'context-test'
 const target = { workspaceId, sessionId: null }
-const attachment = { source: 'view:orders', label: 'Order #1042', text: 'Order ID: 1042' }
+const attachment = {
+  icon: 'default' as const,
+  source: 'view:orders',
+  label: 'Order #1042',
+  text: 'Order ID: 1042'
+}
 afterEach(() => liveStore.setState({ attachments: {} }))
 
 describe('text staging and sends', () => {
@@ -22,13 +27,15 @@ describe('text staging and sends', () => {
       type: 'text',
       label: 'Order',
       text: 'Status: pending',
-      source: 'widget:forged'
+      source: 'widget:forged',
+      icon: 'plus'
     }
     bridge.addChatAttachment(input)
     input.text = 'Status: done'
     dispose()
     bridge.addChatAttachment({ type: 'text', label: 'Another', text: 'Order' })
     off()
+    expect(attachmentsForSend(workspaceId, null)[0]).not.toHaveProperty('icon')
     expect(attachmentsForSend(workspaceId, null)).toMatchObject([
       {
         kind: 'text',

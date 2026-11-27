@@ -5,6 +5,7 @@ import { isParamsRecord } from './workspace-tabs'
 import { isAttachmentOnlyPlaceholder, splitAttachmentNote } from './attachment-note'
 import { stripMoiContext } from './moi-context'
 
+import { attachmentIconIds } from './types'
 import type { DrawingPurpose, Attachment, TextAttachmentInput, TextAttachment } from './types'
 export const MAX_TEXT_ATTACHMENT_CHARS = 5000
 export const MAX_ATTACHMENT_LABEL_CHARS = 120
@@ -26,6 +27,10 @@ export function snapshotTextAttachment(value: unknown): TextAttachmentInput | nu
   return { label, text: value.text }
 }
 
+function isAttachmentIconId(value: unknown): boolean {
+  return attachmentIconIds.some(id => id === value)
+}
+
 export function isTextAttachments(value: unknown): value is TextAttachment[] {
   return (
     Array.isArray(value) &&
@@ -33,6 +38,7 @@ export function isTextAttachments(value: unknown): value is TextAttachment[] {
       item =>
         isParamsRecord(item) &&
         item.purpose === undefined &&
+        (item.icon === undefined || isAttachmentIconId(item.icon)) &&
         (item.source === undefined ||
           (typeof item.source === 'string' && item.source.length > 0)) &&
         snapshotTextAttachment(item) !== null
@@ -94,7 +100,12 @@ export function splitAttachments(text: string): {
     /<moi-attachments>([^<]*)<\/moi-attachments>/g,
     (block: string, json: string) => {
       try {
-        const parsed: unknown = JSON.parse(json)
+        // A transcript from a newer client may use an icon this client doesn't have.
+        const parsed: unknown = JSON.parse(json, (key, value: unknown) =>
+          key === 'icon' && typeof value === 'string' && value && !isAttachmentIconId(value)
+            ? 'default'
+            : value
+        )
         const entries =
           isParamsRecord(parsed) && parsed.version === 1 && Array.isArray(parsed.attachments)
             ? parsed.attachments.map(item =>
@@ -120,21 +131,15 @@ export function attachmentLabel(attachment: Attachment): string {
 }
 
 export function attachmentPart(attachment: Attachment, previewUrl?: string): Part {
-  const { source } = attachment
-  const label = attachmentLabel(attachment)
   if (attachment.type === 'text') {
-    return {
-      type: 'text-attachment',
-      source: attachment.source,
-      label,
-      text: attachment.text
-    }
+    const { source, label, text, icon } = attachment
+    return { type: 'text-attachment', source, label, text, icon }
   }
   return {
     type: 'file-attachment',
-    label,
+    label: attachmentLabel(attachment),
     mediaType: attachment.mediaType,
-    source,
+    source: attachment.source,
     ...(attachment.purpose ? { purpose: attachment.purpose } : {}),
     // Filesystem-only images keep their identity and render as labelled chips.
     previewUrl,

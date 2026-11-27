@@ -185,7 +185,14 @@ export type DrawingPurpose = 'annotation' | 'sketch'
 // Host-stamped ID of the applet or workspace tab that created the attachment.
 export type AttachmentOrigin = { source: string }
 
-export type TextAttachment = Partial<AttachmentOrigin> & { label: string; text: string }
+export const attachmentIconIds = ['default', 'plus', 'scribble'] as const
+export type AttachmentIconId = (typeof attachmentIconIds)[number]
+
+export type TextAttachment = Partial<AttachmentOrigin> & {
+  label: string
+  text: string
+  icon?: AttachmentIconId
+}
 
 type FileAttachment = Partial<AttachmentOrigin> & {
   mediaType: string

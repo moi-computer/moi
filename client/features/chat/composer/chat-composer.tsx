@@ -1,7 +1,6 @@
 import { toast } from '@/client/components/ui/toast'
-import { TextAttachmentChip } from './attachments/text-attachment-chip'
+import { AttachmentChip } from './attachments/attachment-chip'
 import { DrawingAttachmentChip } from './attachments/drawing-attachment-chip'
-import { FileAttachmentChip } from './attachments/file-attachment-chip'
 import { type RefObject, useEffect, useRef, useState } from 'react'
 import { draftSessionId, composerDraftKey } from '@/lib/session-drafts'
 import { useCurrentTabId } from '../sessions/use-selected-session'
@@ -159,9 +158,10 @@ export function ChatComposer({
             .toSorted((a, b) => ATTACHMENT_ORDER[a.kind] - ATTACHMENT_ORDER[b.kind])
             .map(a =>
               a.kind === 'text' ? (
-                <TextAttachmentChip
+                <AttachmentChip
                   key={a.localId}
                   label={a.label}
+                  icon={a.icon}
                   onRemove={() => removeAttachment(a)}
                 />
               ) : a.kind === 'drawing' ? (
@@ -171,9 +171,13 @@ export function ChatComposer({
                   onRemove={() => removeAttachment(a)}
                 />
               ) : (
-                <FileAttachmentChip
+                <AttachmentChip
                   key={a.localId}
-                  attachment={a}
+                  label={a.label}
+                  title={a.label}
+                  className="max-w-52"
+                  previewUrl={a.previewUrl}
+                  loading={a.status === 'uploading'}
                   onRemove={() => removeAttachment(a)}
                 />
               )

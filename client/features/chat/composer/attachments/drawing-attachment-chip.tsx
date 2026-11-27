@@ -14,7 +14,7 @@ export function DrawingAttachmentChip({ attachment, onRemove }: DrawingAttachmen
   return (
     <HoverCard>
       <HoverCardTrigger
-        render={<AttachmentChip tabIndex={0} label={label} onRemove={onRemove} />}
+        render={<AttachmentChip icon="scribble" tabIndex={0} label={label} onRemove={onRemove} />}
       />
       {previewUrl && (
         <HoverCardContent

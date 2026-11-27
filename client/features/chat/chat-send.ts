@@ -57,11 +57,9 @@ function prepareAttachment(
       }
     }
   }
-  const { source, label, text } = input
-  return {
-    attachment: { type: 'text', source, label, text },
-    part: attachmentPart({ type: 'text', source, label, text })
-  }
+  const { source, label, text, icon } = input
+  const attachment = { type: 'text', source, label, text, icon } as const
+  return { attachment, part: attachmentPart(attachment) }
 }
 
 function collectPreparedAttachments(

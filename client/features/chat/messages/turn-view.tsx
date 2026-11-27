@@ -1,4 +1,4 @@
-import { TextAttachmentChip } from '../composer/attachments/text-attachment-chip'
+import { AttachmentChip } from '../composer/attachments/attachment-chip'
 import { memo } from 'react'
 
 import { IconChevronRight, IconTextScan2 } from '@tabler/icons-react'
@@ -177,7 +177,7 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
     return (
       <div className="flex w-full min-w-0 flex-col items-end gap-1.5 pl-8">
         {textAttachmentParts.map((p, i) => (
-          <TextAttachmentChip key={`text-attachment:${i}`} label={p.label} />
+          <AttachmentChip key={`text-attachment:${i}`} label={p.label} icon={p.icon} />
         ))}
         {fileParts.map((p, i) => (
           <FilePart key={i} mediaType={p.mediaType} previewUrl={p.previewUrl} label={p.label} />
@@ -204,7 +204,7 @@ type PartRendererProps = { part: Part }
 function PartRenderer({ part }: PartRendererProps) {
   switch (part.type) {
     case 'text-attachment':
-      return <TextAttachmentChip label={part.label} />
+      return <AttachmentChip label={part.label} icon={part.icon} />
     case 'text':
       return <MarkdownContent content={part.text} />
     case 'tool-call':
