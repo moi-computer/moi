@@ -78,12 +78,16 @@ function WorkspaceEntry({ id }: WorkspaceRouteProps) {
   return <WorkspaceLive id={id} />
 }
 
-// One owner connection carries shared updates always and presence on Cloud.
+// Shared updates and presence use the same workspace connection.
 function WorkspaceLive({ id }: WorkspaceRouteProps) {
-  const { environment } = useAppConfig()
+  const { environment, testLocalCollab } = useAppConfig()
   const socket = useWorkspaceSocket(id)
   return (
-    <CollabProvider workspaceId={id} enabled={environment === 'cloud'} socket={socket}>
+    <CollabProvider
+      workspaceId={id}
+      enabled={environment === 'cloud' || testLocalCollab === true}
+      socket={socket}
+    >
       <WorkspaceContent id={id} />
     </CollabProvider>
   )

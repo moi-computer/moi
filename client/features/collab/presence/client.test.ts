@@ -2,13 +2,17 @@ import { seedWorkspaceInfo } from '@/client/features/workspace/workspace-test-ut
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 
 import { colorForId } from '@/lib/collab/colors'
-import { COLLAB_MAX_CONNECTIONS, isCollabClientMessage } from '@/lib/collab/protocol'
+import {
+  COLLAB_MAX_CONNECTIONS,
+  COLLAB_PROTOCOL_VERSION,
+  isCollabClientMessage
+} from '@/lib/collab/protocol'
 import type { CollabClientMessage } from '@/lib/collab/types'
 import { CollabService } from '@/server/collab/service'
 
 import { ReconnectingSocket } from '@/client/runtime/reconnecting-socket'
 import { CollabClient, NO_ENGINE } from './client'
-import { getCurrentProfile } from '../host-state'
+import * as hostState from '../host-state'
 import { setIdentity } from '../../identity/store'
 import { setWorkspaceMembers, clearWorkspaceMembers } from '../members/store'
 import type { ProfileInput } from '../host-state'
@@ -124,8 +128,31 @@ test('runtime without a current user stays idle and never joins anonymously', ()
     value: 'title'
   })
   expect(sockets).toHaveLength(0)
-  expect(getCurrentProfile()).toBeUndefined()
+  expect(hostState.getCurrentProfile()).toBeUndefined()
   expect(engine.getSnapshot().status).toBe('disconnected')
+})
+
+test('a local viewer learns who else is in the workspace from live presence', () => {
+  const viewer = { type: 'user', id: 'local-anna', name: 'Anna', color: 'blue' } as const
+  const peer = { type: 'user', id: 'local-boris', name: 'Boris', color: 'emerald' } as const
+  const source = spyOn(hostState, 'getCurrentProfileSource').mockReturnValue('local')
+  const profile = spyOn(hostState, 'getCurrentProfile').mockReturnValue(viewer)
+  const engine = new CollabClient('workspace')
+  const onDirectory = spyOn({ read: engine.getDirectory }, 'read')
+  const unsubscribe = engine.subscribeDirectory(onDirectory)
+  stop = engine.start()
+  try {
+    expect(engine.getDirectory()).toEqual([viewer])
+    sockets[0]!.open()
+    service.receive('peer', { type: 'join', version: COLLAB_PROTOCOL_VERSION, profile: peer })
+    expect(onDirectory).toHaveLastReturnedWith([viewer, peer])
+    service.leave('peer')
+    expect(onDirectory).toHaveLastReturnedWith([viewer])
+  } finally {
+    unsubscribe()
+    profile.mockRestore()
+    source.mockRestore()
+  }
 })
 
 test('an explicit user enables workspace presence without an applet and clearing it disconnects', () => {

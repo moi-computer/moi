@@ -98,8 +98,11 @@ export class CollabClient implements CollabEngineApi {
   getDirectory = () => {
     const members = getWorkspaceDirectory(this.workspaceId)
     if (members !== undefined) return members
-    // Standalone Moi has one local viewer. Cloud membership never falls back.
-    const local = getCurrentProfileSource() !== 'external' ? getCurrentProfile() : undefined
+    const source = getCurrentProfileSource()
+    // Local dev learns its peers from live presence. Cloud keeps its published directory.
+    const profiles = this.getProfilesSnapshot().profiles
+    if (source === 'local' && profiles.length) return profiles
+    const local = source !== 'external' ? getCurrentProfile() : undefined
     if (!local) return undefined
     if (this.localDirectory?.[0] !== local) this.localDirectory = [local]
     return this.localDirectory
@@ -107,9 +110,11 @@ export class CollabClient implements CollabEngineApi {
   subscribeDirectory = (listener: () => void) => {
     const members = subscribeWorkspaceDirectory(listener)
     const identity = subscribeCurrentProfileStore(listener)
+    const presence = getCurrentProfileSource() === 'local' ? this.subscribe(listener) : noop
     return () => {
       members()
       identity()
+      presence()
     }
   }
   getLocation = (): ConnectionLocation | null => (this.enabled ? this.store.getLocation() : null)
