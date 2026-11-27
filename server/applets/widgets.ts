@@ -1,10 +1,13 @@
 import type { ServerEvent } from '@/lib/events'
 import { existsSync } from 'node:fs'
 
-import type { WidgetConfig, WidgetInfo } from '@/lib/types'
+import type { WidgetConfig, WidgetInfo, WorkspaceEntry } from '@/lib/types'
 
 import { syncAppletLogAfterBuild } from './log'
 import { buildApplets, getAppletPaths, getAppletRevision, listBuilt, serveApplet } from './'
+import { serializeWorkspaceBundle } from './bundle-queue'
+import { AppletMutationError, deleteAppletSourceFiles } from './applet-source'
+import { isDefaultWidget } from '@/lib/default-widgets'
 import { reloadModules } from './functions'
 
 const DEFAULT_CONFIG: WidgetConfig = { rowSpan: 1, colSpan: 2 }
@@ -168,6 +171,22 @@ export async function handleBundle(
   }
 
   return results
+}
+
+export async function deleteWidget(
+  publish: (msg: ServerEvent) => void,
+  ws: WorkspaceEntry,
+  widgetId: string
+): Promise<void> {
+  const { id: workspaceId, path: workspacePath } = ws
+  await serializeWorkspaceBundle(workspacePath, async () => {
+    if (isDefaultWidget(widgetId) || !(await listBuiltWidgets(workspacePath)).includes(widgetId)) {
+      throw new AppletMutationError('Widget not found', 404)
+    }
+    await deleteAppletSourceFiles(workspacePath, 'widget', widgetId)
+    reloadModules([`widgets/${widgetId}`], workspacePath)
+    await handleBundle(publish, workspaceId, workspacePath, false, widgetId)
+  })
 }
 
 export function serveWidget(

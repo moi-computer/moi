@@ -2,13 +2,40 @@ import type { ReactNode } from 'react'
 
 import { motion } from 'motion/react'
 
-import { IconMinus, IconPencil, IconPlus } from '@tabler/icons-react'
+import { IconMinus, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
 
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { isDefaultWidget } from '@/lib/default-widgets'
+
+import { AlertDialogTrigger } from '@/client/components/ui/alert-dialog'
+import { DeleteAppletDialog } from '@/client/features/applets/delete-applet-dialog'
+import { labelFromSlug } from '@/lib/slug'
+
+type DeleteWidgetButtonProps = { id: string }
+
+function DeleteWidgetButton({ id }: DeleteWidgetButtonProps) {
+  const label = labelFromSlug(id)
+  return (
+    <DeleteAppletDialog kind="widget" id={id} label={label}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <AlertDialogTrigger
+              render={<Button size="icon-sm" variant="outline" className="rounded-full" />}
+            />
+          }
+          aria-label={`Delete ${label}`}
+        >
+          <IconTrash stroke={1.75} />
+        </TooltipTrigger>
+        <TooltipContent>Delete</TooltipContent>
+      </Tooltip>
+    </DeleteAppletDialog>
+  )
+}
 
 type WidgetFrameProps = {
   customizing?: boolean
@@ -66,7 +93,7 @@ export function WidgetFrame({
             <Tooltip>
               <TooltipTrigger
                 render={<Button size="icon-sm" variant="outline" className="rounded-full" />}
-                aria-label={`Edit ${widgetId} in chat`}
+                aria-label={`Edit ${labelFromSlug(widgetId)} in chat`}
                 onClick={() => onEdit(widgetId)}
               >
                 <IconPencil stroke={1.75} />
@@ -84,6 +111,7 @@ export function WidgetFrame({
             </TooltipTrigger>
             <TooltipContent>{hidden ? 'Add to overview' : 'Hide'}</TooltipContent>
           </Tooltip>
+          {hidden && widgetId && !builtIn && <DeleteWidgetButton id={widgetId} />}
         </div>
       )}
     </motion.div>

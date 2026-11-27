@@ -18,7 +18,7 @@ import { completeViewBuild, listPendingViews } from '../sessions/pending-views'
 import { archiveViewSessions } from '../sessions/archive'
 import type { WorkspaceRef } from '../workspace-state'
 import { setViewSourceTitle } from './config'
-import { deleteViewSourceFiles, readViewSource, ViewSourceInUseError } from './view-source'
+import { deleteAppletSourceFiles, readViewSource, AppletMutationError } from './applet-source'
 
 // The view applet kind. Sources in `.moi/views/`, compiled output + manifest in
 // `.moi/.build/views/`; the shared mechanics live in `applets/index.ts`. Manifest
@@ -28,16 +28,6 @@ import { deleteViewSourceFiles, readViewSource, ViewSourceInUseError } from './v
 type ViewManifest = {
   config: Record<string, ViewConfig>
   order: string[]
-}
-
-export class ViewMutationError extends Error {
-  constructor(
-    message: string,
-    public status: 404 | 409 | 422
-  ) {
-    super(message)
-    this.name = 'ViewMutationError'
-  }
 }
 
 async function readManifest(workspacePath: string): Promise<ViewManifest> {
@@ -243,17 +233,17 @@ export async function updateViewTitle(
 ): Promise<CompiledView> {
   return serializeWorkspaceBundle(workspacePath, async () => {
     const current = (await listCompiledViews(workspacePath)).find(view => view.id === viewId)
-    if (!current) throw new ViewMutationError('View not found', 404)
+    if (!current) throw new AppletMutationError('View not found', 404)
     if (current.title === title) return current
 
     const source = await readViewSource(workspacePath, viewId)
-    if (!source) throw new ViewMutationError('View source not found', 409)
+    if (!source) throw new AppletMutationError('View source not found', 409)
 
     let updated: string
     try {
       updated = setViewSourceTitle(source.source, title)
     } catch (error) {
-      throw new ViewMutationError(
+      throw new AppletMutationError(
         error instanceof Error ? error.message : 'Could not update the view title',
         409
       )
@@ -266,12 +256,12 @@ export async function updateViewTitle(
       const results = await handleBundleViews(publish, workspaceId, workspacePath, true, viewId)
       const result = results.find(candidate => candidate.name === viewId)
       if (result?.status !== 'built') {
-        throw new ViewMutationError(result?.error ?? 'Could not rebuild the renamed view', 422)
+        throw new AppletMutationError(result?.error ?? 'Could not rebuild the renamed view', 422)
       }
 
       const renamed = (await listCompiledViews(workspacePath)).find(view => view.id === viewId)
       if (!renamed) {
-        throw new ViewMutationError('Renamed view was not found after rebuilding', 422)
+        throw new AppletMutationError('Renamed view was not found after rebuilding', 422)
       }
       return renamed
     } catch (error) {
@@ -296,14 +286,11 @@ export async function deleteView(
   const { id: workspaceId, path: workspacePath } = ws
   await serializeWorkspaceBundle(workspacePath, async () => {
     const current = (await listCompiledViews(workspacePath)).some(view => view.id === viewId)
-    if (!current) throw new ViewMutationError('View not found', 404)
+    if (!current) throw new AppletMutationError('View not found', 404)
 
-    try {
-      await deleteViewSourceFiles(workspacePath, viewId, () => archiveViewSessions(ws, viewId))
-    } catch (error) {
-      if (error instanceof ViewSourceInUseError) throw new ViewMutationError(error.message, 409)
-      throw error
-    }
+    await deleteAppletSourceFiles(workspacePath, 'view', viewId, () =>
+      archiveViewSessions(ws, viewId)
+    )
     reloadModules([`views/${viewId}`], workspacePath)
     await completeViewBuild(ws, viewId)
     publish({ type: 'view:deleted', workspaceId, name: viewId })

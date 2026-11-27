@@ -1,3 +1,4 @@
+import { useDeleteApplet } from '@/client/features/applets/api'
 import { useUiStore } from '@/client/store/ui'
 import { draftSessionId, composerDraftKey } from '@/lib/session-drafts'
 import { useQueryClient } from '@tanstack/react-query'
@@ -17,12 +18,7 @@ import {
 import { getCachedWorkspaceState } from '@/client/features/workspace/workspace-state'
 import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
-import {
-  useCreateView,
-  useDiscardView,
-  useSaveViewDraft,
-  useSubmitView
-} from '@/client/features/views/api'
+import { useCreateView, useSaveViewDraft, useSubmitView } from '@/client/features/views/api'
 import { recoverViewSubmission } from './view-submission'
 import type { PendingView } from '@/lib/types'
 import { viewTabId } from '@/lib/workspace-tabs'
@@ -35,7 +31,7 @@ export function useViewActions() {
   const createMutation = useCreateView(workspaceId)
   const saveMutation = useSaveViewDraft(workspaceId)
   const submitMutation = useSubmitView(workspaceId)
-  const discardMutation = useDiscardView(workspaceId)
+  const discardMutation = useDeleteApplet('view')
 
   const create = () => createMutation.mutateAsync()
 

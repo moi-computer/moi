@@ -1,3 +1,4 @@
+import { labelFromSlug } from '@/lib/slug'
 import { stageTextAttachment } from '@/client/features/chat/composer/attachments/draft-attachments'
 import { useFloatingChatOpen } from './workspace-preferences'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -336,8 +337,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   }
 
   function editWidget(id: string) {
-    const name = id.replaceAll('-', ' ')
-    const label = name.charAt(0).toUpperCase() + name.slice(1)
+    const label = labelFromSlug(id)
     stageTextAttachment(
       { workspaceId, sessionId: composerSessionId },
       { label, source: `widget:${id}`, text: `Selected Overview widget: widgets/${id}` }

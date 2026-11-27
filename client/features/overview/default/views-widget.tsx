@@ -1,25 +1,9 @@
 import { useState } from 'react'
 
-import {
-  IconDots,
-  IconEdit,
-  IconLoader2,
-  IconPlus,
-  IconTrash,
-  type TablerIcon
-} from '@tabler/icons-react'
+import { IconDots, IconEdit, IconPlus, IconTrash, type TablerIcon } from '@tabler/icons-react'
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from '@/client/components/ui/alert-dialog'
+import { AlertDialogTrigger } from '@/client/components/ui/alert-dialog'
+import { DeleteAppletDialog } from '@/client/features/applets/delete-applet-dialog'
 import { Button } from '@/client/components/ui/button'
 import {
   DropdownMenu,
@@ -29,7 +13,7 @@ import {
 } from '@/client/components/ui/dropdown-menu'
 import { InlineInput } from '@/client/components/ui/inline-input'
 import { toast } from '@/client/components/ui/toast'
-import { useDeleteView, useRenameView } from '@/client/features/views/api'
+import { useRenameView } from '@/client/features/views/api'
 import { getViewIcon, getViewLabel } from '@/client/features/views/view-presentation'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import { cn } from '@/client/lib/cn'
@@ -82,7 +66,6 @@ type ViewItemProps = {
 function ViewItem({ view, Icon, onOpen }: ViewItemProps) {
   const { workspaceId } = useWorkspaceLayoutCtx()
   const renameView = useRenameView(workspaceId)
-  const deleteView = useDeleteView(workspaceId)
   const label = getViewLabel(view)
   const [editing, setEditing] = useState(false)
 
@@ -138,7 +121,7 @@ function ViewItem({ view, Icon, onOpen }: ViewItemProps) {
         />
       )}
 
-      <AlertDialog>
+      <DeleteAppletDialog kind="view" id={view.id} label={label}>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
@@ -158,46 +141,13 @@ function ViewItem({ view, Icon, onOpen }: ViewItemProps) {
               <IconEdit stroke={1.75} />
               Rename
             </DropdownMenuItem>
-            <DropdownMenuItem
-              nativeButton
-              render={<AlertDialogTrigger />}
-              disabled={deleteView.isPending}
-              onClick={() => deleteView.reset()}
-              className="w-full"
-            >
+            <DropdownMenuItem nativeButton render={<AlertDialogTrigger />} className="w-full">
               <IconTrash stroke={1.75} />
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete “{label}”?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This deletes the view and its source code. Related data and shared files stay in the
-              workspace.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {deleteView.isError && (
-            <p className="text-xs text-destructive">{deleteView.error.message}</p>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteView.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              type="button"
-              variant="destructive"
-              disabled={deleteView.isPending}
-              onClick={() => deleteView.mutate(view.id)}
-            >
-              {deleteView.isPending && (
-                <IconLoader2 data-icon="inline-start" stroke={1.75} className="animate-spin" />
-              )}
-              Delete view
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      </DeleteAppletDialog>
     </div>
   )
 }

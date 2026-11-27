@@ -1,3 +1,5 @@
+import { workspaceApiBase } from '@/lib/workspace-config'
+import { useAppletUrl } from '@/client/features/applets/api'
 import { viewTabId } from '@/lib/workspace-tabs'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import type { SpeedMode } from '@/lib/types'
@@ -10,7 +12,7 @@ import type {
 } from '@/lib/types'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
+import { jsonRequest, requestJson } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import {
   getCachedWorkspaceState,
@@ -91,46 +93,20 @@ function useViewMutation<T, Input>(workspaceId: string, mutationFn: (input: Inpu
     onSuccess: () => queryClient.invalidateQueries({ queryKey: workspaceKeys.views(workspaceId) })
   })
 }
-// A view still being built lives in this Moi's state, next to the chat building
-// it. A compiled view lives with the workspace's owner.
-function useViewBase(workspaceId: string) {
-  const { apiBase } = useWorkspaceLayoutCtx()
-  const queryClient = useQueryClient()
-  const local = `/api/workspaces/${workspaceId}`
-  return {
-    local,
-    forView: (viewId: string) =>
-      getCachedWorkspaceState(queryClient, workspaceId)?.pendingViews[viewId] ? local : apiBase
-  }
-}
 export function useRenameView(workspaceId: string) {
-  const base = useViewBase(workspaceId)
+  const url = useAppletUrl('view')
   return useViewMutation(workspaceId, ({ viewId, title }: { viewId: string; title: string }) =>
-    requestJson<ViewInfo>(
-      `${base.forView(viewId)}/views/${encodeURIComponent(viewId)}`,
-      jsonRequest('PATCH', { title }),
-      'Couldn’t rename view'
-    )
-  )
-}
-export function useDeleteView(workspaceId: string) {
-  const base = useViewBase(workspaceId)
-  return useViewMutation(workspaceId, (viewId: string) =>
-    requestVoid(
-      `${base.forView(viewId)}/views/${encodeURIComponent(viewId)}`,
-      { method: 'DELETE' },
-      'Couldn’t delete view'
-    )
+    requestJson<ViewInfo>(url(viewId), jsonRequest('PATCH', { title }), 'Couldn’t rename view')
   )
 }
 export function useCreateView(workspaceId: string) {
-  const { local } = useViewBase(workspaceId)
+  const local = workspaceApiBase(workspaceId)
   return useViewMutation(workspaceId, () =>
     requestJson<PendingView>(`${local}/views`, jsonRequest('POST'), 'Couldn’t create view')
   )
 }
 export function useSaveViewDraft(workspaceId: string) {
-  const { local } = useViewBase(workspaceId)
+  const local = workspaceApiBase(workspaceId)
   return useViewMutation(
     workspaceId,
     ({ viewId, requirements }: { viewId: string; requirements: string }) =>
@@ -153,7 +129,7 @@ export type SubmitViewInput = {
   stream?: boolean
 }
 export function useSubmitView(workspaceId: string) {
-  const { local } = useViewBase(workspaceId)
+  const local = workspaceApiBase(workspaceId)
   return useWorkspaceStateWrite<
     SubmitViewInput,
     {
@@ -185,4 +161,3 @@ export function useSubmitView(workspaceId: string) {
     errorTitle: 'Couldn’t start view chat'
   })
 }
-export const useDiscardView = useDeleteView

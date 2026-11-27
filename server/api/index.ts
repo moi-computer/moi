@@ -89,8 +89,7 @@ import {
   getWorkspaceViews,
   listViews,
   serveView,
-  updateViewTitle,
-  ViewMutationError
+  updateViewTitle
 } from '../applets/views'
 import {
   createPendingView,
@@ -100,7 +99,8 @@ import {
   PendingViewError
 } from '../sessions/pending-views'
 import { submitView, ViewStartupError } from '../sessions/view-sessions'
-import { listWidgets, serveWidget } from '../applets/widgets'
+import { AppletMutationError } from '../applets/applet-source'
+import { deleteWidget, listWidgets, serveWidget } from '../applets/widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from '../workspaces/config'
 import { createWorkspaceDirectory, provisionWorkspace } from '../workspaces/init'
 import { validateWorkspaceName } from '@/lib/workspace-name'
@@ -214,6 +214,16 @@ one.patch('/harness', workspaceAccess('personal', { reserveOperation: false }), 
 })
 
 one.get('/widgets', ownerWorkspace, c => listWidgets(c.get('ws').path))
+one.delete('/widgets/:widgetId', ownerWorkspace, async c => {
+  const ws = c.get('ws')
+  try {
+    await deleteWidget(publishEvent, ws, c.req.param('widgetId'))
+    return c.body(null, 204)
+  } catch (error) {
+    if (error instanceof AppletMutationError) return c.text(error.message, error.status)
+    throw error
+  }
+})
 
 // Widget bundle: the compiled ESM for one widget, dynamically imported by the
 // client (useWidget). Sits beside the GET .../widgets list above — the exact
@@ -267,7 +277,7 @@ one.patch('/views/:viewId', personalWorkspace, async c => {
   try {
     return c.json(await updateViewTitle(publishEvent, ws.id, ws.path, c.req.param('viewId'), title))
   } catch (error) {
-    if (error instanceof ViewMutationError || error instanceof PendingViewError)
+    if (error instanceof AppletMutationError || error instanceof PendingViewError)
       return c.text(error.message, error.status)
     throw error
   }
@@ -289,7 +299,7 @@ one.delete('/views/:viewId', personalWorkspace, async c => {
     else await deleteView(publishEvent, ws, viewId)
     return c.body(null, 204)
   } catch (error) {
-    if (error instanceof ViewMutationError || error instanceof PendingViewError)
+    if (error instanceof AppletMutationError || error instanceof PendingViewError)
       return c.text(error.message, error.status)
     throw error
   }

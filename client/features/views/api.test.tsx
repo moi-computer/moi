@@ -1,3 +1,4 @@
+import { useDeleteApplet } from '@/client/features/applets/api'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { act, useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -7,14 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WorkspaceLayoutContext } from '@/client/features/workspace/workspace-layout-context'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import type { CompiledView, WorkspaceState } from '@/lib/types'
-import {
-  useCreateView,
-  useDeleteView,
-  useRenameView,
-  useSaveViewDraft,
-  useSubmitView,
-  useViews
-} from './api'
+import { useCreateView, useRenameView, useSaveViewDraft, useSubmitView, useViews } from './api'
 
 const LOCAL = '/api/workspaces/visitor'
 const OWNER = '/api/workspaces/alice:board'
@@ -65,7 +59,8 @@ async function mount(isRemote: boolean, pending: string[], compiled: string[]) {
       save: useSaveViewDraft('visitor').mutateAsync,
       submit: useSubmitView('visitor').mutateAsync,
       rename: useRenameView('visitor').mutateAsync,
-      remove: useDeleteView('visitor').mutateAsync
+      deleteView: useDeleteApplet('view').mutateAsync,
+      deleteWidget: useDeleteApplet('widget').mutateAsync
     }
   }
   function Probe() {
@@ -129,9 +124,10 @@ test('a remote view under construction is written to the visitor and a compiled 
     actions.submit({ viewId: 'draft', requirements: 'Cards', sessionId: 's', optimisticId: 'o' })
   )
   await run(actions => actions.rename({ viewId: 'draft', title: 'Cards' }))
-  await run(actions => actions.remove('draft'))
+  await run(actions => actions.deleteView('draft'))
   await run(actions => actions.rename({ viewId: 'built', title: 'Plan' }))
-  await run(actions => actions.remove('built'))
+  await run(actions => actions.deleteView('built'))
+  await run(actions => actions.deleteWidget('draft'))
   expect(writes).toEqual([
     `POST ${LOCAL}/views`,
     `PATCH ${LOCAL}/views/draft`,
@@ -139,6 +135,7 @@ test('a remote view under construction is written to the visitor and a compiled 
     `PATCH ${LOCAL}/views/draft`,
     `DELETE ${LOCAL}/views/draft`,
     `PATCH ${OWNER}/views/built`,
-    `DELETE ${OWNER}/views/built`
+    `DELETE ${OWNER}/views/built`,
+    `DELETE ${OWNER}/widgets/draft`
   ])
 })

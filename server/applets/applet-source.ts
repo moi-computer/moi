@@ -1,3 +1,4 @@
+import type { AppletKind } from '@/lib/types'
 import { realpath, rm } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 
@@ -21,7 +22,15 @@ export async function readViewSource(
   return null
 }
 
-export class ViewSourceInUseError extends Error {}
+export class AppletMutationError extends Error {
+  constructor(
+    message: string,
+    public status: 404 | 409 | 422
+  ) {
+    super(message)
+    this.name = 'AppletMutationError'
+  }
+}
 
 function isCleanupSource(moiRoot: string, path: string): boolean {
   if (!path.startsWith(moiRoot + sep) || !MODULE_FILE_RE.test(path)) return false
@@ -31,16 +40,23 @@ function isCleanupSource(moiRoot: string, path: string): boolean {
     .some(part => part.startsWith('.') || ['data', 'ui', 'node_modules'].includes(part))
 }
 
-export async function deleteViewSourceFiles(
+export async function deleteAppletSourceFiles(
   workspacePath: string,
-  viewId: string,
+  kind: AppletKind,
+  id: string,
   beforeDelete?: () => Promise<void>
 ): Promise<void> {
   const workspaceRoot = await realpath(workspacePath)
   const moiRoot = join(workspaceRoot, '.moi')
-  const directory = join(moiRoot, 'views')
-  const sources = ['tsx', 'ts'].map(extension => join(directory, `${viewId}.${extension}`))
-  const roots = new Set([...sources, join(directory, `${viewId}.server.ts`)])
+  const directory = join(moiRoot, `${kind}s`)
+  if ((await realpath(directory).catch(() => directory)) !== directory) {
+    throw new AppletMutationError(
+      'Cannot delete source files through a linked applet directory',
+      409
+    )
+  }
+  const sources = ['tsx', 'ts'].map(extension => join(directory, `${id}.${extension}`))
+  const roots = new Set([...sources, join(directory, `${id}.server.ts`)])
   const remove = new Set(sources)
   const graph = await analyzeAppletDependencies(workspaceRoot).catch(() => null)
 
@@ -57,8 +73,9 @@ export async function deleteViewSourceFiles(
         ...[...candidates].filter(path => !isCleanupSource(moiRoot, path))
       ])
       if (sources.some(path => retained.has(path))) {
-        throw new ViewSourceInUseError(
-          'Another applet imports this view. Remove that import before deleting it.'
+        throw new AppletMutationError(
+          `Another applet imports this ${kind}. Remove that import before deleting it.`,
+          409
         )
       }
       for (const path of candidates) {

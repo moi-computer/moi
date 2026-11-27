@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { analyzeAppletDependencies, analyzeDependencies } from '../applets/dependencies'
-import { deleteViewSourceFiles } from '../applets/view-source'
+import { deleteAppletSourceFiles } from '../applets/applet-source'
 
 let workspace: string
 
@@ -64,7 +64,7 @@ test('deletes only the view and its unused transitive code dependencies', async 
   await seed('views/_unrelated.ts')
   await seed('data/rows.json', '[]')
 
-  await deleteViewSourceFiles(workspace, 'cards')
+  await deleteAppletSourceFiles(workspace, 'view', 'cards')
 
   for (const path of [
     'views/cards.tsx',
@@ -89,7 +89,7 @@ for (const kind of ['views', 'widgets']) {
     await seed(`${kind}/other.tsx`, "export * from '../lib/bridge'")
     await seed('lib/bridge.ts', "export * from '../views/cards.server'")
 
-    await deleteViewSourceFiles(workspace, 'cards')
+    await deleteAppletSourceFiles(workspace, 'view', 'cards')
 
     expect(await exists('views/cards.tsx')).toBe(false)
     expect(await exists('views/_private.ts')).toBe(false)
@@ -104,7 +104,7 @@ test('preserves helpers used only by a remaining applet’s companion server mod
   await seed('views/other.tsx')
   await seed('views/other.server.ts', "export * from './_utils'")
 
-  await deleteViewSourceFiles(workspace, 'cards')
+  await deleteAppletSourceFiles(workspace, 'view', 'cards')
 
   expect(await exists('views/_utils.ts')).toBe(true)
 })
@@ -117,7 +117,7 @@ for (const source of ["export * from './missing'", 'import { from']) {
     await seed('widgets/unfinished.tsx', source)
 
     expect((await analyzeAppletDependencies(workspace)).complete).toBe(false)
-    await deleteViewSourceFiles(workspace, 'cards')
+    await deleteAppletSourceFiles(workspace, 'view', 'cards')
 
     expect(await exists('views/cards.tsx')).toBe(false)
     expect(await exists('views/cards.server.ts')).toBe(true)
@@ -139,7 +139,7 @@ test('caps the scan and leaves helpers behind for oversized graphs', async () =>
   const graph = await analyzeAppletDependencies(workspace)
   expect(graph.complete).toBe(false)
   expect(graph.modules.size).toBe(256)
-  await deleteViewSourceFiles(workspace, 'cards')
+  await deleteAppletSourceFiles(workspace, 'view', 'cards')
 
   expect(await exists('views/cards.tsx')).toBe(false)
   expect(await exists('lib/helper0.ts')).toBe(true)
@@ -151,7 +151,7 @@ test('keeps installed UI components and code they import', async () => {
   await seed('ui/card.tsx', "export * from '../lib/style'")
   await seed('lib/style.ts')
 
-  await deleteViewSourceFiles(workspace, 'cards')
+  await deleteAppletSourceFiles(workspace, 'view', 'cards')
 
   expect(await exists('ui/card.tsx')).toBe(true)
   expect(await exists('lib/style.ts')).toBe(true)
@@ -163,7 +163,7 @@ test('leaves helpers alone when a symlink obscures their ownership', async () =>
   await symlink(helper, join(workspace, '.moi', 'views', '_alias.ts'))
   await seed('views/other.tsx', "export * from './_alias'")
 
-  await deleteViewSourceFiles(workspace, 'cards')
+  await deleteAppletSourceFiles(workspace, 'view', 'cards')
 
   expect(await exists('views/cards.tsx')).toBe(false)
   expect(await exists('views/_utils.ts')).toBe(true)

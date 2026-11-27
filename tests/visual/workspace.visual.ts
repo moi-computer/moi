@@ -57,7 +57,7 @@ test(
     await page.getByRole('button', { name: 'Customize', exact: true }).click()
     // Freeze the continuous Customize wiggle for the snapshot.
     await page.addStyleTag({ content: '[class~="group/widget"] { transform: none !important }' })
-    const edit = page.getByRole('button', { name: 'Edit launch-brief in chat' })
+    const edit = page.getByRole('button', { name: 'Edit Launch brief in chat' })
     await page.locator('[data-applet-thumbnail="widgets/launch-brief"]').hover()
     await expect(edit).toBeVisible()
     await takeSnapshot('widget edit controls')
@@ -81,6 +81,56 @@ test(
     }
   }
 )
+
+for (const kind of ['widget', 'view'] as const) {
+  test(`confirm deleting a ${kind} from overview`, async page => {
+    const list = `**/api/workspaces/${WORKSPACE}/${kind}s`
+    const item =
+      kind === 'widget'
+        ? { id: 'launch-brief', config: { colSpan: 2, rowSpan: 1 } }
+        : { id: 'launch-brief', status: 'compiled', title: 'Launch brief' }
+    let deletes = 0
+    await page.route(list, route =>
+      route.fulfill({ json: { [`${kind}s`]: deletes ? [] : [item] } })
+    )
+    await page.route(list + '/launch-brief', route => {
+      expect(route.request().method()).toBe('DELETE')
+      deletes++
+      return route.fulfill({ status: 204 })
+    })
+    await page.route('**/widgets/launch-brief/module?*', route =>
+      route.fulfill({ contentType: 'text/javascript', body: 'export default () => "Launch brief"' })
+    )
+    await page.goto(WORKSPACE_PAGE)
+    if (kind === 'widget') {
+      await page.getByRole('button', { name: 'Customize', exact: true }).click()
+      await page.addStyleTag({ content: '[class~="group/widget"] { transform: none !important }' })
+    }
+    const openConfirmation = async () => {
+      if (kind === 'view') {
+        await page.getByRole('button', { name: 'View actions for Launch brief' }).click()
+        await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+      } else {
+        await page.getByRole('button', { name: 'Delete Launch brief' }).click()
+      }
+    }
+    await openConfirmation()
+    const dialog = page.getByRole('alertdialog', { name: 'Delete “Launch brief”?' })
+    await expect(dialog).toBeVisible()
+    await takeSnapshot('confirm deletion')
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    expect(deletes).toBe(0)
+    await openConfirmation()
+    await dialog.getByRole('button', { name: `Delete ${kind}` }).click()
+    await expect(dialog).toHaveCount(0)
+    expect(deletes).toBe(1)
+    await expect(
+      page.getByRole('button', {
+        name: kind === 'widget' ? 'Delete Launch brief' : 'Open Launch brief'
+      })
+    ).toHaveCount(0)
+  })
+}
 
 describe('Workspace', () => {
   test('home', async page => {
