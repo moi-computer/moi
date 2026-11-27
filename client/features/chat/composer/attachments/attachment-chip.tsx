@@ -1,7 +1,7 @@
 import type { ComponentPropsWithRef } from 'react'
 import {
+  IconLayoutGridAdd,
   IconLoader2,
-  IconPlus,
   IconScribble,
   IconTextScan2,
   IconX,
@@ -12,7 +12,7 @@ import { cn } from '@/client/lib/cn'
 import type { AttachmentIconId } from '@/lib/types'
 
 const attachmentIcons = {
-  plus: IconPlus,
+  'layout-grid-add': IconLayoutGridAdd,
   scribble: IconScribble,
   default: IconTextScan2
 } satisfies Record<AttachmentIconId, TablerIcon>

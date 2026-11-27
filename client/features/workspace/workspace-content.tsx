@@ -64,7 +64,7 @@ import { UnavailablePage } from './unavailable-page'
 const newWidgetAttachment = {
   source: 'overview:new-widget',
   label: 'New widget',
-  icon: 'plus',
+  icon: 'layout-grid-add',
   text: 'Create a new widget for this workspace’s overview.'
 } as const
 

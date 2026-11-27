@@ -15,7 +15,7 @@ import { formatChatTitle } from './chat-title'
 
 const attachment = {
   type: 'text' as const,
-  icon: 'plus' as const,
+  icon: 'layout-grid-add' as const,
   source: 'view:orders',
   label: 'Order #1042',
   text: 'Order ID: 1042'

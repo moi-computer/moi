@@ -28,7 +28,7 @@ describe('text staging and sends', () => {
       label: 'Order',
       text: 'Status: pending',
       source: 'widget:forged',
-      icon: 'plus'
+      icon: 'layout-grid-add'
     }
     bridge.addChatAttachment(input)
     input.text = 'Status: done'
