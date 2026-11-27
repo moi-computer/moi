@@ -43,12 +43,25 @@ test('local account menu retains inherited identity and no signout', async () =>
   const feedback = ui.document.querySelector<HTMLAnchorElement>(
     'a[href="https://moi.notion.site/d59bcba2169883f1bf670177b3f54638?pvs=105"]'
   )
-  expect(discord?.textContent).toContain('Discord')
+  expect(discord?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Join Discord')
   expect(discord?.target).toBe('_blank')
   expect(discord?.rel).toBe('noreferrer')
   expect(feedback?.textContent).toContain('Leave feedback')
   expect(feedback?.target).toBe('_blank')
   expect(feedback?.rel).toBe('noreferrer')
+  const menuOrder = [...ui.document.querySelectorAll('[role="menuitem"], [role="separator"]')].map(
+    node =>
+      node.getAttribute('role') === 'separator'
+        ? 'separator'
+        : node.textContent?.replace(/\s+/g, ' ').trim()
+  )
+  expect(menuOrder).toEqual([
+    'separator',
+    'Leave feedback',
+    'Join Discord',
+    'separator',
+    'Settings'
+  ])
   expect(ui.document.body.innerHTML).not.toContain('mlfrg.notion.site')
   expect(ui.calls).toEqual([])
 })

@@ -64,8 +64,13 @@ export function AccountMenu() {
           </DropdownMenuItem>
           <DropdownMenuItem render={<a href={DISCORD_URL} target="_blank" rel="noreferrer" />}>
             <IconBrandDiscord stroke={1.75} />
-            Discord
+            Join Discord
           </DropdownMenuItem>
+        </DropdownMenuGroup>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuGroup>
           <DropdownMenuItem render={<Link href="/settings" />}>
             <IconSettings stroke={1.75} />
             Settings
