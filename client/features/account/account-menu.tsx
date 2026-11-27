@@ -60,7 +60,7 @@ export function AccountMenu() {
         <DropdownMenuGroup>
           <DropdownMenuItem render={<a href={FEEDBACK_URL} target="_blank" rel="noreferrer" />}>
             <IconMessage2Share stroke={1.75} />
-            Leave feedback
+            Send feedback
           </DropdownMenuItem>
           <DropdownMenuItem render={<a href={DISCORD_URL} target="_blank" rel="noreferrer" />}>
             <IconBrandDiscord stroke={1.75} />

@@ -46,7 +46,7 @@ test('local account menu retains inherited identity and no signout', async () =>
   expect(discord?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Join Discord')
   expect(discord?.target).toBe('_blank')
   expect(discord?.rel).toBe('noreferrer')
-  expect(feedback?.textContent).toContain('Leave feedback')
+  expect(feedback?.textContent).toContain('Send feedback')
   expect(feedback?.target).toBe('_blank')
   expect(feedback?.rel).toBe('noreferrer')
   const menuOrder = [...ui.document.querySelectorAll('[role="menuitem"], [role="separator"]')].map(
@@ -55,13 +55,7 @@ test('local account menu retains inherited identity and no signout', async () =>
         ? 'separator'
         : node.textContent?.replace(/\s+/g, ' ').trim()
   )
-  expect(menuOrder).toEqual([
-    'separator',
-    'Leave feedback',
-    'Join Discord',
-    'separator',
-    'Settings'
-  ])
+  expect(menuOrder).toEqual(['separator', 'Send feedback', 'Join Discord', 'separator', 'Settings'])
   expect(ui.document.body.innerHTML).not.toContain('mlfrg.notion.site')
   expect(ui.calls).toEqual([])
 })

@@ -60,7 +60,7 @@ describe('Workspace', () => {
     await page.goto('/#/')
     await page.getByRole('button', { name: 'User menu' }).click()
     const discord = page.getByRole('menuitem', { name: 'Join Discord' })
-    const feedback = page.getByRole('menuitem', { name: 'Leave feedback' })
+    const feedback = page.getByRole('menuitem', { name: 'Send feedback' })
     await expect(discord).toBeVisible()
     await expect(discord).toHaveAttribute('href', 'https://discord.gg/4BgC4kE3gu')
     await expect(discord).toHaveAttribute('target', '_blank')
