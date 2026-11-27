@@ -3,6 +3,7 @@ import { useCallback, useMemo } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
+import { HttpError } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useSessionState, useSessionView } from '@/client/features/chat/sessions/api'
 import { useWorkspaceHarness } from '@/client/features/workspace/api'
@@ -219,7 +220,11 @@ export function useChat(address: WorkspaceTabAddress) {
     composerSessionId,
     processing,
     error,
-    loadError: session.error?.message ?? viewQuery.error?.message ?? null,
+    // The resume overlay handles machine-marked 503s.
+    loadError:
+      [session.error, viewQuery.error].find(
+        err => err && !(err instanceof HttpError && err.machineState)
+      )?.message ?? null,
     retryLoad,
     send,
     stop,
