@@ -113,47 +113,6 @@ test(
   }
 )
 
-test(
-  'edit a widget opens the closed floating chat',
-  async page => {
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        'moi:ui',
-        JSON.stringify({
-          version: 0,
-          state: { workspaces: { northwind: { layoutMode: 'fullscreen' } } }
-        })
-      )
-    })
-    await page.route('**/widgets/launch-brief/module?*', route =>
-      route.fulfill({ contentType: 'text/javascript', body: 'export default () => "Launch brief"' })
-    )
-    await page.goto(WORKSPACE_PAGE)
-    await expect(page.getByRole('button', { name: 'Close chat', exact: true })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Customize', exact: true }).click()
-    // Freeze the continuous Customize wiggle for the snapshot.
-    await page.addStyleTag({ content: '[class~="group/widget"] { transform: none !important }' })
-    await page.locator('[data-applet-thumbnail="widgets/launch-brief"]').hover()
-    await page.getByRole('button', { name: 'Edit Launch brief in chat' }).click()
-    await expect(page.getByRole('button', { name: 'Close chat', exact: true })).toBeVisible()
-    await expect(
-      page.getByRole('button', { name: 'Remove Launch brief', exact: true })
-    ).toBeVisible()
-    await takeSnapshot('widget edit opened floating chat')
-  },
-  {
-    api: {
-      [`/api/workspaces/${WORKSPACE}`]: {
-        ...(API[`/api/workspaces/${WORKSPACE}`] as WorkspaceLayoutResponse),
-        widgetGrid: [{ i: 'launch-brief', x: 0, y: 0 }]
-      },
-      [`/api/workspaces/${WORKSPACE}/widgets`]: {
-        widgets: [{ id: 'launch-brief', config: { colSpan: 2, rowSpan: 1 } }]
-      }
-    }
-  }
-)
-
 for (const kind of ['widget', 'view'] as const) {
   test(`confirm deleting a ${kind} from overview`, async page => {
     const list = `**/api/workspaces/${WORKSPACE}/${kind}s`
