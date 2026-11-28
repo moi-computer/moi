@@ -350,6 +350,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
       { workspaceId, sessionId: composerSessionId },
       { label, source: `widget:${id}`, text: `Selected Overview widget: widgets/${id}` }
     )
+    openChat()
   }
 
   const createItems: CreateWorkspaceTabItem[] = [
@@ -366,14 +367,12 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     ...allViews
       .map(view => ({ view, tab: viewTabId(view.id) }))
       .filter(({ tab }) => !openSet.has(tab))
-      .map(
-        ({ view, tab }): CreateWorkspaceTabItem => ({
-          key: tab,
-          Icon: getViewIcon(view),
-          label: getViewLabel(view),
-          onClick: () => openTab(tab)
-        })
-      ),
+      .map(({ view, tab }): CreateWorkspaceTabItem => ({
+        key: tab,
+        Icon: getViewIcon(view),
+        label: getViewLabel(view),
+        onClick: () => openTab(tab)
+      })),
     ...(onCreateView
       ? [
           {
