@@ -350,6 +350,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
       { workspaceId, sessionId: composerSessionId },
       { label, source: `widget:${id}`, text: `Selected Overview widget: widgets/${id}` }
     )
+    openChat()
   }
 
   const createItems: CreateWorkspaceTabItem[] = [

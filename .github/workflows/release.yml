@@ -69,7 +69,14 @@ jobs:
         run: bun run lint
 
       - name: Format check
-        run: bun run format:check
+        # oxfmt only names the files; on failure, format them and print the diff to apply
+        run: |
+          if ! bun run format:check; then
+            bun run format
+            echo "::error::Formatting differs. Run 'bun run format' locally, or apply the diff below"
+            git --no-pager diff --color=always
+            exit 1
+          fi
 
       - name: Validate registry
         run: bun run registry:validate
